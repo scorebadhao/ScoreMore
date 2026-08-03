@@ -1,0 +1,63 @@
+name: Deploy ScoreMore Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY_SCOREMORE to apply migrations and seed data
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scoremore-database-deploy
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+    steps:
+      - name: Confirm ScoreMore deployment
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != "DEPLOY_SCOREMORE" ]; then
+            echo "Confirmation text is incorrect."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+          github-token: ${{ github.token }}
+
+      - name: Verify ScoreMore project target
+        run: |
+          if [ "$SUPABASE_PROJECT_ID" != "stejewkuikvqpqotjnnt" ]; then
+            echo "Refusing to deploy: project reference does not match ScoreMore."
+            exit 1
+          fi
+
+      - name: Link ScoreMore Supabase project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Preview pending database changes
+        run: supabase db push --dry-run --include-seed
+
+      - name: Apply migrations and seed data
+        run: supabase db push --include-seed --yes
+
+      - name: Show migration status
+        run: supabase migration list
