@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="ScoreMore administration and draft question review." />
+  <title>ScoreMore Admin</title>
+  <link rel="stylesheet" href="./assets/css/main.css" />
+</head>
+<body class="admin-body">
+  <div class="app-shell">
+    <header class="topbar topbar-dark">
+      <a class="brand" href="./index.html">
+        <span class="brand-mark">S+</span>
+        <span><strong>ScoreMore Admin</strong><small>Draft → review → publish</small></span>
+      </a>
+      <div class="topbar-actions">
+        <a class="button button-ghost-light" href="./index.html">Student site</a>
+        <button id="adminSignOut" class="button button-ghost-light hidden" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <section id="adminSetupNotice" class="notice notice-warning hidden">
+        Add the Supabase URL and publishable key to your environment before running ScoreMore.
+      </section>
+
+      <section id="adminLoginPanel" class="auth-card section narrow-card">
+        <span class="eyebrow">Protected administration</span>
+        <h1>Admin sign in</h1>
+        <p>Only profiles with the database role <strong>ADMIN</strong> may access question drafts.</p>
+        <form id="adminLoginForm" class="auth-form" novalidate>
+          <label>Email<input name="email" type="email" autocomplete="email" required /></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+          <button class="button button-primary button-block" type="submit">Sign in</button>
+        </form>
+      </section>
+
+      <section id="adminPanel" class="hidden">
+        <div class="dashboard-header">
+          <div>
+            <span class="eyebrow">Question operations</span>
+            <h1>Draft Review Centre</h1>
+            <p>Every imported, PDF, OCR and AI question must remain here until human publication.</p>
+          </div>
+          <button id="refreshDrafts" class="button button-secondary" type="button">Refresh drafts</button>
+        </div>
+
+        <div class="admin-grid">
+          <section class="panel-card">
+            <div class="section-heading compact">
+              <div><span class="eyebrow">Source file</span><h2>Upload PDF/image</h2></div>
+            </div>
+            <form id="sourceUploadForm" class="stack-form">
+              <label>Source file<input name="sourceFile" type="file" accept="application/pdf,image/*" required /></label>
+              <button class="button button-secondary" type="submit">Upload privately</button>
+            </form>
+            <p id="uploadedSourcePath" class="muted"></p>
+          </section>
+
+          <section class="panel-card">
+            <div class="section-heading compact">
+              <div><span class="eyebrow">Manual entry</span><h2>Create draft</h2></div>
+            </div>
+            <form id="draftForm" class="stack-form">
+              <div class="form-row">
+                <label>Question type
+                  <select name="questionType" required>
+                    <option value="PYQ">PYQ</option>
+                    <option value="NORMAL">Normal</option>
+                  </select>
+                </label>
+                <label>Proposed Question ID<input name="proposedQuestionId" placeholder="GSSSB-CCE-2024-REASONING-0401S1-0001" required /></label>
+              </div>
+              <div class="form-row">
+                <label>Board
+                  <select id="draftBoardId" name="boardId" required><option value="">Loading boards…</option></select>
+                </label>
+                <label>Exam
+                  <select id="draftExamId" name="examId"><option value="">Select exam</option></select>
+                </label>
+                <label>Subject
+                  <select id="draftSubjectId" name="subjectId" required><option value="">Select subject</option></select>
+                </label>
+                <label>Topic
+                  <select id="draftTopicId" name="topicId"><option value="">Optional topic</option></select>
+                </label>
+              </div>
+              <label>Question text<textarea name="questionText" rows="4" required></textarea></label>
+              <div class="form-row option-row">
+                <label>Option A<input name="optionA" required /></label>
+                <label>Option B<input name="optionB" required /></label>
+                <label>Option C<input name="optionC" required /></label>
+                <label>Option D<input name="optionD" required /></label>
+              </div>
+              <div class="form-row">
+                <label>Correct answer
+                  <select name="correctAnswer" required>
+                    <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                  </select>
+                </label>
+                <label>Language<input name="language" value="GUJARATI" required /></label>
+                <label>Difficulty
+                  <select name="difficulty"><option>EASY</option><option selected>MEDIUM</option><option>HARD</option></select>
+                </label>
+              </div>
+              <label>Explanation<textarea name="explanation" rows="3"></textarea></label>
+              <input name="sourceFileId" type="hidden" />
+              <button class="button button-primary" type="submit">Save to draft</button>
+            </form>
+          </section>
+        </div>
+
+        <section class="section panel-card">
+          <div class="section-heading">
+            <div><span class="eyebrow">Human review required</span><h2>Pending drafts</h2></div>
+            <select id="draftStatusFilter" aria-label="Draft status filter">
+              <option value="PENDING">Pending</option>
+              <option value="IN_REVIEW">In review</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="PUBLISHED">Published</option>
+              <option value="">All</option>
+            </select>
+          </div>
+          <div id="draftList" class="draft-list" aria-live="polite"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="draftDialog" class="review-dialog">
+    <form method="dialog" class="dialog-close-row"><button class="icon-button" value="cancel" aria-label="Close">×</button></form>
+    <div id="draftDialogContent"></div>
+  </dialog>
+
+  <div id="toastRoot" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+  <script type="module" src="./assets/js/admin.js"></script>
+</body>
+</html>
