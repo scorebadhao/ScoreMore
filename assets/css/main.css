@@ -924,3 +924,74 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
   .import-report-toolbar > label { min-width: 0; width: 100%; }
   .import-history-item .button { width: 100%; }
 }
+
+/* Phase 3C: controlled draft creation and duplicate occurrence decisions */
+.import-selection-summary {
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.import-action-choice {
+  margin: 12px 0 2px;
+  padding: 11px 12px;
+  border: 1px solid #a9ddc0;
+  border-radius: 13px;
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr);
+  align-items: start;
+  gap: 10px;
+  color: #214f3b;
+  background: #edf9f2;
+  cursor: pointer;
+}
+.import-action-choice.occurrence-choice {
+  border-color: #b9d6eb;
+  color: #245d87;
+  background: #eef7ff;
+}
+.import-action-choice input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: var(--primary);
+}
+.import-action-choice span { display: grid; gap: 3px; }
+.import-action-choice small { color: var(--muted); line-height: 1.4; }
+.import-resolution {
+  margin: 12px 0 2px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  background: var(--surface-2);
+}
+.import-resolution strong { color: var(--text-strong); }
+.import-resolution span { overflow-wrap: anywhere; }
+.import-resolution.resolution-success {
+  border-color: #a9ddc0;
+  color: #315b58;
+  background: #edf9f2;
+}
+.import-resolution.resolution-warning {
+  border-color: #e5cb8a;
+  color: #80520b;
+  background: #fff8e8;
+}
+.import-status-pill.status-imported-to-draft,
+.import-status-pill.status-linked-to-existing {
+  color: #176542;
+  border-color: #a9ddc0;
+  background: #edf9f2;
+}
+.import-status-pill.status-skipped {
+  color: #5f6d72;
+  border-color: #d7dfe2;
+  background: #f5f7f8;
+}
+
+@media (min-width: 920px) {
+  .import-summary-grid { grid-template-columns: repeat(5, minmax(0,1fr)); }
+}
