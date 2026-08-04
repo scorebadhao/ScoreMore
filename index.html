@@ -20,7 +20,6 @@
       </a>
       <div class="topbar-actions">
         <span id="syncState" class="sync-state" aria-live="polite">Online</span>
-        <button id="signOutButton" class="button button-ghost hidden" type="button">Sign out</button>
       </div>
     </header>
 
@@ -29,7 +28,9 @@
         Add the Supabase URL and publishable key to your environment before running ScoreMore.
       </section>
 
-      <section id="publicView">
+      <section id="publicLoading" class="section loading-state">Opening ScoreMore…</section>
+
+      <section id="publicView" class="hidden">
         <div class="hero">
           <div class="hero-copy">
             <span id="scopeBadge" class="eyebrow">Dynamic exam platform</span>
@@ -81,60 +82,10 @@
           </form>
         </section>
       </section>
-
-      <section id="studentView" class="hidden">
-        <div class="dashboard-header">
-          <div>
-            <span class="eyebrow">Student dashboard</span>
-            <h1 id="welcomeTitle">Welcome</h1>
-            <p id="targetExamLabel">Your dynamic test catalogue is ready.</p>
-          </div>
-          <button id="continueAttemptButton" class="button button-primary hidden" type="button">Continue Test</button>
-        </div>
-
-        <div class="dashboard-grid">
-          <button class="dashboard-card" data-test-filter="PYQ_FULL" type="button"><strong>Previous Papers</strong><span>Original date and shift papers</span></button>
-          <button class="dashboard-card" data-test-filter="PYQ_SECTIONAL" type="button"><strong>Sectional Tests</strong><span>Subject-wise PYQ practice</span></button>
-          <button class="dashboard-card" data-test-filter="FULL_MOCK" type="button"><strong>Full Mock Tests</strong><span>Complete exam simulations</span></button>
-          <button class="dashboard-card" data-route="#bookmarks" type="button"><strong>Bookmarks</strong><span>Revise saved questions</span></button>
-          <button class="dashboard-card" data-route="#mistakes" type="button"><strong>Mistake Revision</strong><span>Practice weak areas</span></button>
-          <button class="dashboard-card" data-route="#results" type="button"><strong>My Performance</strong><span>Results and analytics</span></button>
-        </div>
-
-        <section id="catalogueSection" class="section">
-          <div class="section-heading">
-            <div>
-              <span class="eyebrow">Dynamic catalogue</span>
-              <h2 id="catalogueTitle">All Tests</h2>
-            </div>
-            <select id="testTypeFilter" aria-label="Filter tests by type">
-              <option value="">All test types</option>
-              <option value="PYQ_FULL">Previous papers</option>
-              <option value="PYQ_SECTIONAL">Sectional</option>
-              <option value="FULL_MOCK">Full mock</option>
-              <option value="TOPIC_PRACTICE">Topic practice</option>
-              <option value="DAILY_QUIZ">Daily quiz</option>
-            </select>
-          </div>
-          <div id="studentTestList" class="card-grid" aria-live="polite"></div>
-        </section>
-
-        <section id="attemptSection" class="section hidden" aria-live="polite">
-          <div id="testEngineRoot"></div>
-        </section>
-      </section>
     </main>
-
-    <nav id="mobileNav" class="mobile-nav hidden" aria-label="Student navigation">
-      <button data-route="#home" class="active" type="button">Home</button>
-      <button data-route="#tests" type="button">Tests</button>
-      <button data-route="#practice" type="button">Practice</button>
-      <button data-route="#results" type="button">Results</button>
-      <button data-route="#profile" type="button">Profile</button>
-    </nav>
   </div>
 
   <div id="toastRoot" class="toast-root" aria-live="polite" aria-atomic="true"></div>
-  <script type="module" src="./assets/js/student.js"></script>
+  <script type="module" src="./assets/js/public.js"></script>
 </body>
 </html>
