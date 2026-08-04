@@ -57,10 +57,16 @@ Never add the service-role key.
 npm run dev
 ```
 
-Student page:
+Public page:
 
 ```text
 http://localhost:5173/
+```
+
+Student page:
+
+```text
+http://localhost:5173/student.html
 ```
 
 Admin page:
@@ -81,6 +87,8 @@ where email = 'OWNER_EMAIL@example.com';
 ```
 
 3. Sign out and sign in through `admin.html`.
+
+Authenticated students use `student.html`; signed-out access to that page redirects to `index.html`.
 
 The browser cannot promote users to admin. This is intentional.
 

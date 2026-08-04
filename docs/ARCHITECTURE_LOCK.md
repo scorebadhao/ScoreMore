@@ -1,4 +1,7 @@
-# ScoreMore Architecture Lock v1.0
+# ScoreMore Architecture Lock v1.1
+
+**Status:** APPROVED AND LOCKED  
+**Approved:** 4 August 2026
 
 ## Identity
 
@@ -6,8 +9,9 @@ ScoreMore is a separate Supabase project and repository. It must not share a liv
 
 ## Locked platform shape
 
-- One student website
-- One admin page
+- One public website entry page: `index.html`
+- One authenticated student application: `student.html`
+- One protected admin page: `admin.html`
 - One Supabase project
 - One PostgreSQL database
 - One repository
@@ -15,6 +19,41 @@ ScoreMore is a separate Supabase project and repository. It must not share a liv
 - PostgreSQL RPC for trusted multi-step workflows
 - Supabase CLI migrations for schema history
 - GitHub Pages deployment from GitHub Actions
+
+## Locked page boundaries
+
+### `index.html` — public application
+
+- Public landing page
+- Dynamic public statistics
+- Public published-test catalogue
+- Student sign-in and registration
+- Authenticated-session redirect to `student.html`
+
+### `student.html` — authenticated student application
+
+- Student dashboard
+- Dynamic test catalogue
+- Active attempt and resume flow
+- Test engine
+- Future Results, Mistake Revision, Bookmarks, Practice and Profile modules
+- Unauthenticated users are redirected to `index.html`
+
+### `admin.html` — protected administration
+
+- Admin role verification
+- Draft-review-publish workflow
+- Source upload
+- Test configuration
+- Future import and catalogue administration
+
+Public, student and admin pages may share CSS, authentication helpers, the Supabase client and `assets/js/api.js`, but each page keeps a separate entry module.
+
+## Approved frontend entry modules
+
+- `assets/js/public.js` → `index.html`
+- `assets/js/student.js` → `student.html`
+- `assets/js/admin.js` → `admin.html`
 
 ## Initial public scope
 
@@ -40,6 +79,7 @@ The UI may emphasize GSSSB CCE, but IDs and catalogue records come from PostgreS
 - The service-role key never enters frontend code or GitHub.
 - Admin status is checked from database-owned `profiles.role`.
 - The private `source-documents` bucket is admin-only.
+- `student.html` must enforce authentication before showing student content.
 
 ## UI lock
 
@@ -50,6 +90,17 @@ The UI may emphasize GSSSB CCE, but IDs and catalogue records come from PostgreS
 - No `alert()`
 - No overlapping mobile controls
 - Refresh-safe auth and attempt state
+- Browser-back navigation must not sign the student out
+
+## Locked near-term phase sequence
+
+1. Separate the public and authenticated student applications.
+2. Review ScoreBadhao UI from a user-supplied ZIP and redesign ScoreMore using only approved UX inspiration and improvements.
+3. Build the validated HTML import package and dry-run import engine.
+4. Reuse imported master questions across original papers, sectional tests and topic practice without duplication.
+5. Build Results history, detailed review and Mistake Revision.
+
+This sequence may change only with explicit user approval.
 
 ## Architecture changes
 

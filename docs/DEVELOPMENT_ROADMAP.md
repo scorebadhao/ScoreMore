@@ -1,106 +1,100 @@
 # ScoreMore Development Roadmap
 
-## Phase SM-0 — Repository and Supabase foundation
+## Locked near-term sequence — approved 4 August 2026
 
-- Create repository and Supabase project
-- Apply migrations and seed
-- Configure local environment
-- Bootstrap owner admin
-- Verify GitHub Pages deployment
-- Test all RLS policies
+### Phase 1 — Public/student application separation
 
-Acceptance: no secret in GitHub; public catalogue loads; non-admin cannot open admin data.
+- Keep `index.html` public-only.
+- Add authenticated `student.html`.
+- Use `assets/js/public.js` for the public entry point.
+- Keep `assets/js/student.js` for the authenticated application.
+- Preserve authentication, catalogue, attempt, refresh and mobile-back behaviour.
 
-## Phase SM-1 — Draft-review-publish vertical slice
+Acceptance:
 
-- Dynamic board/exam/subject/topic selectors
-- Private source upload
-- CSV/static-page import adapter
-- PDF/OCR import records
+- Logged-out visitors can use the public landing, catalogue and authentication forms.
+- Logged-in users are redirected from `index.html` to `student.html`.
+- Opening `student.html` while signed out redirects to `index.html`.
+- Test start/resume/submit survives the page separation.
+- GitHub Pages builds `index.html`, `student.html` and `admin.html`.
+
+### Phase 2 — ScoreBadhao-inspired ScoreMore UI redesign
+
+- Review a user-supplied ScoreBadhao repository ZIP and key screenshots.
+- Compare dashboard, catalogue, test engine, result and navigation UX.
+- Rebuild the useful UX patterns in ScoreMore with improved mobile, accessibility and Supabase-compatible behaviour.
+- Do not copy ScoreBadhao backend architecture, Apps Script logic, secrets or branding.
+
+### Phase 3 — Accurate validated HTML import engine
+
+- Define a versioned HTML package containing validated structured JSON.
+- Add dry-run preview, schema validation, duplicate detection and metadata warnings.
+- Import only into `draft_questions` and import-batch records.
+- Preserve mandatory human review before publication.
+
+### Phase 4 — Dynamic question reuse
+
+- Import one genuine GSSSB CCE shift.
+- Reuse each published master question for the original paper, sectional tests and topic practice.
+- Do not duplicate master question rows.
+
+### Phase 5 — Results and Mistake Revision
+
+- Results history
+- Detailed attempt review
+- Improved result summary
+- Mistake Revision list
+- Automatic resolved/unresolved status
+- Secure student-only RPC functions
+
+---
+
+## Long-term roadmap
+
+### Foundation and security
+
+- Repository and separate Supabase project
+- Migration-based database history
+- Owner/admin bootstrap
+- RLS verification
+- Dynamic public configuration
+
+### Content operations
+
 - Draft validation and preview
-- Review correction form
-- Publish and reject audit trail
+- Human review and correction
+- Protected publication
+- Private source upload
+- Import history and reconciliation
 
-Acceptance: no import path can insert directly into `questions`.
+### Test platform
 
-## Phase SM-2 — Dynamic landing and dashboard
-
-- Dynamic statistics
-- Authentication lifecycle
-- Student profile
-- Continue attempt card
-- Recent attempts
-- Recommended test placeholder based on data
-- Refresh and mobile-back stability
-
-## Phase SM-3 — Test catalogue
-
-- Dynamic test tabs
-- Year/date/shift/subject filters
-- Package locks
-- Start/resume/reattempt state
-- Pagination/lazy loading
-
-## Phase SM-4 — Test engine stabilization
-
+- Dynamic catalogue
+- Fixed and filtered question selection
 - Exam, Practice and Review modes
-- Timer and auto-submit
-- Question palette
-- Section switching
-- Mark for review
-- Bookmark
-- IndexedDB/local queue
-- Retry and conflict handling
+- Offline answer queue
+- Server-side scoring
 - Duplicate submission protection
 
-## Phase SM-5 — Real GSSSB CCE PYQ import
-
-- Import one complete shift through drafts
-- Verify official answer source
-- Publish after human review
-- Build original full paper
-- Build sectional tests from the same question rows
-- Build topic practice from the same question rows
-
-## Phase SM-6 — Results and analytics
-
-- Score summary
-- Subject/topic/difficulty analysis
-- Time analysis
-- Mistake patterns
-- Recommendation engine
-
-## Phase SM-7 — Revision loops
+### Learning and analytics
 
 - Bookmarks
-- Mistake book
-- Repeated mistake count
-- Revision test generation
+- Mistake practice generation
+- Subject/topic/difficulty analysis
+- Time analysis
+- Rank, percentile and readiness score
 
-## Phase SM-8 — Rank and leaderboard
-
-- Test rank
-- Percentile
-- Readiness score
-- Improvement trend
-- Privacy-safe leaderboard names
-
-## Phase SM-9 — Packages and payment readiness
+### Commercial readiness
 
 - Package catalogue
 - Access expiry
 - Admin grants
-- Razorpay/UPI readiness
 - Payment verification through trusted backend logic
 
-## Phase SM-10 — Production quality
+### Production quality
 
-- Mobile device QA
-- Slow network QA
-- Offline answer QA
-- RLS/security review
-- Accessibility review
-- Lighthouse review
-- Error logging
+- Mobile and desktop QA
+- Slow-network and offline QA
+- Security and RLS review
+- Accessibility and Lighthouse review
 - Backup and restore drill
-- Launch checklist
