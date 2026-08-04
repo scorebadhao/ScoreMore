@@ -34,6 +34,7 @@ export function bindStudentAuth({ onAuthenticated } = {}) {
   signInForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     const values = new FormData(form);
     setBusy(form, true);
     const loading = toast.loading('Signing in…');
@@ -57,6 +58,7 @@ export function bindStudentAuth({ onAuthenticated } = {}) {
   signUpForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     const values = new FormData(form);
     setBusy(form, true);
     const loading = toast.loading('Creating account…');

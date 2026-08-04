@@ -35,7 +35,17 @@ function clean(value) {
 
 async function getUser() {
   const client = requireSupabase();
-  const data = unwrap(await withTimeout(client.auth.getUser()), 'Unable to verify your session.');
+  const sessionData = unwrap(
+    await withTimeout(client.auth.getSession()),
+    'Unable to read your session.',
+  );
+
+  if (!sessionData?.session) return null;
+
+  const data = unwrap(
+    await withTimeout(client.auth.getUser()),
+    'Unable to verify your session.',
+  );
   return data.user || null;
 }
 
