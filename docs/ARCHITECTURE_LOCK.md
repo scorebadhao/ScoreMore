@@ -1,4 +1,4 @@
-# ScoreMore Architecture Lock v1.2
+# ScoreMore Architecture Lock v1.3
 
 **Status:** APPROVED AND LOCKED  
 **Approved:** 4 August 2026
@@ -105,11 +105,32 @@ The following remain prohibited:
 
 The Phase 2 implementation is documented in `docs/UI_PARITY_SCOREBADHAO.md`.
 
+## Phase 3 import architecture lock
+
+The user approved the Phase 3 design on 4 August 2026.
+
+- HTML is a portable container; the JSON payload inside `#scoremore-import-data` is authoritative.
+- Imported HTML is never executed or inserted into the admin DOM.
+- Raw file bytes, canonical payload identity and original source identity use separate SHA-256 checksums.
+- Every package question receives an item-level reconciliation row, including invalid and duplicate records.
+- Strict content fingerprints block duplicate master questions even when Question IDs or source papers differ.
+- Loose fingerprints produce human-review warnings only.
+- One master question may have many rows in `question_occurrences`.
+- Same Question ID with different content, same content with different answer, and same occurrence with different content are blocking conflicts.
+- Missing answers may enter drafts but cannot be published.
+- `RECONSTRUCTED` and `AI_GENERATED` content cannot be published as original PYQ content.
+- No import route inserts directly into `questions`; `publish_draft_question()` remains mandatory.
+- The versioned specification is `docs/HTML_IMPORT_SPEC_v1.md`.
+
 ## Locked near-term phase sequence
 
-1. Separate the public and authenticated student applications.
+1. Separate the public and authenticated student applications — COMPLETED.
 2. ScoreBadhao-inspired ScoreMore UI redesign — COMPLETED for the public landing, student dashboard, catalogue and test-engine foundation.
-3. Build the validated HTML import package and dry-run import engine.
+3. Build the validated HTML import engine:
+   - Phase 3A database identity, duplicate constraints, validation RPCs and specification — COMPLETED in repository files; production migration pending.
+   - Phase 3B admin dry-run parser and reconciliation UI.
+   - Phase 3C controlled draft import and occurrence linking.
+   - Phase 3D duplicate/conflict acceptance testing.
 4. Reuse imported master questions across original papers, sectional tests and topic practice without duplication.
 5. Build Results history, detailed review and Mistake Revision.
 

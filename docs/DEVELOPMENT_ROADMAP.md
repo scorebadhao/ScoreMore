@@ -36,10 +36,47 @@ Acceptance:
 
 ### Phase 3 — Accurate validated HTML import engine
 
-- Define a versioned HTML package containing validated structured JSON.
-- Add dry-run preview, schema validation, duplicate detection and metadata warnings.
-- Import only into `draft_questions` and import-batch records.
-- Preserve mandatory human review before publication.
+#### Phase 3A — Import database foundation — COMPLETED IN REPOSITORY
+
+- Added versioned HTML/JSON package specification and machine-readable JSON Schema.
+- Added raw-file, canonical-package and source checksum identities.
+- Added `import_batch_items` for permanent item-level reconciliation.
+- Added `question_occurrences` so one master question can represent multiple authentic source appearances.
+- Added server-generated strict and loose fingerprints.
+- Added content-origin tracking and PYQ origin restrictions.
+- Added draft chronology and import-item traceability.
+- Added package/question validation RPCs and secure occurrence-link RPC.
+- Strengthened `publish_draft_question()` against duplicate content and source conflicts.
+
+Acceptance before Phase 3B:
+
+- Database migration workflow succeeds.
+- Existing question, draft, test and attempt flows remain operational.
+- Existing records receive fingerprints.
+- Duplicate master content is protected by a unique index.
+- New import tables remain admin-only under RLS.
+- Validation RPCs return structured errors/warnings without writing data.
+
+#### Phase 3B — Dry-run parser and reconciliation UI
+
+- Safely parse only `#scoremore-import-data`.
+- Calculate raw-file and canonical-payload checksums.
+- Validate JSON Schema and package identity.
+- Merge source/default/item metadata.
+- Call PostgreSQL validation for every record.
+- Persist and display dry-run status, errors, warnings, duplicates and conflicts.
+- Do not create drafts yet.
+
+#### Phase 3C — Controlled draft import
+
+- Import selected valid new records into `draft_questions`.
+- Link human-confirmed exact duplicates as source occurrences.
+- Preserve raw payload, normalized payload and complete audit history.
+- Provide downloadable reconciliation output.
+
+#### Phase 3D — Duplicate/conflict acceptance testing
+
+Test a package containing valid, exact duplicate, alternate-ID duplicate, ID conflict, answer conflict, source conflict, missing answer and unknown catalogue records. Re-import the same file and verify zero extra source files, batches, drafts and master questions.
 
 ### Phase 4 — Dynamic question reuse
 
