@@ -14,6 +14,28 @@ It does not modify or connect to the ScoreBadhao Google Sheets + Apps Script pro
 
 ScoreMore now uses a separate public page and authenticated student application with a ScoreBadhao-inspired, ScoreMore-specific mobile UI. The UX reference is documented in `docs/UI_PARITY_SCOREBADHAO.md`; no ScoreBadhao backend architecture is used.
 
+
+## Phase 3A import foundation
+
+The approved HTML import architecture now has its database and specification foundation:
+
+- versioned `scoremore.question-import` JSON payload embedded in HTML;
+- raw file, canonical package and original source checksum identities;
+- persistent item-level reconciliation in `import_batch_items`;
+- strict duplicate prevention through server-generated content fingerprints;
+- warning-only loose fingerprints for possible OCR/option-order matches;
+- one master question with many authentic `question_occurrences`;
+- content-origin and answer-source tracking;
+- admin-only package/question validation RPCs;
+- mandatory draft-review-publish remains unchanged.
+
+Specification files:
+
+- `docs/HTML_IMPORT_SPEC_v1.md`
+- `docs/scoremore-question-import.schema.v1.json`
+
+Phase 3A adds no import UI. Phase 3B will build the safe dry-run parser and reconciliation screen.
+
 ## Included vertical slice
 
 - Supabase email/password authentication
