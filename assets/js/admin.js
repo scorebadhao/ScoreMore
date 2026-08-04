@@ -30,6 +30,9 @@ const elements = {
   importItemList: document.getElementById('importItemList'),
   importItemFilter: document.getElementById('importItemFilter'),
   downloadImportReport: document.getElementById('downloadImportReport'),
+  importValidDrafts: document.getElementById('importValidDrafts'),
+  linkDuplicateOccurrences: document.getElementById('linkDuplicateOccurrences'),
+  importSelectionSummary: document.getElementById('importSelectionSummary'),
   recentImportPanel: document.getElementById('recentImportPanel'),
   recentImportList: document.getElementById('recentImportList'),
 };
@@ -42,6 +45,9 @@ let configuredTests = [];
 let parsedImportPackage = null;
 let currentImportReport = null;
 let recentImportBatches = [];
+let currentImportBatchId = null;
+let selectedDraftItemIds = new Set();
+let selectedOccurrenceItemIds = new Set();
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -395,13 +401,75 @@ function renderClientPackagePreview(parsed) {
   `;
 }
 
+function resetImportSelections() {
+  selectedDraftItemIds = new Set();
+  selectedOccurrenceItemIds = new Set();
+  currentImportBatchId = null;
+  updateImportActionControls();
+}
+
+function isDraftEligible(item) {
+  return ['VALID', 'VALID_WITH_WARNINGS'].includes(item?.validation_status)
+    && !item?.created_draft_id;
+}
+
+function isOccurrenceActionable(item) {
+  return item?.validation_status === 'EXACT_DUPLICATE'
+    && Boolean(item?.matched_question_id)
+    && Boolean(item?.occurrence_key)
+    && item?.resolution_action === 'NONE';
+}
+
+function syncImportSelections(report) {
+  const batchId = report?.batch?.import_batch_id || null;
+  const items = report?.items || [];
+  const eligibleDraftIds = new Set(items.filter(isDraftEligible).map((item) => item.import_item_id));
+  const actionableOccurrenceIds = new Set(items.filter(isOccurrenceActionable).map((item) => item.import_item_id));
+
+  if (batchId !== currentImportBatchId) {
+    currentImportBatchId = batchId;
+    selectedDraftItemIds = new Set(eligibleDraftIds);
+    selectedOccurrenceItemIds = new Set();
+    return;
+  }
+
+  selectedDraftItemIds = new Set([...selectedDraftItemIds].filter((id) => eligibleDraftIds.has(id)));
+  selectedOccurrenceItemIds = new Set([...selectedOccurrenceItemIds].filter((id) => actionableOccurrenceIds.has(id)));
+}
+
+function updateImportActionControls() {
+  const batchId = currentImportReport?.batch?.import_batch_id;
+  const draftCount = selectedDraftItemIds.size;
+  const occurrenceCount = selectedOccurrenceItemIds.size;
+
+  if (elements.importValidDrafts) elements.importValidDrafts.disabled = !batchId || draftCount === 0;
+  if (elements.linkDuplicateOccurrences) elements.linkDuplicateOccurrences.disabled = !batchId || occurrenceCount === 0;
+  if (elements.importSelectionSummary) {
+    elements.importSelectionSummary.textContent = batchId
+      ? `${draftCount} valid record${draftCount === 1 ? '' : 's'} selected for draft creation · ${occurrenceCount} exact duplicate PYQ occurrence${occurrenceCount === 1 ? '' : 's'} selected for linking.`
+      : 'Run or open a dry-run report to select eligible records.';
+  }
+}
+
 function renderPackageValidationFailure(packageValidation) {
   currentImportReport = {
     package_validation: packageValidation,
     batch: null,
-    summary: { total: parsedImportPackage?.metadata.questionCount || 0, valid: 0, warnings: 0, errors: 1, duplicates: 0, ready_for_draft: 0 },
+    summary: {
+      total: parsedImportPackage?.metadata.questionCount || 0,
+      valid: 0,
+      warnings: 0,
+      errors: 1,
+      duplicates: 0,
+      ready_for_draft: 0,
+      imported_to_draft: 0,
+      linked_to_existing: 0,
+      skipped_duplicates: 0,
+      actionable_occurrences: 0,
+    },
     items: [],
   };
+  resetImportSelections();
   elements.importReportPanel.classList.remove('hidden');
   elements.importReportTitle.textContent = 'Package validation stopped';
   elements.importReportMeta.textContent = packageValidation?.status || 'INVALID';
@@ -425,6 +493,10 @@ function renderImportSummary(summary) {
     ['Errors/conflicts', summaryValue(summary, 'errors')],
     ['Duplicates', summaryValue(summary, 'duplicates')],
     ['Ready for draft', summaryValue(summary, 'ready_for_draft')],
+    ['Drafts created', summaryValue(summary, 'imported_to_draft')],
+    ['Occurrences linked', summaryValue(summary, 'linked_to_existing')],
+    ['Duplicates skipped', summaryValue(summary, 'skipped_duplicates')],
+    ['Occurrences awaiting confirmation', summaryValue(summary, 'actionable_occurrences')],
   ];
   elements.importSummaryGrid.innerHTML = rows.map(([label, value]) => `
     <div class="import-summary-card"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>
@@ -437,7 +509,69 @@ function importItemMatchesFilter(item, filter) {
   if (filter === 'WARNINGS') return ['VALID_WITH_WARNINGS', 'POSSIBLE_DUPLICATE'].includes(status) || (item.warnings?.length || 0) > 0;
   if (filter === 'ERRORS') return ['INVALID', 'ID_CONFLICT', 'ANSWER_CONFLICT', 'SOURCE_CONFLICT'].includes(status);
   if (filter === 'DUPLICATES') return ['EXACT_DUPLICATE', 'POSSIBLE_DUPLICATE'].includes(status);
+  if (filter === 'IMPORTED') return status === 'IMPORTED_TO_DRAFT';
+  if (filter === 'LINKED') return status === 'LINKED_TO_EXISTING';
   return true;
+}
+
+function importActionMarkup(item) {
+  if (isDraftEligible(item)) {
+    return `
+      <label class="import-action-choice">
+        <input type="checkbox" data-import-draft-select="${escapeHtml(item.import_item_id)}" ${selectedDraftItemIds.has(item.import_item_id) ? 'checked' : ''} />
+        <span><strong>Create draft</strong><small>Revalidated again by PostgreSQL before insertion.</small></span>
+      </label>
+    `;
+  }
+
+  if (isOccurrenceActionable(item)) {
+    return `
+      <label class="import-action-choice occurrence-choice">
+        <input type="checkbox" data-import-occurrence-select="${escapeHtml(item.import_item_id)}" ${selectedOccurrenceItemIds.has(item.import_item_id) ? 'checked' : ''} />
+        <span><strong>Link this PYQ occurrence</strong><small>Keep one master question and attach this confirmed paper occurrence.</small></span>
+      </label>
+    `;
+  }
+
+  if (item.validation_status === 'IMPORTED_TO_DRAFT') {
+    return `<div class="import-resolution resolution-success"><strong>Draft created</strong><span>${escapeHtml(item.created_draft_id || item.matched_draft_id || '')}</span></div>`;
+  }
+
+  if (item.validation_status === 'LINKED_TO_EXISTING') {
+    return `<div class="import-resolution resolution-success"><strong>Occurrence linked</strong><span>${escapeHtml(item.matched_question_id || '')}</span></div>`;
+  }
+
+  if (item.resolution_action && item.resolution_action !== 'NONE') {
+    return `<div class="import-resolution"><strong>${escapeHtml(item.resolution_action)}</strong><span>${escapeHtml(item.resolution_notes || '')}</span></div>`;
+  }
+
+  if (item.validation_status === 'POSSIBLE_DUPLICATE') {
+    return '<div class="import-resolution resolution-warning"><strong>Human duplicate decision required</strong><span>Possible duplicates are never auto-imported or auto-linked.</span></div>';
+  }
+
+  if (item.validation_status === 'EXACT_DUPLICATE') {
+    return '<div class="import-resolution"><strong>Duplicate skipped</strong><span>No duplicate draft or master question will be created.</span></div>';
+  }
+
+  return '';
+}
+
+function bindImportItemSelections() {
+  elements.importItemList.querySelectorAll('[data-import-draft-select]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) selectedDraftItemIds.add(checkbox.dataset.importDraftSelect);
+      else selectedDraftItemIds.delete(checkbox.dataset.importDraftSelect);
+      updateImportActionControls();
+    });
+  });
+
+  elements.importItemList.querySelectorAll('[data-import-occurrence-select]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) selectedOccurrenceItemIds.add(checkbox.dataset.importOccurrenceSelect);
+      else selectedOccurrenceItemIds.delete(checkbox.dataset.importOccurrenceSelect);
+      updateImportActionControls();
+    });
+  });
 }
 
 function renderImportItems() {
@@ -455,6 +589,7 @@ function renderImportItems() {
   ` : '';
   if (!items.length) {
     elements.importItemList.innerHTML = `${packageBlock}<div class="empty-state">No import items match this filter.</div>`;
+    updateImportActionControls();
     return;
   }
 
@@ -472,6 +607,7 @@ function renderImportItems() {
           </div>
           <span class="import-status-pill status-${escapeHtml(String(item.validation_status || 'pending').toLowerCase().replaceAll('_', '-'))}">${escapeHtml(item.validation_status)}</span>
         </div>
+        ${importActionMarkup(item)}
         <p class="import-question-preview">${escapeHtml(question.question_text || 'Question text unavailable')}</p>
         <div class="test-meta">
           <span class="chip">${escapeHtml(question.question_type || '—')}</span>
@@ -479,14 +615,16 @@ function renderImportItems() {
           <span class="chip">${escapeHtml(question.language || '—')}</span>
           <span class="chip">${escapeHtml(question.difficulty || '—')}</span>
           <span class="chip">Duplicate: ${escapeHtml(item.duplicate_kind || 'NONE')}</span>
+          ${item.resolution_action && item.resolution_action !== 'NONE' ? `<span class="chip">Action: ${escapeHtml(item.resolution_action)}</span>` : ''}
         </div>
         ${duplicateMatch ? `<p class="import-match"><strong>Matched record:</strong> ${escapeHtml(duplicateMatch)}</p>` : ''}
         <details class="import-item-details">
-          <summary>Validation and fingerprints</summary>
+          <summary>Validation, source and fingerprints</summary>
           <div class="checksum-list compact-checksums">
             <div><strong>Strict</strong><code>${escapeHtml(item.strict_fingerprint || '—')}</code></div>
             <div><strong>Loose</strong><code>${escapeHtml(item.loose_fingerprint || '—')}</code></div>
             <div><strong>Occurrence</strong><code>${escapeHtml(item.occurrence_key || '—')}</code></div>
+            <div><strong>Draft</strong><code>${escapeHtml(item.created_draft_id || '—')}</code></div>
           </div>
           ${errors.length ? `<div class="issue-block issue-error"><strong>Errors</strong><ul>${errors.map(formatIssue).join('')}</ul></div>` : ''}
           ${warnings.length ? `<div class="issue-block issue-warning"><strong>Warnings</strong><ul>${warnings.map(formatIssue).join('')}</ul></div>` : ''}
@@ -495,19 +633,23 @@ function renderImportItems() {
       </article>
     `;
   }).join('');
+  bindImportItemSelections();
+  updateImportActionControls();
 }
 
 function renderImportReport(report) {
   currentImportReport = report;
   const batch = report?.batch;
+  syncImportSelections(report);
   elements.importReportPanel.classList.remove('hidden');
-  elements.importReportTitle.textContent = batch?.package_id || 'Dry-run report';
+  elements.importReportTitle.textContent = batch?.package_id || 'Import reconciliation';
   elements.importReportMeta.textContent = batch
-    ? `${batch.status} · Batch ${batch.import_batch_id} · ${batch.source_file?.original_file_name || 'HTML package'}`
+    ? `${batch.status} · Draft import ${batch.draft_import_status || 'NOT_STARTED'} · Batch ${batch.import_batch_id} · ${batch.source_file?.original_file_name || 'HTML package'}`
     : report?.package_validation?.status || 'Package validation';
   renderImportSummary(report?.summary || {});
   renderImportItems();
   elements.downloadImportReport.disabled = false;
+  updateImportActionControls();
 }
 
 async function loadRecentImportBatches() {
@@ -523,12 +665,13 @@ async function loadRecentImportBatches() {
       <article class="import-history-item">
         <div>
           <strong>${escapeHtml(batch.package_id || 'Unnamed package')}</strong>
-          <span>${escapeHtml(batch.status)} · ${escapeHtml(new Date(batch.created_at).toLocaleString())}</span>
+          <span>${escapeHtml(batch.status)} · Draft import ${escapeHtml(batch.draft_import_status || 'NOT_STARTED')} · ${escapeHtml(new Date(batch.created_at).toLocaleString())}</span>
           <small>${escapeHtml(batch.source_files?.original_file_name || '')}</small>
         </div>
         <div class="import-history-counts">
           <span>${escapeHtml(batch.total_raw)} total</span>
-          <span>${escapeHtml(batch.total_error)} errors</span>
+          <span>${escapeHtml(batch.total_draft || 0)} drafts</span>
+          <span>${escapeHtml(batch.total_linked || 0)} linked</span>
           <span>${escapeHtml(batch.total_duplicate)} duplicates</span>
         </div>
         <button class="button button-ghost" type="button" data-import-batch="${escapeHtml(batch.import_batch_id)}">Open report</button>
@@ -560,6 +703,7 @@ async function runImportDryRun(event) {
   if (!form.reportValidity()) return;
   const file = new FormData(form).get('htmlImportFile');
   setBusy(form, true);
+  resetImportSelections();
   elements.downloadImportReport.disabled = true;
   elements.importReportPanel.classList.add('hidden');
   const loading = toast.loading('Inspecting HTML package safely…');
@@ -585,7 +729,7 @@ async function runImportDryRun(event) {
       const report = await api.getImportBatchReport(packageValidation.existing_import_batch_id);
       renderImportReport({ ...report, package_validation: packageValidation, reused_existing_batch: true });
       loading.close();
-      toast.info('This package was already validated. The existing report was reused; no duplicate batch was created.');
+      toast.info('This package already exists. Its persistent reconciliation and draft-import state were reused.');
       return;
     }
 
@@ -610,14 +754,113 @@ async function runImportDryRun(event) {
     await loadRecentImportBatches();
     loading.close();
     toast.success(report.reused_existing_batch
-      ? 'Existing dry-run report loaded. No duplicate records were created.'
-      : 'Dry validation completed. No drafts or published questions were created.');
+      ? 'Existing reconciliation loaded. No duplicate batch or records were created.'
+      : 'Dry validation completed. Select valid records before creating drafts.');
   } catch (error) {
     loading.close();
     toast.error(error.message);
   } finally {
     setBusy(form, false);
     elements.downloadImportReport.disabled = !currentImportReport;
+    updateImportActionControls();
+  }
+}
+
+function requestImportConfirmation({ title, message, buttonLabel }) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    elements.dialogContent.innerHTML = `
+      <div class="review-content">
+        <span class="eyebrow">Controlled import confirmation</span>
+        <h2>${escapeHtml(title)}</h2>
+        <p>${escapeHtml(message)}</p>
+        <div class="import-safety-note">
+          <strong>Architecture lock</strong>
+          <span>This action creates draft_questions only. It never publishes directly to the master questions table.</span>
+        </div>
+        <div class="draft-item-actions">
+          <button id="confirmImportAction" class="button button-primary" type="button">${escapeHtml(buttonLabel)}</button>
+          <button id="cancelImportAction" class="button button-ghost" type="button">Cancel</button>
+        </div>
+      </div>
+    `;
+    elements.dialogContent.querySelector('#confirmImportAction')?.addEventListener('click', () => {
+      finish(true);
+      elements.dialog.close();
+    });
+    elements.dialogContent.querySelector('#cancelImportAction')?.addEventListener('click', () => {
+      finish(false);
+      elements.dialog.close();
+    });
+    elements.dialog.addEventListener('close', () => finish(false), { once: true });
+    elements.dialog.showModal();
+  });
+}
+
+async function importSelectedDrafts() {
+  const batchId = currentImportReport?.batch?.import_batch_id;
+  const itemIds = [...selectedDraftItemIds];
+  if (!batchId || !itemIds.length) return toast.warning('Select at least one valid record.');
+
+  const confirmed = await requestImportConfirmation({
+    title: `Create ${itemIds.length} question draft${itemIds.length === 1 ? '' : 's'}?`,
+    message: 'ScoreMore will revalidate every selected record against the current database, skip new duplicates, and create only pending drafts for human review.',
+    buttonLabel: 'Create controlled drafts',
+  });
+  if (!confirmed) return;
+
+  elements.importValidDrafts.disabled = true;
+  elements.linkDuplicateOccurrences.disabled = true;
+  const loading = toast.loading('Revalidating and creating controlled drafts…');
+  try {
+    const report = await api.importBatchItemsToDrafts({ importBatchId: batchId, importItemIds: itemIds });
+    renderImportReport(report);
+    await Promise.all([loadDrafts(), loadRecentImportBatches()]);
+    const result = report.draft_import_result || {};
+    loading.close();
+    toast.success(`${Number(result.imported || 0)} draft${Number(result.imported || 0) === 1 ? '' : 's'} created. Human review is still required.`);
+    document.getElementById('importReportPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (error) {
+    loading.close();
+    toast.error(error.message);
+  } finally {
+    updateImportActionControls();
+  }
+}
+
+async function linkSelectedOccurrences() {
+  const batchId = currentImportReport?.batch?.import_batch_id;
+  const itemIds = [...selectedOccurrenceItemIds];
+  if (!batchId || !itemIds.length) return toast.warning('Select at least one exact duplicate PYQ occurrence.');
+
+  const confirmed = await requestImportConfirmation({
+    title: `Link ${itemIds.length} source occurrence${itemIds.length === 1 ? '' : 's'}?`,
+    message: 'This does not create another master question. It links each confirmed paper occurrence to the existing exact master question.',
+    buttonLabel: 'Link confirmed occurrences',
+  });
+  if (!confirmed) return;
+
+  elements.importValidDrafts.disabled = true;
+  elements.linkDuplicateOccurrences.disabled = true;
+  const loading = toast.loading('Linking confirmed source occurrences…');
+  try {
+    const report = await api.linkImportBatchOccurrences({ importBatchId: batchId, importItemIds: itemIds });
+    renderImportReport(report);
+    await loadRecentImportBatches();
+    const result = report.occurrence_link_result || {};
+    loading.close();
+    toast.success(`${Number(result.linked || 0)} occurrence${Number(result.linked || 0) === 1 ? '' : 's'} linked without duplicating master questions.`);
+  } catch (error) {
+    loading.close();
+    toast.error(error.message);
+  } finally {
+    updateImportActionControls();
   }
 }
 
@@ -666,6 +909,8 @@ function bindEvents() {
   elements.htmlImportForm?.addEventListener('submit', runImportDryRun);
   elements.importItemFilter?.addEventListener('change', renderImportItems);
   elements.downloadImportReport?.addEventListener('click', downloadCurrentImportReport);
+  elements.importValidDrafts?.addEventListener('click', importSelectedDrafts);
+  elements.linkDuplicateOccurrences?.addEventListener('click', linkSelectedOccurrences);
   document.getElementById('refreshImportBatches')?.addEventListener('click', async () => {
     await loadRecentImportBatches();
     elements.recentImportPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -676,6 +921,7 @@ function bindEvents() {
     elements.importPackagePreview.classList.add('hidden');
     elements.importReportPanel.classList.add('hidden');
     elements.downloadImportReport.disabled = true;
+    resetImportSelections();
   });
 
   document.getElementById('refreshDrafts')?.addEventListener('click', loadDrafts);

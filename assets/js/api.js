@@ -468,11 +468,39 @@ export const api = Object.freeze({
     ), 'Unable to load the import reconciliation report.');
   },
 
+  async importBatchItemsToDrafts({ importBatchId, importItemIds }) {
+    const ids = [...new Set((importItemIds || []).filter(Boolean))];
+    if (!importBatchId) throw new Error('Import batch ID is required.');
+    if (!ids.length) throw new Error('Select at least one valid record.');
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('import_valid_batch_items_to_drafts', {
+        p_import_batch_id: importBatchId,
+        p_import_item_ids: ids,
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 120000),
+    ), 'Unable to create controlled question drafts.');
+  },
+
+  async linkImportBatchOccurrences({ importBatchId, importItemIds }) {
+    const ids = [...new Set((importItemIds || []).filter(Boolean))];
+    if (!importBatchId) throw new Error('Import batch ID is required.');
+    if (!ids.length) throw new Error('Select at least one exact duplicate PYQ occurrence.');
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('link_import_batch_occurrences', {
+        p_import_batch_id: importBatchId,
+        p_import_item_ids: ids,
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 120000),
+    ), 'Unable to link the selected source occurrences.');
+  },
+
   async listImportBatches({ pageSize = 20 } = {}) {
     const client = requireSupabase();
     return unwrap(await withTimeout(
       client.from('import_batches')
-        .select('import_batch_id, package_id, schema_version, status, total_raw, total_valid, total_warning, total_error, total_duplicate, created_at, completed_at, source_files(original_file_name, checksum_sha256)')
+        .select('import_batch_id, package_id, schema_version, status, draft_import_status, total_raw, total_valid, total_warning, total_error, total_duplicate, total_draft, total_linked, total_skipped, created_at, completed_at, draft_import_completed_at, source_files(original_file_name, checksum_sha256)')
         .eq('import_method', 'HTML_PACKAGE')
         .order('created_at', { ascending: false })
         .limit(Math.min(Math.max(Number(pageSize) || 20, 1), 50)),
