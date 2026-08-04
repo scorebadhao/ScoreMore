@@ -1,4 +1,4 @@
-# ScoreMore Architecture Lock v1.1
+# ScoreMore Architecture Lock v1.2
 
 **Status:** APPROVED AND LOCKED  
 **Approved:** 4 August 2026
@@ -92,10 +92,23 @@ The UI may emphasize GSSSB CCE, but IDs and catalogue records come from PostgreS
 - Refresh-safe auth and attempt state
 - Browser-back navigation must not sign the student out
 
+## Phase 2 UI adoption lock
+
+The ScoreBadhao repository supplied by the user may be used only as a UX reference. ScoreMore has adopted improved patterns for the public hero, dashboard hierarchy, test catalogue, bottom navigation, question workspace and question navigator.
+
+The following remain prohibited:
+
+- ScoreBadhao Google Sheets or Apps Script architecture
+- ScoreBadhao authentication, payment, rank or data-access code
+- ScoreBadhao branding or secrets
+- Hardcoded ScoreBadhao catalogue data
+
+The Phase 2 implementation is documented in `docs/UI_PARITY_SCOREBADHAO.md`.
+
 ## Locked near-term phase sequence
 
 1. Separate the public and authenticated student applications.
-2. Review ScoreBadhao UI from a user-supplied ZIP and redesign ScoreMore using only approved UX inspiration and improvements.
+2. ScoreBadhao-inspired ScoreMore UI redesign — COMPLETED for the public landing, student dashboard, catalogue and test-engine foundation.
 3. Build the validated HTML import package and dry-run import engine.
 4. Reuse imported master questions across original papers, sectional tests and topic practice without duplication.
 5. Build Results history, detailed review and Mistake Revision.

@@ -18,12 +18,21 @@ Acceptance:
 - Test start/resume/submit survives the page separation.
 - GitHub Pages builds `index.html`, `student.html` and `admin.html`.
 
-### Phase 2 — ScoreBadhao-inspired ScoreMore UI redesign
+### Phase 2 — ScoreBadhao-inspired ScoreMore UI redesign — COMPLETED
 
-- Review a user-supplied ScoreBadhao repository ZIP and key screenshots.
-- Compare dashboard, catalogue, test engine, result and navigation UX.
-- Rebuild the useful UX patterns in ScoreMore with improved mobile, accessibility and Supabase-compatible behaviour.
-- Do not copy ScoreBadhao backend architecture, Apps Script logic, secrets or branding.
+- Reviewed the user-supplied ScoreBadhao repository ZIP.
+- Rebuilt the useful public, dashboard, catalogue, navigation and test-engine UX patterns for ScoreMore.
+- Added improved mobile hierarchy, accessibility, search, test-type tabs, question navigator and result summary.
+- Preserved Supabase, RLS, RPC, separate-page and central API architecture.
+- Did not copy ScoreBadhao backend architecture, Apps Script logic, secrets or branding.
+
+Acceptance:
+
+- Public landing, discovery, catalogue and authentication remain database driven.
+- Student dashboard and catalogue remain fully authenticated and refresh safe.
+- Existing test start/resume/save/submit behaviour remains connected to Supabase.
+- Admin question and test workflows remain unaffected.
+- Results history and Mistake Revision stay deferred to Phase 5.
 
 ### Phase 3 — Accurate validated HTML import engine
 
