@@ -255,6 +255,68 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 .review-option { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
 .review-option.correct { border-color: #86efac; background: #f0fdf4; }
 
+
+/* Admin fixed-question test manager */
+.question-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+.question-picker-heading strong,
+.question-picker-heading span { display: block; }
+.question-picker {
+  display: grid;
+  gap: 10px;
+  max-height: 460px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f8fbfb;
+}
+.question-picker-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0,1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+.question-picker-item input {
+  width: 20px;
+  min-height: 20px;
+  margin: 2px 0 0;
+}
+.question-picker-item > span,
+.question-picker-text { display: block; }
+.question-picker-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0; }
+.question-picker-text { color: var(--muted); font-size: .86rem; white-space: pre-wrap; }
+.inline-note {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-height: 66px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-soft);
+}
+.inline-note span { color: var(--muted); font-size: .82rem; }
+.test-admin-list { display: grid; gap: 12px; }
+.test-admin-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+.test-admin-item p { margin-bottom: 0; }
+
 .test-engine { border: 1px solid var(--border); border-radius: 22px; background: #fff; box-shadow: var(--shadow); overflow: hidden; }
 .test-engine-header { position: sticky; top: 68px; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 15px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.97); }
 .test-engine-body { padding: 20px; }
