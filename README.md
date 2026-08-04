@@ -146,3 +146,8 @@ The Vite base path is `/ScoreMore/`. Change `vite.config.js` only if the reposit
 - [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md)
 - [`docs/MIGRATION_MAPPING_SCOREBADHAO.md`](docs/MIGRATION_MAPPING_SCOREBADHAO.md)
 - [`docs/SETUP.md`](docs/SETUP.md)
+
+
+### Phase 3C controlled draft import
+
+The Admin HTML Import panel can now select reconciled valid records and create pending drafts through an admin-only RPC. Every record is revalidated before insertion, exact duplicates are skipped, possible duplicates remain blocked, and confirmed exact duplicate PYQ occurrences can be linked to an existing master question without duplicating content. Human review and protected publication remain mandatory.

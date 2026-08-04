@@ -115,9 +115,9 @@
         <section id="htmlImportSection" class="section panel-card import-panel">
           <div class="section-heading">
             <div>
-              <span class="eyebrow">Phase 3B · dry run only</span>
+              <span class="eyebrow">Phase 3C · controlled draft import</span>
               <h2>HTML Question Import</h2>
-              <p class="muted">Safely parse one versioned ScoreMore HTML package, calculate SHA-256 checksums and create a persistent reconciliation report. No draft or published question is created in this phase.</p>
+              <p class="muted">Safely validate a versioned ScoreMore HTML package, reconcile duplicates, and import only selected valid records into draft_questions. Human review and protected publication remain mandatory.</p>
             </div>
             <button id="refreshImportBatches" class="button button-secondary" type="button">Recent dry runs</button>
           </div>
@@ -127,14 +127,16 @@
               <input id="htmlImportFile" name="htmlImportFile" type="file" accept=".html,.htm,.xhtml,text/html,application/xhtml+xml" required />
             </label>
             <div class="import-safety-note">
-              <strong>Safe parser</strong>
-              <span>Only the JSON inside <code>#scoremore-import-data</code> is read. Imported HTML and scripts are never rendered or executed.</span>
+              <strong>Safe parser and controlled write</strong>
+              <span>Only the JSON inside <code>#scoremore-import-data</code> is read. HTML/scripts are never rendered. Draft creation is performed only by an admin-only PostgreSQL RPC after current-state revalidation.</span>
             </div>
             <div class="button-row">
               <button id="runImportDryRun" class="button button-primary" type="submit">Run dry validation</button>
               <button id="downloadImportReport" class="button button-ghost" type="button" disabled>Download report</button>
-              <button class="button button-ghost" type="button" disabled title="Enabled in Phase 3C">Import valid records to drafts</button>
+              <button id="importValidDrafts" class="button button-primary" type="button" disabled>Import selected valid records to drafts</button>
+              <button id="linkDuplicateOccurrences" class="button button-secondary" type="button" disabled>Link selected PYQ occurrences</button>
             </div>
+            <p id="importSelectionSummary" class="muted import-selection-summary">Run or open a dry-run report to select eligible records.</p>
           </form>
 
           <div id="importPackagePreview" class="import-package-preview hidden" aria-live="polite"></div>
@@ -153,6 +155,8 @@
                   <option value="WARNINGS">Warnings</option>
                   <option value="ERRORS">Errors/conflicts</option>
                   <option value="DUPLICATES">Duplicates</option>
+                  <option value="IMPORTED">Imported drafts</option>
+                  <option value="LINKED">Linked occurrences</option>
                 </select>
               </label>
             </div>
