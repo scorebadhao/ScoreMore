@@ -302,3 +302,57 @@ Returns an admin-only JSON report containing batch/source identity, summary coun
 - `DRY_RUN_COMPLETE`
 - `DRY_RUN_COMPLETE_WITH_WARNINGS`
 - `DRY_RUN_COMPLETE_WITH_ERRORS`
+
+
+## Phase 3C controlled draft import
+
+### New import action fields
+
+`import_batches` adds:
+
+- `draft_import_status` (`NOT_STARTED`, `PARTIAL`, `COMPLETE`)
+- `total_linked`
+- `total_skipped`
+- `draft_import_started_at`
+- `draft_import_completed_at`
+
+`import_batch_items` adds:
+
+- `resolution_action` (`NONE`, `CREATE_DRAFT`, `LINK_OCCURRENCE`, `SKIP_DUPLICATE`, `BLOCKED`)
+- `resolution_notes`
+- `resolved_by`
+- `resolved_at`
+
+### `import_valid_batch_items_to_drafts()`
+
+Admin-only security-definer RPC. It:
+
+1. locks the selected import batch;
+2. accepts only item IDs belonging to that batch;
+3. accepts only `VALID` and `VALID_WITH_WARNINGS` records;
+4. calls `validate_import_question()` again against current database state;
+5. skips records that became duplicates or conflicts;
+6. inserts eligible records into `draft_questions`;
+7. copies original catalogue, source, chronology, grouping, answer, content-origin and import traceability fields;
+8. marks the item `IMPORTED_TO_DRAFT`;
+9. records the action in `admin_audit_logs`;
+10. returns the refreshed reconciliation report.
+
+It never inserts into `questions`.
+
+### `link_import_batch_occurrences()`
+
+Admin-only security-definer RPC. It accepts only selected `EXACT_DUPLICATE` items that have:
+
+- an exact matched published master question; and
+- a valid source occurrence key.
+
+It delegates to `link_question_occurrence()` and therefore stores one master question with another authentic paper occurrence. Possible duplicates cannot use this function.
+
+### Idempotency
+
+- `created_draft_id` is unique.
+- Active draft Question IDs and strict content fingerprints remain unique.
+- The RPC revalidates immediately before insert.
+- Repeated calls return already-imported records instead of creating new drafts.
+- Occurrence keys remain unique and cannot point to different master content.

@@ -1,4 +1,4 @@
-# ScoreMore Architecture Lock v1.4
+# ScoreMore Architecture Lock v1.5
 
 **Status:** APPROVED AND LOCKED  
 **Approved:** 4 August 2026
@@ -126,14 +126,27 @@ The user approved the Phase 3 design on 4 August 2026.
 - Phase 3B creates `import_batches` and `import_batch_items` only; it must create no drafts and no published master questions.
 - Exact package/file re-imports reuse the existing report instead of creating duplicate source, batch or item rows.
 
+## Phase 3C controlled import lock
+
+- Only `VALID` and `VALID_WITH_WARNINGS` reconciliation items may create drafts.
+- Every selected item is revalidated by PostgreSQL immediately before draft insertion.
+- `POSSIBLE_DUPLICATE`, conflict and invalid records remain blocked.
+- Exact duplicates never create another draft or master question.
+- Exact duplicate PYQ content may link a confirmed new source occurrence to the existing published master question.
+- `import_valid_batch_items_to_drafts()` is the only Phase 3C batch-to-draft write boundary.
+- `link_import_batch_occurrences()` is the only Phase 3C batch duplicate-occurrence write boundary.
+- Both operations are admin-only, idempotent, audit logged and preserve the original source file, package, item and chronology references.
+- Draft creation never bypasses `draft_questions`; human review and `publish_draft_question()` remain mandatory.
+- Re-running the same import action must create zero additional drafts and zero duplicate master questions.
+
 ## Locked near-term phase sequence
 
 1. Separate the public and authenticated student applications — COMPLETED.
 2. ScoreBadhao-inspired ScoreMore UI redesign — COMPLETED for the public landing, student dashboard, catalogue and test-engine foundation.
 3. Build the validated HTML import engine:
    - Phase 3A database identity, duplicate constraints, validation RPCs and specification — COMPLETED and deployed.
-   - Phase 3B admin safe parser, checksum identity, persistent dry-run staging and reconciliation UI — COMPLETED in repository files; production deployment pending.
-   - Phase 3C controlled draft import and occurrence linking.
+   - Phase 3B admin safe parser, checksum identity, persistent dry-run staging and reconciliation UI — COMPLETED AND DEPLOYED.
+   - Phase 3C controlled draft import and occurrence linking — IMPLEMENTED; deployment and acceptance testing pending.
    - Phase 3D duplicate/conflict acceptance testing.
 4. Reuse imported master questions across original papers, sectional tests and topic practice without duplication.
 5. Build Results history, detailed review and Mistake Revision.

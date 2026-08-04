@@ -395,3 +395,21 @@ Returns the complete admin-only batch summary and ordered item-level reconciliat
 Changes that add, remove or reinterpret package fields require a new `schema_version` and a new machine-readable schema file.
 
 Phase 3B rejects unsupported schema versions rather than guessing how to interpret them. The browser validator is an early safety gate; PostgreSQL remains authoritative for catalogue, duplicate and conflict outcomes.
+
+
+## Phase 3C controlled draft action
+
+A successful dry run does not imply publication. The administrator may select only records whose authoritative status is `VALID` or `VALID_WITH_WARNINGS`. ScoreMore revalidates those records at import time and creates pending `draft_questions` rows only.
+
+The following statuses are never imported automatically:
+
+- `EXACT_DUPLICATE`
+- `POSSIBLE_DUPLICATE`
+- `INVALID`
+- `ID_CONFLICT`
+- `ANSWER_CONFLICT`
+- `SOURCE_CONFLICT`
+
+An exact duplicate PYQ with a matched published master question and a different valid occurrence key may be explicitly linked as another source occurrence. This operation does not create another master question.
+
+Every import action is persistent and idempotent. Repeating the same action must not create a second draft.

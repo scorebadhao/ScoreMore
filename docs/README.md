@@ -10,3 +10,5 @@
 - `SETUP.md` — Supabase and deployment setup
 
 - `PHASE3B_ACCEPTANCE_TESTS.md` — safe parser, exact re-import and reconciliation verification.
+
+- `PHASE3C_ACCEPTANCE_TESTS.md` — controlled draft-import and idempotency verification.

@@ -57,7 +57,7 @@ Acceptance before Phase 3B:
 - New import tables remain admin-only under RLS.
 - Validation RPCs return structured errors/warnings without writing data.
 
-#### Phase 3B — Dry-run parser and reconciliation UI — COMPLETED IN REPOSITORY
+#### Phase 3B — Dry-run parser and reconciliation UI — COMPLETED AND DEPLOYED
 
 - Safely parses only `#scoremore-import-data`; imported HTML and scripts are never rendered or executed.
 - Calculates raw-file and canonical-payload SHA-256 checksums in the browser.
@@ -77,12 +77,26 @@ Acceptance before Phase 3C:
 - dry-run summary and item details are readable on mobile;
 - manual draft, Test Manager and student attempt flows pass regression.
 
-#### Phase 3C — Controlled draft import
+#### Phase 3C — Controlled draft import — IMPLEMENTED; DEPLOYMENT PENDING
 
-- Import selected valid new records into `draft_questions`.
-- Link human-confirmed exact duplicates as source occurrences.
-- Preserve raw payload, normalized payload and complete audit history.
-- Provide downloadable reconciliation output.
+- Imports only selected `VALID` and `VALID_WITH_WARNINGS` items into `draft_questions`.
+- Revalidates every selected record against current database state before insertion.
+- Skips exact duplicates without creating duplicate drafts or master questions.
+- Keeps possible duplicates and conflicts blocked for human correction.
+- Links explicitly selected exact duplicate PYQ occurrences to existing master questions.
+- Preserves source file, import batch, import item, sort order, content origin and fingerprint traceability.
+- Records per-item resolution action, admin identity and timestamp.
+- Supports safe retries without creating additional drafts.
+- Keeps human review and protected publication mandatory.
+
+Acceptance before Phase 3D:
+
+- database migration and frontend workflows deploy successfully;
+- the sample package creates exactly one new pending draft;
+- its exact duplicate creates no draft;
+- running the import action again creates zero extra drafts;
+- reopening the same batch displays the created draft ID and persistent action state;
+- manual draft, test manager and student flows pass regression.
 
 #### Phase 3D — Duplicate/conflict acceptance testing
 
