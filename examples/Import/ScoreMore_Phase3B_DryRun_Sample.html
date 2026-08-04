@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ScoreMore Phase 3B Dry-Run Sample</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;line-height:1.55;color:#17212b}
+    article{border:1px solid #d8e2e4;border-radius:14px;padding:16px;margin:14px 0}
+    code{overflow-wrap:anywhere}
+  </style>
+</head>
+<body>
+  <h1>ScoreMore Phase 3B Dry-Run Sample</h1>
+  <p>This visible page is for human inspection only. ScoreMore reads only the JSON payload below and never executes imported HTML.</p>
+  <article>
+    <strong>Record Q001</strong>
+    <p>Existing sample question. It should be reported as an exact duplicate after the earlier manual publication test.</p>
+  </article>
+  <article>
+    <strong>Record Q002</strong>
+    <p>New sample question. It should be reported as valid and ready for Phase 3C draft import.</p>
+  </article>
+
+  <script type="application/json" id="scoremore-import-data">
+  {
+    "schema": "scoremore.question-import",
+    "schema_version": "1.0.0",
+    "package_id": "GSSSB-CCE-PHASE3B-DRYRUN-V1",
+    "generated_at": "2026-08-04T16:00:00Z",
+    "generator": "ScoreMore Phase 3B acceptance sample",
+    "source": {
+      "source_type": "ADMIN_TEST_PACKAGE",
+      "original_file_name": "ScoreMore_Phase3B_DryRun_Sample.html",
+      "board_id": "GSSSB",
+      "exam_id": "CCE",
+      "language": "GUJARATI",
+      "notes": "Synthetic normal questions used only to verify dry-run validation and duplicate prevention."
+    },
+    "defaults": {
+      "question_type": "NORMAL",
+      "board_id": "GSSSB",
+      "exam_id": "CCE",
+      "language": "GUJARATI",
+      "difficulty": "EASY",
+      "content_origin": "MANUAL_ENTRY",
+      "verification_status": "VERIFIED",
+      "answer_source": "MANUALLY_VERIFIED",
+      "tags": ["PHASE3B_TEST"]
+    },
+    "questions": [
+      {
+        "source_record_id": "Q001",
+        "proposed_question_id": "GSSSB-REASONING-SERIES-EASY-0001",
+        "subject_id": "REASONING",
+        "sort_order": 1,
+        "question_text": "શ્રેણીમાં આગળની સંખ્યા કઈ આવશે?\n\n2, 4, 8, 16, ?",
+        "options": {
+          "A": "24",
+          "B": "30",
+          "C": "32",
+          "D": "34"
+        },
+        "correct_answer": "C",
+        "explanation": "દરેક સંખ્યાને 2 વડે ગુણવામાં આવે છે. તેથી 16 × 2 = 32.",
+        "image_refs": [],
+        "tags": ["NUMBER_SERIES", "PHASE3B_TEST"]
+      },
+      {
+        "source_record_id": "Q002",
+        "proposed_question_id": "GSSSB-REASONING-SERIES-EASY-0002",
+        "subject_id": "REASONING",
+        "sort_order": 2,
+        "question_text": "શ્રેણીમાં આગળની સંખ્યા કઈ આવશે?\n\n5, 10, 20, 40, ?",
+        "options": {
+          "A": "50",
+          "B": "60",
+          "C": "80",
+          "D": "90"
+        },
+        "correct_answer": "C",
+        "explanation": "દરેક સંખ્યાને 2 વડે ગુણવામાં આવે છે. તેથી 40 × 2 = 80.",
+        "image_refs": [],
+        "tags": ["NUMBER_SERIES", "PHASE3B_TEST"]
+      }
+    ]
+  }
+  </script>
+</body>
+</html>
