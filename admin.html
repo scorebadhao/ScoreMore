@@ -112,6 +112,62 @@
           </section>
         </div>
 
+        <section id="htmlImportSection" class="section panel-card import-panel">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Phase 3B · dry run only</span>
+              <h2>HTML Question Import</h2>
+              <p class="muted">Safely parse one versioned ScoreMore HTML package, calculate SHA-256 checksums and create a persistent reconciliation report. No draft or published question is created in this phase.</p>
+            </div>
+            <button id="refreshImportBatches" class="button button-secondary" type="button">Recent dry runs</button>
+          </div>
+
+          <form id="htmlImportForm" class="stack-form" novalidate>
+            <label>ScoreMore HTML package
+              <input id="htmlImportFile" name="htmlImportFile" type="file" accept=".html,.htm,.xhtml,text/html,application/xhtml+xml" required />
+            </label>
+            <div class="import-safety-note">
+              <strong>Safe parser</strong>
+              <span>Only the JSON inside <code>#scoremore-import-data</code> is read. Imported HTML and scripts are never rendered or executed.</span>
+            </div>
+            <div class="button-row">
+              <button id="runImportDryRun" class="button button-primary" type="submit">Run dry validation</button>
+              <button id="downloadImportReport" class="button button-ghost" type="button" disabled>Download report</button>
+              <button class="button button-ghost" type="button" disabled title="Enabled in Phase 3C">Import valid records to drafts</button>
+            </div>
+          </form>
+
+          <div id="importPackagePreview" class="import-package-preview hidden" aria-live="polite"></div>
+
+          <div id="importReportPanel" class="hidden">
+            <div class="import-report-toolbar">
+              <div>
+                <span class="eyebrow">Persistent reconciliation</span>
+                <h3 id="importReportTitle">Dry-run report</h3>
+                <p id="importReportMeta" class="muted"></p>
+              </div>
+              <label>Filter
+                <select id="importItemFilter">
+                  <option value="ALL">All records</option>
+                  <option value="READY">Ready for draft</option>
+                  <option value="WARNINGS">Warnings</option>
+                  <option value="ERRORS">Errors/conflicts</option>
+                  <option value="DUPLICATES">Duplicates</option>
+                </select>
+              </label>
+            </div>
+            <div id="importSummaryGrid" class="import-summary-grid"></div>
+            <div id="importItemList" class="import-item-list" aria-live="polite"></div>
+          </div>
+
+          <div id="recentImportPanel" class="import-history hidden">
+            <div class="section-heading compact">
+              <div><span class="eyebrow">Audit history</span><h3>Recent HTML dry runs</h3></div>
+            </div>
+            <div id="recentImportList" class="import-history-list"></div>
+          </div>
+        </section>
+
         <section class="section panel-card">
           <div class="section-heading">
             <div><span class="eyebrow">Human review required</span><h2>Question drafts</h2></div>

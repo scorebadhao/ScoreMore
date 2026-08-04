@@ -34,7 +34,17 @@ Specification files:
 - `docs/HTML_IMPORT_SPEC_v1.md`
 - `docs/scoremore-question-import.schema.v1.json`
 
-Phase 3A adds no import UI. Phase 3B will build the safe dry-run parser and reconciliation screen.
+Phase 3A provides the database identity and duplicate foundation. Phase 3B now adds the safe dry-run interface:
+
+- non-executing HTML parsing through `assets/js/importEngine.js`;
+- raw-file and canonical-package SHA-256 checksums;
+- client structural validation plus authoritative PostgreSQL validation;
+- private HTML source storage;
+- persistent `import_batches` and `import_batch_items` reconciliation;
+- exact package/file report reuse;
+- mobile filters, recent batch history and downloadable reconciliation JSON.
+
+Phase 3B creates no drafts and publishes no questions. Controlled draft creation remains Phase 3C.
 
 ## Included vertical slice
 
@@ -53,6 +63,7 @@ Phase 3A adds no import UI. Phase 3B will build the safe dry-run parser and reco
 - Mandatory human draft review
 - Protected draft publication RPC
 - Fixed-question test manager
+- Phase 3B HTML import dry-run and reconciliation engine
 - Row Level Security policies
 - Supabase migrations and seed data
 - GitHub Pages deployment workflow
