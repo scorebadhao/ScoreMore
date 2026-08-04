@@ -70,6 +70,7 @@ export const api = Object.freeze({
       email: clean(email),
       password,
       options: {
+        emailRedirectTo: new URL('./student.html', window.location.href).href,
         data: {
           full_name: clean(fullName),
           mobile: normalizedMobile,
