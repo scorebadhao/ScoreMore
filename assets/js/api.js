@@ -33,6 +33,19 @@ function clean(value) {
   return typeof value === 'string' ? value.trim() : value;
 }
 
+function normalizeIndianMobile(value) {
+  const digits = String(clean(value) || '').replace(/\D/g, '');
+  const nationalNumber = digits.length === 12 && digits.startsWith('91')
+    ? digits.slice(2)
+    : digits;
+
+  if (!/^[6-9][0-9]{9}$/.test(nationalNumber)) {
+    throw new Error('Enter a valid 10-digit Indian mobile number.');
+  }
+
+  return `+91${nationalNumber}`;
+}
+
 async function getUser() {
   const client = requireSupabase();
   const sessionData = unwrap(
@@ -50,12 +63,18 @@ async function getUser() {
 }
 
 export const api = Object.freeze({
-  async signUp({ fullName, email, password }) {
+  async signUp({ fullName, mobile, email, password }) {
     const client = requireSupabase();
+    const normalizedMobile = normalizeIndianMobile(mobile);
     const data = unwrap(await withTimeout(client.auth.signUp({
       email: clean(email),
       password,
-      options: { data: { full_name: clean(fullName) } },
+      options: {
+        data: {
+          full_name: clean(fullName),
+          mobile: normalizedMobile,
+        },
+      },
     })), 'Unable to create account.');
     return data;
   },

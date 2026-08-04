@@ -65,6 +65,7 @@ export function bindStudentAuth({ onAuthenticated } = {}) {
     try {
       const result = await api.signUp({
         fullName: values.get('fullName'),
+        mobile: values.get('mobile'),
         email: values.get('email'),
         password: values.get('password'),
       });
