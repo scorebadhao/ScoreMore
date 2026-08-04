@@ -374,6 +374,111 @@ export const api = Object.freeze({
     ), 'Unable to reject the draft.');
   },
 
+  async validateImportPackage({ manifest, packageChecksum, rawFileChecksum }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('validate_import_package', {
+        p_manifest: manifest,
+        p_package_checksum_sha256: clean(packageChecksum)?.toLowerCase() || null,
+        p_source_checksum_sha256: clean(rawFileChecksum)?.toLowerCase() || null,
+      }),
+    ), 'Unable to validate the import package.');
+  },
+
+  async uploadImportHtml(file, rawFileChecksum) {
+    const client = requireSupabase();
+    const user = await getUser();
+    if (!user) throw new Error('Your session has expired.');
+
+    const checksum = clean(rawFileChecksum)?.toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(checksum || '')) {
+      throw new Error('A valid HTML SHA-256 checksum is required.');
+    }
+
+    const existingResponse = await withTimeout(
+      client.from('source_files')
+        .select('*')
+        .eq('checksum_sha256', checksum)
+        .maybeSingle(),
+    );
+    const existing = unwrap(existingResponse, 'Unable to inspect existing source files.');
+    if (existing) return { ...existing, reused: true };
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${user.id}/html-imports/${checksum}-${safeName}`;
+    const uploadResponse = await withTimeout(
+      client.storage.from(APP_CONFIG.sourceBucket).upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'text/html',
+      }),
+    );
+
+    let upload;
+    if (uploadResponse?.error) {
+      const duplicateStorage = String(uploadResponse.error.message || '').toLowerCase().includes('already exists');
+      if (!duplicateStorage) throw normalizeError(uploadResponse.error, 'Unable to upload the HTML package privately.');
+      upload = { path: storagePath };
+    } else {
+      upload = uploadResponse.data;
+    }
+
+    const insertResponse = await withTimeout(
+      client.from('source_files').insert({
+        storage_bucket: APP_CONFIG.sourceBucket,
+        storage_path: upload.path,
+        original_file_name: file.name,
+        mime_type: file.type || 'text/html',
+        file_size_bytes: file.size,
+        checksum_sha256: checksum,
+        uploaded_by: user.id,
+      }).select('*').single(),
+    );
+
+    if (!insertResponse?.error) return { ...insertResponse.data, reused: false };
+
+    if (insertResponse.error.code === '23505') {
+      const duplicate = unwrap(await withTimeout(
+        client.from('source_files').select('*').eq('checksum_sha256', checksum).single(),
+      ), 'Unable to load the existing HTML source record.');
+      return { ...duplicate, reused: true };
+    }
+
+    throw normalizeError(insertResponse.error, 'HTML uploaded, but its source record could not be saved.');
+  },
+
+  async stageImportDryRun({ manifest, rawFileChecksum, packageChecksum, sourceFileId }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('stage_import_dry_run', {
+        p_manifest: manifest,
+        p_raw_file_checksum_sha256: clean(rawFileChecksum)?.toLowerCase(),
+        p_package_checksum_sha256: clean(packageChecksum)?.toLowerCase(),
+        p_source_file_id: sourceFileId,
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 120000),
+    ), 'Unable to complete the authoritative import dry run.');
+  },
+
+  async getImportBatchReport(importBatchId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_import_batch_report', { p_import_batch_id: importBatchId }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 60000),
+    ), 'Unable to load the import reconciliation report.');
+  },
+
+  async listImportBatches({ pageSize = 20 } = {}) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.from('import_batches')
+        .select('import_batch_id, package_id, schema_version, status, total_raw, total_valid, total_warning, total_error, total_duplicate, created_at, completed_at, source_files(original_file_name, checksum_sha256)')
+        .eq('import_method', 'HTML_PACKAGE')
+        .order('created_at', { ascending: false })
+        .limit(Math.min(Math.max(Number(pageSize) || 20, 1), 50)),
+    ), 'Unable to load recent import dry runs.') || [];
+  },
+
   async uploadSourceFile(file) {
     const client = requireSupabase();
     const user = await getUser();
