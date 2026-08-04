@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#111827" />
-  <meta name="description" content="ScoreMore administration and draft question review." />
+  <meta name="description" content="ScoreMore administration for reviewed questions and dynamic tests." />
   <title>ScoreMore Admin</title>
   <link rel="stylesheet" href="./assets/css/main.css" />
 </head>
@@ -13,7 +13,7 @@
     <header class="topbar topbar-dark">
       <a class="brand" href="./index.html">
         <span class="brand-mark">S+</span>
-        <span><strong>ScoreMore Admin</strong><small>Draft → review → publish</small></span>
+        <span><strong>ScoreMore Admin</strong><small>Draft → review → test → publish</small></span>
       </a>
       <div class="topbar-actions">
         <a class="button button-ghost-light" href="./index.html">Student site</a>
@@ -29,7 +29,7 @@
       <section id="adminLoginPanel" class="auth-card section narrow-card">
         <span class="eyebrow">Protected administration</span>
         <h1>Admin sign in</h1>
-        <p>Only profiles with the database role <strong>ADMIN</strong> may access question drafts.</p>
+        <p>Only profiles with the database role <strong>ADMIN</strong> may access content and test operations.</p>
         <form id="adminLoginForm" class="auth-form" novalidate>
           <label>Email<input name="email" type="email" autocomplete="email" required /></label>
           <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
@@ -40,9 +40,9 @@
       <section id="adminPanel" class="hidden">
         <div class="dashboard-header">
           <div>
-            <span class="eyebrow">Question operations</span>
-            <h1>Draft Review Centre</h1>
-            <p>Every imported, PDF, OCR and AI question must remain here until human publication.</p>
+            <span class="eyebrow">Content and test operations</span>
+            <h1>Admin Operations Centre</h1>
+            <p>Review questions first, then assemble published questions into dynamic tests.</p>
           </div>
           <button id="refreshDrafts" class="button button-secondary" type="button">Refresh drafts</button>
         </div>
@@ -114,7 +114,7 @@
 
         <section class="section panel-card">
           <div class="section-heading">
-            <div><span class="eyebrow">Human review required</span><h2>Pending drafts</h2></div>
+            <div><span class="eyebrow">Human review required</span><h2>Question drafts</h2></div>
             <select id="draftStatusFilter" aria-label="Draft status filter">
               <option value="PENDING">Pending</option>
               <option value="IN_REVIEW">In review</option>
@@ -124,6 +124,100 @@
             </select>
           </div>
           <div id="draftList" class="draft-list" aria-live="polite"></div>
+        </section>
+
+        <section id="testManagerSection" class="section panel-card">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Test configuration</span>
+              <h2>Fixed Question Test Manager</h2>
+              <p class="muted">Select published master questions once and link them to a free test. No question is duplicated.</p>
+            </div>
+            <button id="refreshTests" class="button button-secondary" type="button">Refresh tests</button>
+          </div>
+
+          <form id="testForm" class="stack-form" novalidate>
+            <div class="form-row">
+              <label>Test ID
+                <input name="testId" placeholder="GSSSB-CCE-REASONING-SECTIONAL-0001" pattern="[A-Z0-9]+(?:-[A-Z0-9]+)+" required />
+              </label>
+              <label>Test name
+                <input name="testName" placeholder="Reasoning Practice Test 1" required />
+              </label>
+            </div>
+
+            <div class="form-row">
+              <label>Board
+                <select id="testBoardId" name="boardId" required><option value="">Select board</option></select>
+              </label>
+              <label>Exam
+                <select id="testExamId" name="examId" required><option value="">Select exam</option></select>
+              </label>
+              <label>Subject
+                <select id="testSubjectId" name="subjectId"><option value="">Optional for full tests</option></select>
+              </label>
+              <label>Topic
+                <select id="testTopicId" name="topicId"><option value="">Optional topic</option></select>
+              </label>
+            </div>
+
+            <div class="form-row">
+              <label>Test type
+                <select name="testType" required>
+                  <option value="SECTIONAL_MOCK" selected>Sectional Mock</option>
+                  <option value="FULL_MOCK">Full Mock</option>
+                  <option value="TOPIC_PRACTICE">Topic Practice</option>
+                  <option value="DAILY_QUIZ">Daily Quiz</option>
+                  <option value="PYQ_SECTIONAL">Sectional PYQ</option>
+                  <option value="PYQ_FULL">Full PYQ Paper</option>
+                </select>
+              </label>
+              <label>Duration in minutes<input name="durationMinutes" type="number" min="0" step="1" value="5" required /></label>
+              <label>Marks per question<input name="marksPerQuestion" type="number" min="0.001" step="0.001" value="1" required /></label>
+              <label>Negative marks<input name="negativeMarks" type="number" min="0" step="0.001" value="0" required /></label>
+            </div>
+
+            <div class="form-row">
+              <label>Catalogue sort order<input name="sortOrder" type="number" step="1" value="1" /></label>
+              <div class="inline-note">
+                <strong>Selection mode</strong>
+                <span>Fixed question list</span>
+              </div>
+              <div class="inline-note">
+                <strong>Access</strong>
+                <span>Free during this phase</span>
+              </div>
+            </div>
+
+            <div class="question-picker-heading">
+              <div>
+                <strong>Published questions</strong>
+                <span id="selectedQuestionCount" class="muted">0 selected</span>
+              </div>
+              <button id="loadPublishedQuestions" class="button button-ghost" type="button">Load matching questions</button>
+            </div>
+            <div id="publishedQuestionList" class="question-picker" aria-live="polite">
+              <div class="empty-state">Choose catalogue fields, then load published questions.</div>
+            </div>
+
+            <div class="draft-item-actions">
+              <button class="button button-ghost" type="submit" name="testAction" value="DRAFT">Save test as draft</button>
+              <button class="button button-primary" type="submit" name="testAction" value="PUBLISH">Publish test</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="section panel-card">
+          <div class="section-heading">
+            <div><span class="eyebrow">Catalogue control</span><h2>Configured tests</h2></div>
+            <select id="testStatusFilter" aria-label="Test status filter">
+              <option value="">All</option>
+              <option value="DRAFT">Draft</option>
+              <option value="PUBLISHED">Published</option>
+              <option value="ARCHIVED">Archived</option>
+            </select>
+          </div>
+          <div id="adminTestList" class="test-admin-list" aria-live="polite"></div>
         </section>
       </section>
     </main>
