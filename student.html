@@ -4,82 +4,171 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f766e" />
-  <meta name="description" content="ScoreMore student dashboard, tests and attempt workspace." />
+  <meta name="description" content="ScoreMore student dashboard, dynamic tests and attempt workspace." />
   <title>ScoreMore Student</title>
   <link rel="stylesheet" href="./assets/css/main.css" />
 </head>
-<body>
-  <div id="app" class="app-shell">
-    <header class="topbar">
+<body class="student-body">
+  <a class="skip-link" href="#mainContent">Skip to main content</a>
+
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-9.5Z"/><path d="m1.5 12.5 10.5-9 10.5 9"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5M9 12h6M9 16h6"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 6v6h-6M4 18v-6h6"/><path d="M18.5 9A7 7 0 0 0 6 6.5L4 9M5.5 15A7 7 0 0 0 18 17.5l2-2.5"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 22V3M5 4h11l-2 4 2 4H5"/></symbol>
+  </svg>
+
+  <div id="app" class="app-shell student-shell">
+    <header class="app-header">
       <a class="brand" href="./student.html#home" aria-label="ScoreMore student home">
-        <span class="brand-mark">S+</span>
-        <span>
+        <span class="brand-mark" aria-hidden="true">S+</span>
+        <span class="brand-copy">
           <strong id="brandName">ScoreMore</strong>
           <small id="brandTagline">Prepare smarter</small>
         </span>
       </a>
-      <div class="topbar-actions">
-        <span id="syncState" class="sync-state" aria-live="polite">Online</span>
-        <button id="signOutButton" class="button button-ghost hidden" type="button">Sign out</button>
+      <div class="header-actions">
+        <span id="syncState" class="sync-badge" aria-live="polite"><span class="sync-dot"></span>Online</span>
+        <button id="profileShortcut" class="icon-button" data-route="#profile" type="button" aria-label="Open profile">
+          <svg class="icon"><use href="#i-user"></use></svg>
+        </button>
+        <button id="signOutButton" class="button button-ghost compact-button hidden" type="button">Sign out</button>
       </div>
     </header>
 
-    <main>
+    <main id="mainContent" class="app-main">
       <section id="setupNotice" class="notice notice-warning hidden" role="status">
         Add the Supabase URL and publishable key to your environment before running ScoreMore.
       </section>
 
-      <section id="studentLoading" class="section loading-state">Checking your ScoreMore session…</section>
+      <section id="studentLoading" class="loading-state app-opening-state">Checking your ScoreMore session…</section>
 
       <section id="studentView" class="hidden">
-        <div class="dashboard-header">
-          <div>
-            <span class="eyebrow">Student dashboard</span>
-            <h1 id="welcomeTitle">Welcome</h1>
-            <p id="targetExamLabel">Your dynamic test catalogue is ready.</p>
+        <section id="dashboardHome" class="dashboard-shell">
+          <div class="dashboard-welcome">
+            <div class="dashboard-welcome-copy">
+              <span class="eyebrow light">Student dashboard</span>
+              <h1 id="welcomeTitle">Welcome</h1>
+              <p id="targetExamLabel">Your dynamic test catalogue is ready.</p>
+            </div>
+            <button id="continueAttemptButton" class="button dashboard-continue hidden" type="button">
+              <svg class="icon"><use href="#i-play"></use></svg><span>Continue test</span>
+            </button>
           </div>
-          <button id="continueAttemptButton" class="button button-primary hidden" type="button">Continue Test</button>
-        </div>
 
-        <div class="dashboard-grid">
-          <button class="dashboard-card" data-test-filter="PYQ_FULL" type="button"><strong>Previous Papers</strong><span>Original date and shift papers</span></button>
-          <button class="dashboard-card" data-test-filter="PYQ_SECTIONAL" type="button"><strong>Sectional Tests</strong><span>Subject-wise PYQ practice</span></button>
-          <button class="dashboard-card" data-test-filter="FULL_MOCK" type="button"><strong>Full Mock Tests</strong><span>Complete exam simulations</span></button>
-          <button class="dashboard-card" data-route="#bookmarks" type="button"><strong>Bookmarks</strong><span>Revise saved questions</span></button>
-          <button class="dashboard-card" data-route="#mistakes" type="button"><strong>Mistake Revision</strong><span>Practice weak areas</span></button>
-          <button class="dashboard-card" data-route="#results" type="button"><strong>My Performance</strong><span>Results and analytics</span></button>
-        </div>
+          <div class="dashboard-summary-grid" aria-label="Preparation summary">
+            <article class="summary-card"><span>Available tests</span><strong id="summaryTestCount">0</strong><small>Live catalogue</small></article>
+            <article class="summary-card"><span>Previous papers</span><strong id="summaryPyqCount">0</strong><small>Original papers</small></article>
+            <article class="summary-card"><span>Practice sets</span><strong id="summaryPracticeCount">0</strong><small>Sectional and mock</small></article>
+            <article class="summary-card"><span>Active attempt</span><strong id="summaryActiveAttempt">0</strong><small>Resume anytime</small></article>
+          </div>
 
-        <section id="catalogueSection" class="section">
-          <div class="section-heading">
+          <div id="continueAttemptCard" class="continue-card hidden" aria-live="polite"></div>
+
+          <div class="section-heading compact dashboard-section-heading">
+            <div><span class="eyebrow">Quick practice</span><h2>What would you like to do?</h2></div>
+          </div>
+
+          <div class="dashboard-grid">
+            <button class="dashboard-card" data-test-filter="PYQ_FULL" type="button">
+              <span class="dashboard-icon"><svg class="icon"><use href="#i-file"></use></svg></span>
+              <span class="dashboard-copy"><strong>Previous Papers</strong><small><b id="quickPyqCount">0</b> original papers</small></span>
+              <svg class="icon card-arrow"><use href="#i-arrow"></use></svg>
+            </button>
+            <button class="dashboard-card" data-test-filter="PYQ_SECTIONAL" type="button">
+              <span class="dashboard-icon"><svg class="icon"><use href="#i-layers"></use></svg></span>
+              <span class="dashboard-copy"><strong>Sectional Tests</strong><small><b id="quickSectionalCount">0</b> subject-wise tests</small></span>
+              <svg class="icon card-arrow"><use href="#i-arrow"></use></svg>
+            </button>
+            <button class="dashboard-card" data-test-filter="FULL_MOCK" type="button">
+              <span class="dashboard-icon"><svg class="icon"><use href="#i-target"></use></svg></span>
+              <span class="dashboard-copy"><strong>Full Mock Tests</strong><small><b id="quickMockCount">0</b> exam simulations</small></span>
+              <svg class="icon card-arrow"><use href="#i-arrow"></use></svg>
+            </button>
+            <button class="dashboard-card" data-route="#bookmarks" type="button">
+              <span class="dashboard-icon"><svg class="icon"><use href="#i-bookmark"></use></svg></span>
+              <span class="dashboard-copy"><strong>Bookmarks</strong><small>Revise saved questions</small></span>
+              <svg class="icon card-arrow"><use href="#i-arrow"></use></svg>
+            </button>
+            <button class="dashboard-card" data-route="#mistakes" type="button">
+              <span class="dashboard-icon"><svg class="icon"><use href="#i-flag"></use></svg></span>
+              <span class="dashboard-copy"><strong>Mistake Revision</strong><small>Practice weak areas</small></span>
+              <svg class="icon card-arrow"><use href="#i-arrow"></use></svg>
+            </button>
+            <button class="dashboard-card" data-route="#results" type="button">
+              <span class="dashboard-icon"><svg class="icon"><use href="#i-chart"></use></svg></span>
+              <span class="dashboard-copy"><strong>My Performance</strong><small>Results and analytics</small></span>
+              <svg class="icon card-arrow"><use href="#i-arrow"></use></svg>
+            </button>
+          </div>
+        </section>
+
+        <section id="catalogueSection" class="section-block catalogue-section student-catalogue-section">
+          <div class="page-heading catalogue-page-heading">
             <div>
               <span class="eyebrow">Dynamic catalogue</span>
               <h2 id="catalogueTitle">All Tests</h2>
+              <p>Search, filter and continue any published ScoreMore test.</p>
             </div>
-            <select id="testTypeFilter" aria-label="Filter tests by type">
-              <option value="">All test types</option>
-              <option value="PYQ_FULL">Previous papers</option>
-              <option value="PYQ_SECTIONAL">Sectional</option>
-              <option value="FULL_MOCK">Full mock</option>
-              <option value="TOPIC_PRACTICE">Topic practice</option>
-              <option value="DAILY_QUIZ">Daily quiz</option>
-            </select>
+            <span class="catalogue-heading-badge"><svg class="icon"><use href="#i-grid"></use></svg><b id="catalogueCount">0</b></span>
           </div>
-          <div id="studentTestList" class="card-grid" aria-live="polite"></div>
+
+          <div id="testTabs" class="scroll-tabs" role="tablist" aria-label="Test types"></div>
+
+          <div class="catalogue-toolbar card">
+            <label class="catalogue-search">
+              <svg class="icon"><use href="#i-search"></use></svg>
+              <span class="sr-only">Search tests</span>
+              <input id="testSearch" type="search" placeholder="Search test, board, exam or subject" autocomplete="off" />
+            </label>
+            <label class="catalogue-sort">
+              <span>Test type</span>
+              <select id="testTypeFilter" aria-label="Filter tests by type">
+                <option value="">All test types</option>
+                <option value="PYQ_FULL">Previous papers</option>
+                <option value="PYQ_SECTIONAL">Sectional PYQ</option>
+                <option value="SECTIONAL_MOCK">Sectional mock</option>
+                <option value="FULL_MOCK">Full mock</option>
+                <option value="TOPIC_PRACTICE">Topic practice</option>
+                <option value="DAILY_QUIZ">Daily quiz</option>
+              </select>
+            </label>
+            <button id="refreshStudentTests" class="button button-ghost icon-button-label" type="button">
+              <svg class="icon"><use href="#i-refresh"></use></svg><span>Refresh</span>
+            </button>
+          </div>
+
+          <div class="catalogue-result-bar">
+            <div><strong id="catalogueResultText">Loading tests…</strong><span id="catalogueScopeText">Published ScoreMore catalogue</span></div>
+            <button id="clearCatalogueFilters" class="text-button hidden" type="button">Clear filters</button>
+          </div>
+
+          <div id="studentTestList" class="catalogue-grid" aria-live="polite"></div>
         </section>
 
-        <section id="attemptSection" class="section hidden" aria-live="polite">
+        <section id="attemptSection" class="section-block hidden" aria-live="polite">
           <div id="testEngineRoot"></div>
         </section>
       </section>
     </main>
 
-    <nav id="mobileNav" class="mobile-nav hidden" aria-label="Student navigation">
-      <button data-route="#home" class="active" type="button">Home</button>
-      <button data-route="#tests" type="button">Tests</button>
-      <button data-route="#practice" type="button">Practice</button>
-      <button data-route="#results" type="button">Results</button>
-      <button data-route="#profile" type="button">Profile</button>
+    <nav id="mobileNav" class="bottom-nav hidden" aria-label="Student navigation">
+      <button data-route="#home" class="active" type="button"><svg class="icon"><use href="#i-home"></use></svg><span>Home</span></button>
+      <button data-route="#tests" type="button"><svg class="icon"><use href="#i-grid"></use></svg><span>Tests</span></button>
+      <button data-route="#practice" type="button"><svg class="icon"><use href="#i-target"></use></svg><span>Practice</span></button>
+      <button data-route="#results" type="button"><svg class="icon"><use href="#i-chart"></use></svg><span>Results</span></button>
+      <button data-route="#profile" type="button"><svg class="icon"><use href="#i-user"></use></svg><span>Profile</span></button>
     </nav>
   </div>
 

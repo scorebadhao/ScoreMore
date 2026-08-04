@@ -10,6 +10,10 @@ It does not modify or connect to the ScoreBadhao Google Sheets + Apps Script pro
 - `student.html` — authenticated student dashboard, test catalogue and test engine
 - `admin.html` — protected question and test administration
 
+## Phase 2 UI foundation
+
+ScoreMore now uses a separate public page and authenticated student application with a ScoreBadhao-inspired, ScoreMore-specific mobile UI. The UX reference is documented in `docs/UI_PARITY_SCOREBADHAO.md`; no ScoreBadhao backend architecture is used.
+
 ## Included vertical slice
 
 - Supabase email/password authentication
