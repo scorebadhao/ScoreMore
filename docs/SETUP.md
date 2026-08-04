@@ -158,7 +158,19 @@ Set **Settings → Pages → Source** to **GitHub Actions**.
 
 Push to `main`. The included workflow builds and deploys `dist/`.
 
-## 10. Production checklist
+## 10. Phase 3B HTML dry-run verification
+
+After applying `20260804040000_phase3b_import_dry_run.sql`, open the admin page and use:
+
+```text
+examples/import/ScoreMore_Phase3B_DryRun_Sample.html
+```
+
+The dry run must create one private source record, one import batch and one item row per package record. It must create no `draft_questions` and no published `questions`. Re-importing the exact same file must reuse the existing report.
+
+Follow `docs/PHASE3B_ACCEPTANCE_TESTS.md` before beginning Phase 3C.
+
+## 11. Production checklist
 
 - Email confirmation and redirect URLs configured
 - Site URL updated in Supabase Auth

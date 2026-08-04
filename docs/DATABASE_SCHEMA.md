@@ -246,6 +246,8 @@ Phase 3 import validation:
 - `validate_import_package(manifest, package_checksum, source_checksum)`
 - `validate_import_question(question)`
 - `link_question_occurrence(question_id, occurrence, import_batch_id, source_file_id, import_item_id)`
+- `stage_import_dry_run(manifest, raw_file_checksum, package_checksum, source_file_id)`
+- `get_import_batch_report(import_batch_id)`
 
 All import RPCs require an active database-owned ADMIN profile.
 
@@ -267,4 +269,36 @@ Private bucket:
 source-documents
 ```
 
-Current upload types include PDF, PNG, JPEG and WebP. Phase 3B will add controlled HTML package handling without making imported files public.
+Current private upload types include PDF, PNG, JPEG, WebP and versioned ScoreMore HTML import packages. HTML files remain admin-only and are never rendered or executed.
+
+
+## Phase 3B dry-run operations
+
+### `stage_import_dry_run()`
+
+Admin-only security-definer RPC. It accepts one validated manifest, raw HTML checksum, canonical package checksum and private `source_file_id`. It:
+
+- reuses an existing exact package report;
+- blocks package ID conflicts;
+- creates one `import_batches` dry-run row;
+- merges source → defaults → item metadata;
+- normalizes each record to database-shaped JSON;
+- calls `validate_import_question()` for live catalogue and master duplicate checks;
+- detects duplicate IDs/content/answers/occurrences inside the same package;
+- detects inconsistent passage/group metadata;
+- persists every item in `import_batch_items`;
+- writes an admin audit event;
+- creates no `draft_questions` and no `questions`.
+
+### `get_import_batch_report()`
+
+Returns an admin-only JSON report containing batch/source identity, summary counters and ordered item reconciliation rows.
+
+### Dry-run status values
+
+`import_batches.status` uses:
+
+- `DRY_RUN_PROCESSING`
+- `DRY_RUN_COMPLETE`
+- `DRY_RUN_COMPLETE_WITH_WARNINGS`
+- `DRY_RUN_COMPLETE_WITH_ERRORS`

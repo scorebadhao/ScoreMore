@@ -1,4 +1,4 @@
-# ScoreMore Architecture Lock v1.3
+# ScoreMore Architecture Lock v1.4
 
 **Status:** APPROVED AND LOCKED  
 **Approved:** 4 August 2026
@@ -121,14 +121,18 @@ The user approved the Phase 3 design on 4 August 2026.
 - `RECONSTRUCTED` and `AI_GENERATED` content cannot be published as original PYQ content.
 - No import route inserts directly into `questions`; `publish_draft_question()` remains mandatory.
 - The versioned specification is `docs/HTML_IMPORT_SPEC_v1.md`.
+- Phase 3B uses `assets/js/importEngine.js` for non-executing HTML parsing, UTF-8 decoding, canonical JSON and browser SHA-256 calculation.
+- `stage_import_dry_run()` is the authoritative admin-only write boundary for dry-run batches and item reconciliation.
+- Phase 3B creates `import_batches` and `import_batch_items` only; it must create no drafts and no published master questions.
+- Exact package/file re-imports reuse the existing report instead of creating duplicate source, batch or item rows.
 
 ## Locked near-term phase sequence
 
 1. Separate the public and authenticated student applications — COMPLETED.
 2. ScoreBadhao-inspired ScoreMore UI redesign — COMPLETED for the public landing, student dashboard, catalogue and test-engine foundation.
 3. Build the validated HTML import engine:
-   - Phase 3A database identity, duplicate constraints, validation RPCs and specification — COMPLETED in repository files; production migration pending.
-   - Phase 3B admin dry-run parser and reconciliation UI.
+   - Phase 3A database identity, duplicate constraints, validation RPCs and specification — COMPLETED and deployed.
+   - Phase 3B admin safe parser, checksum identity, persistent dry-run staging and reconciliation UI — COMPLETED in repository files; production deployment pending.
    - Phase 3C controlled draft import and occurrence linking.
    - Phase 3D duplicate/conflict acceptance testing.
 4. Reuse imported master questions across original papers, sectional tests and topic practice without duplication.

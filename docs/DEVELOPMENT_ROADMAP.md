@@ -36,7 +36,7 @@ Acceptance:
 
 ### Phase 3 — Accurate validated HTML import engine
 
-#### Phase 3A — Import database foundation — COMPLETED IN REPOSITORY
+#### Phase 3A — Import database foundation — COMPLETED AND DEPLOYED
 
 - Added versioned HTML/JSON package specification and machine-readable JSON Schema.
 - Added raw-file, canonical-package and source checksum identities.
@@ -57,15 +57,25 @@ Acceptance before Phase 3B:
 - New import tables remain admin-only under RLS.
 - Validation RPCs return structured errors/warnings without writing data.
 
-#### Phase 3B — Dry-run parser and reconciliation UI
+#### Phase 3B — Dry-run parser and reconciliation UI — COMPLETED IN REPOSITORY
 
-- Safely parse only `#scoremore-import-data`.
-- Calculate raw-file and canonical-payload checksums.
-- Validate JSON Schema and package identity.
-- Merge source/default/item metadata.
-- Call PostgreSQL validation for every record.
-- Persist and display dry-run status, errors, warnings, duplicates and conflicts.
-- Do not create drafts yet.
+- Safely parses only `#scoremore-import-data`; imported HTML and scripts are never rendered or executed.
+- Calculates raw-file and canonical-payload SHA-256 checksums in the browser.
+- Performs versioned structural validation aligned to the locked JSON Schema.
+- Reuses exact source/package reports and blocks package ID conflicts.
+- Uploads new HTML packages to the private admin-only source bucket.
+- Calls PostgreSQL validation for every merged source/default/item record.
+- Persists item-level status, errors, warnings, fingerprints, duplicates and conflicts.
+- Provides Android-friendly filters, batch history and downloadable reconciliation JSON.
+- Creates no drafts and no published questions.
+
+Acceptance before Phase 3C:
+
+- database and frontend workflows deploy successfully;
+- the same file reuses one source, one batch and the same item rows;
+- changed content with the same package ID is blocked;
+- dry-run summary and item details are readable on mobile;
+- manual draft, Test Manager and student attempt flows pass regression.
 
 #### Phase 3C — Controlled draft import
 

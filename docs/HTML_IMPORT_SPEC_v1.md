@@ -214,7 +214,7 @@ Defaults reduce repeated metadata but do not override explicit item values.
 }
 ```
 
-Phase 3B will merge in this order:
+Phase 3B merges in this order:
 
 ```text
 source metadata
@@ -358,7 +358,7 @@ Each `import_batch_items` row uses one of:
 | Loose fingerprint match only | `POSSIBLE_DUPLICATE` | Human decision required |
 | New valid content | `VALID` or `VALID_WITH_WARNINGS` | Draft only after confirmation |
 
-## 15. Phase 3A database RPCs
+## 15. Phase 3A and Phase 3B database RPCs
 
 ### `validate_import_package(manifest, package_checksum, source_checksum)`
 
@@ -371,6 +371,14 @@ Validates a fully merged question record against the live catalogue, computes fi
 ### `link_question_occurrence(question_id, occurrence, import_batch_id, source_file_id, import_item_id)`
 
 Admin-only trusted operation for linking a human-confirmed duplicate occurrence to an existing published master question. It never creates another master question.
+
+### `stage_import_dry_run(manifest, raw_file_checksum, package_checksum, source_file_id)`
+
+Phase 3B admin-only operation that persists one validated import batch and one reconciliation row per package question. It performs live catalogue checks, fingerprints, database duplicate checks, intra-package duplicate/conflict checks and group consistency checks. It creates no draft and no published question.
+
+### `get_import_batch_report(import_batch_id)`
+
+Returns the complete admin-only batch summary and ordered item-level reconciliation report.
 
 ## 16. Security
 
@@ -386,4 +394,4 @@ Admin-only trusted operation for linking a human-confirmed duplicate occurrence 
 
 Changes that add, remove or reinterpret package fields require a new `schema_version` and a new machine-readable schema file.
 
-Phase 3B must reject unsupported schema versions rather than guessing how to interpret them.
+Phase 3B rejects unsupported schema versions rather than guessing how to interpret them. The browser validator is an early safety gate; PostgreSQL remains authoritative for catalogue, duplicate and conflict outcomes.
