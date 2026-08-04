@@ -74,6 +74,7 @@
 
           <form id="signUpForm" class="auth-form hidden" novalidate>
             <label>Full name<input name="fullName" type="text" autocomplete="name" required /></label>
+            <label>Mobile number (+91)<input name="mobile" type="tel" inputmode="numeric" autocomplete="tel-national" pattern="[6-9][0-9]{9}" minlength="10" maxlength="10" placeholder="10-digit mobile number" required /></label>
             <label>Email<input name="email" type="email" autocomplete="email" required /></label>
             <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
             <button class="button button-primary button-block" type="submit">Create account</button>
