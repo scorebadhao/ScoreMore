@@ -14,11 +14,18 @@ const elements = {
   statusFilter: document.getElementById('draftStatusFilter'),
   dialog: document.getElementById('draftDialog'),
   dialogContent: document.getElementById('draftDialogContent'),
+  testForm: document.getElementById('testForm'),
+  publishedQuestionList: document.getElementById('publishedQuestionList'),
+  selectedQuestionCount: document.getElementById('selectedQuestionCount'),
+  adminTestList: document.getElementById('adminTestList'),
+  testStatusFilter: document.getElementById('testStatusFilter'),
 };
 
 let profile = null;
 let drafts = [];
 let referenceData = { boards: [], exams: [], subjects: [], topics: [] };
+let publishedQuestions = [];
+let configuredTests = [];
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -53,7 +60,7 @@ async function showAdmin() {
   elements.adminPanel.classList.remove('hidden');
   elements.signOut.classList.remove('hidden');
   await loadReferenceData();
-  await loadDrafts();
+  await Promise.all([loadDrafts(), loadConfiguredTests()]);
 }
 
 function renderDrafts() {
@@ -107,7 +114,7 @@ function fillSelect(select, rows, valueKey, labelKey, placeholder) {
   if ([...select.options].some((option) => option.value === current)) select.value = current;
 }
 
-function refreshReferenceSelects() {
+function refreshDraftReferenceSelects() {
   const boardSelect = document.getElementById('draftBoardId');
   const examSelect = document.getElementById('draftExamId');
   const subjectSelect = document.getElementById('draftSubjectId');
@@ -122,9 +129,126 @@ function refreshReferenceSelects() {
   fillSelect(topicSelect, topics, 'topic_id', 'topic_name', 'Optional topic');
 }
 
+function refreshTestReferenceSelects() {
+  const boardSelect = document.getElementById('testBoardId');
+  const examSelect = document.getElementById('testExamId');
+  const subjectSelect = document.getElementById('testSubjectId');
+  const topicSelect = document.getElementById('testTopicId');
+
+  fillSelect(boardSelect, referenceData.boards, 'board_id', 'board_name', 'Select board');
+  const exams = referenceData.exams.filter((row) => !boardSelect?.value || row.board_id === boardSelect.value);
+  fillSelect(examSelect, exams, 'exam_id', 'exam_name', 'Select exam');
+  const subjects = referenceData.subjects.filter((row) => !examSelect?.value || row.exam_id === examSelect.value);
+  fillSelect(subjectSelect, subjects, 'subject_id', 'subject_name', 'Optional for full tests');
+  const topics = referenceData.topics.filter((row) => !subjectSelect?.value || row.subject_id === subjectSelect.value);
+  fillSelect(topicSelect, topics, 'topic_id', 'topic_name', 'Optional topic');
+}
+
 async function loadReferenceData() {
   referenceData = await api.getAdminReferenceData();
-  refreshReferenceSelects();
+  refreshDraftReferenceSelects();
+  refreshTestReferenceSelects();
+}
+
+function resetQuestionPicker() {
+  publishedQuestions = [];
+  elements.publishedQuestionList.innerHTML = '<div class="empty-state">Catalogue selection changed. Load matching questions again.</div>';
+  updateSelectedQuestionCount();
+}
+
+function updateSelectedQuestionCount() {
+  const count = elements.publishedQuestionList?.querySelectorAll('[data-question-id]:checked').length || 0;
+  elements.selectedQuestionCount.textContent = `${count} selected`;
+}
+
+function renderPublishedQuestions() {
+  if (!publishedQuestions.length) {
+    elements.publishedQuestionList.innerHTML = '<div class="empty-state">No published questions match these catalogue fields.</div>';
+    updateSelectedQuestionCount();
+    return;
+  }
+
+  elements.publishedQuestionList.innerHTML = publishedQuestions.map((question) => `
+    <label class="question-picker-item">
+      <input type="checkbox" data-question-id="${escapeHtml(question.question_id)}" />
+      <span>
+        <strong>${escapeHtml(question.question_id)}</strong>
+        <span class="question-picker-meta">
+          <span class="chip">${escapeHtml(question.question_type)}</span>
+          <span class="chip">${escapeHtml(question.subject_id)}</span>
+          <span class="chip">${escapeHtml(question.difficulty)}</span>
+        </span>
+        <span class="question-picker-text">${escapeHtml(question.question_text)}</span>
+      </span>
+    </label>
+  `).join('');
+
+  elements.publishedQuestionList.querySelectorAll('[data-question-id]').forEach((checkbox) => {
+    checkbox.addEventListener('change', updateSelectedQuestionCount);
+  });
+  updateSelectedQuestionCount();
+}
+
+async function loadPublishedQuestions() {
+  const form = elements.testForm;
+  const values = Object.fromEntries(new FormData(form).entries());
+  if (!values.boardId || !values.examId) {
+    return toast.warning('Select a board and exam before loading questions.');
+  }
+
+  elements.publishedQuestionList.innerHTML = '<div class="loading-state">Loading published questions…</div>';
+  updateSelectedQuestionCount();
+  try {
+    publishedQuestions = await api.listPublishedQuestions({
+      boardId: values.boardId,
+      examId: values.examId,
+      subjectId: values.subjectId,
+      topicId: values.topicId,
+      pageSize: 200,
+    });
+    renderPublishedQuestions();
+  } catch (error) {
+    elements.publishedQuestionList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    toast.error(error.message);
+  }
+}
+
+function renderConfiguredTests() {
+  if (!configuredTests.length) {
+    elements.adminTestList.innerHTML = '<div class="empty-state">No tests match this status.</div>';
+    return;
+  }
+
+  elements.adminTestList.innerHTML = configuredTests.map((test) => `
+    <article class="test-admin-item">
+      <div class="draft-item-header">
+        <div>
+          <span class="eyebrow">${escapeHtml(test.status)} · ${escapeHtml(test.test_type)}</span>
+          <h3>${escapeHtml(test.test_name)}</h3>
+          <p class="muted">${escapeHtml(test.test_id)}</p>
+        </div>
+        <span class="chip">${escapeHtml(test.question_count)} question${Number(test.question_count) === 1 ? '' : 's'}</span>
+      </div>
+      <div class="test-meta">
+        ${test.boards?.board_name ? `<span class="chip">${escapeHtml(test.boards.board_name)}</span>` : ''}
+        ${test.exams?.exam_name ? `<span class="chip">${escapeHtml(test.exams.exam_name)}</span>` : ''}
+        ${test.subjects?.subject_name ? `<span class="chip">${escapeHtml(test.subjects.subject_name)}</span>` : ''}
+        <span class="chip">${escapeHtml(test.duration_minutes)} min</span>
+        <span class="chip">${escapeHtml(test.selection_mode)}</span>
+      </div>
+    </article>
+  `).join('');
+}
+
+async function loadConfiguredTests() {
+  elements.adminTestList.innerHTML = '<div class="loading-state">Loading configured tests…</div>';
+  try {
+    configuredTests = await api.listAdminTests({ status: elements.testStatusFilter.value });
+    renderConfiguredTests();
+  } catch (error) {
+    elements.adminTestList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    toast.error(error.message);
+  }
 }
 
 function openReview(draftId) {
@@ -206,6 +330,7 @@ function bindEvents() {
   elements.loginForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     const values = new FormData(form);
     setBusy(form, true);
     const loading = toast.loading('Signing in…');
@@ -229,13 +354,24 @@ function bindEvents() {
 
   document.getElementById('refreshDrafts')?.addEventListener('click', loadDrafts);
   elements.statusFilter?.addEventListener('change', loadDrafts);
-  document.getElementById('draftBoardId')?.addEventListener('change', refreshReferenceSelects);
-  document.getElementById('draftExamId')?.addEventListener('change', refreshReferenceSelects);
-  document.getElementById('draftSubjectId')?.addEventListener('change', refreshReferenceSelects);
+  document.getElementById('draftBoardId')?.addEventListener('change', refreshDraftReferenceSelects);
+  document.getElementById('draftExamId')?.addEventListener('change', refreshDraftReferenceSelects);
+  document.getElementById('draftSubjectId')?.addEventListener('change', refreshDraftReferenceSelects);
+
+  document.getElementById('refreshTests')?.addEventListener('click', loadConfiguredTests);
+  elements.testStatusFilter?.addEventListener('change', loadConfiguredTests);
+  document.getElementById('loadPublishedQuestions')?.addEventListener('click', loadPublishedQuestions);
+  ['testBoardId', 'testExamId', 'testSubjectId', 'testTopicId'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      refreshTestReferenceSelects();
+      resetQuestionPicker();
+    });
+  });
 
   elements.sourceUploadForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     const file = new FormData(form).get('sourceFile');
     if (!(file instanceof File) || !file.size) return toast.warning('Choose a PDF or image first.');
     setBusy(form, true);
@@ -256,6 +392,7 @@ function bindEvents() {
   elements.draftForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    if (!form.reportValidity()) return;
     const values = Object.fromEntries(new FormData(form).entries());
     setBusy(form, true);
     const loading = toast.loading('Saving to draft questions…');
@@ -268,6 +405,36 @@ function bindEvents() {
       form.elements.sourceFileId.value = retainedSource;
       form.elements.language.value = 'GUJARATI';
       await loadDrafts();
+    } catch (error) {
+      loading.close();
+      toast.error(error.message);
+    } finally { setBusy(form, false); }
+  });
+
+  elements.testForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+
+    const questionIds = [...elements.publishedQuestionList.querySelectorAll('[data-question-id]:checked')]
+      .map((checkbox) => checkbox.dataset.questionId)
+      .filter(Boolean);
+
+    if (!questionIds.length) return toast.warning('Select at least one published question.');
+
+    const values = Object.fromEntries(new FormData(form).entries());
+    const publishTest = event.submitter?.value === 'PUBLISH';
+    setBusy(form, true);
+    const loading = toast.loading(publishTest ? 'Publishing test…' : 'Saving test draft…');
+    try {
+      const result = await api.saveFixedQuestionTest({
+        ...values,
+        questionIds,
+        publish: publishTest,
+      });
+      loading.close();
+      toast.success(`${result.test_id} saved as ${result.status}.`);
+      await loadConfiguredTests();
     } catch (error) {
       loading.close();
       toast.error(error.message);

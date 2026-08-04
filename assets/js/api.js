@@ -246,6 +246,68 @@ export const api = Object.freeze({
     };
   },
 
+  async listPublishedQuestions({ boardId = '', examId = '', subjectId = '', topicId = '', pageSize = 100 } = {}) {
+    const client = requireSupabase();
+    let query = client
+      .from('questions')
+      .select('question_id, question_type, board_id, exam_id, subject_id, topic_id, language, difficulty, question_text')
+      .eq('question_status', 'PUBLISHED')
+      .order('question_id', { ascending: true })
+      .limit(Math.min(Math.max(Number(pageSize) || 100, 1), 200));
+
+    if (boardId) query = query.eq('board_id', clean(boardId).toUpperCase());
+    if (examId) query = query.eq('exam_id', clean(examId).toUpperCase());
+    if (subjectId) query = query.eq('subject_id', clean(subjectId).toUpperCase());
+    if (topicId) query = query.eq('topic_id', clean(topicId).toUpperCase());
+
+    return unwrap(await withTimeout(query), 'Unable to load published questions.') || [];
+  },
+
+  async listAdminTests({ status = '', pageSize = 50 } = {}) {
+    const client = requireSupabase();
+    let query = client
+      .from('tests')
+      .select(`
+        test_id, test_name, test_type, selection_mode, question_count,
+        duration_minutes, marks_per_question, negative_marks, status,
+        is_free, sort_order, created_at, updated_at,
+        boards (board_id, board_name),
+        exams (exam_id, exam_name),
+        subjects (subject_id, subject_name),
+        topics (topic_id, topic_name)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(Math.min(Math.max(Number(pageSize) || 50, 1), 100));
+
+    if (status) query = query.eq('status', clean(status).toUpperCase());
+    return unwrap(await withTimeout(query), 'Unable to load configured tests.') || [];
+  },
+
+  async saveFixedQuestionTest(input) {
+    const client = requireSupabase();
+    const questionIds = Array.isArray(input.questionIds)
+      ? input.questionIds.map((value) => clean(value).toUpperCase()).filter(Boolean)
+      : [];
+
+    return unwrap(await withTimeout(
+      client.rpc('save_fixed_question_test', {
+        p_test_id: clean(input.testId).toUpperCase(),
+        p_test_name: clean(input.testName),
+        p_board_id: clean(input.boardId).toUpperCase(),
+        p_exam_id: clean(input.examId).toUpperCase(),
+        p_subject_id: clean(input.subjectId)?.toUpperCase() || null,
+        p_topic_id: clean(input.topicId)?.toUpperCase() || null,
+        p_test_type: clean(input.testType).toUpperCase(),
+        p_duration_minutes: Math.max(0, Math.round(Number(input.durationMinutes) || 0)),
+        p_marks_per_question: Number(input.marksPerQuestion) || 1,
+        p_negative_marks: Math.max(0, Number(input.negativeMarks) || 0),
+        p_sort_order: Math.round(Number(input.sortOrder) || 0),
+        p_question_ids: questionIds,
+        p_publish: Boolean(input.publish),
+      }),
+    ), 'Unable to save the test configuration.');
+  },
+
   async listDrafts({ status = 'PENDING', page = 0, pageSize = 30 } = {}) {
     const client = requireSupabase();
     const from = page * pageSize;
