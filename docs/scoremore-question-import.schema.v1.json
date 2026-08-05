@@ -45,6 +45,21 @@
       "items": {
         "$ref": "#/$defs/question"
       }
+    },
+    "package_version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "supersedes_package_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{5,119}$"
+    },
+    "paper": {
+      "$ref": "#/$defs/paper"
     }
   },
   "$defs": {
@@ -102,6 +117,7 @@
         "MANUALLY_VERIFIED",
         "SOURCE_BOOK",
         "ADMIN_CORRECTED",
+        "AI_PROPOSED",
         null
       ]
     },
@@ -317,6 +333,18 @@
           "items": {
             "type": "string"
           }
+        },
+        "transcription_confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "answer_confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "topic_confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "source_quality": {
+          "$ref": "#/$defs/sourceQuality"
         }
       }
     },
@@ -498,6 +526,175 @@
           "uniqueItems": true,
           "items": {
             "type": "string"
+          }
+        },
+        "suggested_topic_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "suggested_topic_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "topic_confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "transcription_confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "answer_confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "answer_review_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_quality": {
+          "$ref": "#/$defs/sourceQuality"
+        },
+        "is_supplemental": {
+          "type": "boolean",
+          "default": false
+        },
+        "supplement_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "confidence": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        null
+      ]
+    },
+    "sourceQuality": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "CLEAR",
+        "LOW_RESOLUTION",
+        "CROPPED",
+        "DIAGRAM_REVIEW",
+        "UNREADABLE",
+        null
+      ]
+    },
+    "sectionPlanRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section_code",
+        "subject_id",
+        "start_question_no",
+        "end_question_no",
+        "expected_count",
+        "extracted_count",
+        "supplemental_count"
+      ],
+      "properties": {
+        "section_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_question_no": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_question_no": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "expected_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "extracted_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "supplemental_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "paper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "declared_total_questions",
+        "extracted_source_questions",
+        "missing_question_count",
+        "missing_question_numbers",
+        "generated_supplement_count",
+        "completeness_status",
+        "section_plan"
+      ],
+      "properties": {
+        "declared_total_questions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "extracted_source_questions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_question_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_question_numbers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "generated_supplement_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completeness_status": {
+          "enum": [
+            "COMPLETE",
+            "PARTIAL",
+            "PARTIAL_WITH_SUPPLEMENTS",
+            "REJECTED"
+          ]
+        },
+        "rejection_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "section_plan": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sectionPlanRow"
           }
         }
       }

@@ -1,4 +1,4 @@
-# ScoreMore Architecture Lock v1.5
+# ScoreMore Architecture Lock v1.6
 
 **Status:** APPROVED AND LOCKED  
 **Approved:** 4 August 2026
@@ -139,6 +139,19 @@ The user approved the Phase 3 design on 4 August 2026.
 - Draft creation never bypasses `draft_questions`; human review and `publish_draft_question()` remain mandatory.
 - Re-running the same import action must create zero additional drafts and zero duplicate master questions.
 
+## Phase 3D controlled acceptance lock
+
+- Phase 3D changes no production schema and adds no new frontend write path.
+- The acceptance suite is stored under `examples/import/phase3d/`.
+- Test packages are synthetic and must never be published as genuine PYQs.
+- The main matrix must prove `VALID`, `VALID_WITH_WARNINGS`, `EXACT_DUPLICATE`, `POSSIBLE_DUPLICATE`, `ID_CONFLICT`, `ANSWER_CONFLICT` and `INVALID` handling.
+- Separate packages must prove `SOURCE_CONFLICT`, local malformed-option rejection and `PACKAGE_ID_CONFLICT`.
+- Exact file re-import must reuse source, batch, item and draft identities and create zero additional records.
+- Controlled draft import must create exactly two drafts once and no published question.
+- Invalid, conflict and possible-duplicate items remain blocked.
+- Acceptance evidence is permanent; cleanup uses draft rejection, never destructive SQL deletion.
+- Phase 4 cannot begin until `docs/PHASE3D_ACCEPTANCE_TESTS.md` passes completely.
+
 ## Locked near-term phase sequence
 
 1. Separate the public and authenticated student applications — COMPLETED.
@@ -146,8 +159,8 @@ The user approved the Phase 3 design on 4 August 2026.
 3. Build the validated HTML import engine:
    - Phase 3A database identity, duplicate constraints, validation RPCs and specification — COMPLETED and deployed.
    - Phase 3B admin safe parser, checksum identity, persistent dry-run staging and reconciliation UI — COMPLETED AND DEPLOYED.
-   - Phase 3C controlled draft import and occurrence linking — IMPLEMENTED; deployment and acceptance testing pending.
-   - Phase 3D duplicate/conflict acceptance testing.
+   - Phase 3C controlled draft import and occurrence linking — COMPLETED AND DEPLOYED.
+   - Phase 3D duplicate/conflict acceptance testing — CONTROLLED TEST SUITE PREPARED; execution pending.
 4. Reuse imported master questions across original papers, sectional tests and topic practice without duplication.
 5. Build Results history, detailed review and Mistake Revision.
 
@@ -156,3 +169,8 @@ This sequence may change only with explicit user approval.
 ## Architecture changes
 
 Any change to this document requires explicit user approval before implementation.
+
+
+## Phase 3E compatibility
+
+AI-proposed answers, canonical topic mapping, dynamic paper completeness, confidence/source-quality metadata and safely labelled supplemental NORMAL questions are supported. AI-proposed answers and unresolved PYQ topics remain blocked from publication until human review.

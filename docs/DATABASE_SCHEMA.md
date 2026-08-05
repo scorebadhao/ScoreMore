@@ -356,3 +356,8 @@ It delegates to `link_question_occurrence()` and therefore stores one master que
 - The RPC revalidates immediately before insert.
 - Repeated calls return already-imported records instead of creating new drafts.
 - Occurrence keys remain unique and cannot point to different master content.
+
+
+## Phase 3E compatibility
+
+AI-proposed answers, canonical topic mapping, dynamic paper completeness, confidence/source-quality metadata and safely labelled supplemental NORMAL questions are supported. AI-proposed answers and unresolved PYQ topics remain blocked from publication until human review.

@@ -77,7 +77,7 @@ Acceptance before Phase 3C:
 - dry-run summary and item details are readable on mobile;
 - manual draft, Test Manager and student attempt flows pass regression.
 
-#### Phase 3C — Controlled draft import — IMPLEMENTED; DEPLOYMENT PENDING
+#### Phase 3C — Controlled draft import — COMPLETED AND DEPLOYED
 
 - Imports only selected `VALID` and `VALID_WITH_WARNINGS` items into `draft_questions`.
 - Revalidates every selected record against current database state before insertion.
@@ -98,9 +98,13 @@ Acceptance before Phase 3D:
 - reopening the same batch displays the created draft ID and persistent action state;
 - manual draft, test manager and student flows pass regression.
 
-#### Phase 3D — Duplicate/conflict acceptance testing
+#### Phase 3D — Duplicate/conflict acceptance testing — TEST SUITE PREPARED
 
-Test a package containing valid, exact duplicate, alternate-ID duplicate, ID conflict, answer conflict, source conflict, missing answer and unknown catalogue records. Re-import the same file and verify zero extra source files, batches, drafts and master questions.
+- Added a controlled eight-record matrix for valid, warning, exact duplicate, alternate-ID duplicate, possible duplicate, ID conflict, answer conflict and unknown catalogue handling.
+- Added separate source-occurrence conflict, malformed-options and package-ID conflict packages.
+- Added exact execution order, expected status matrix and read-only SQL verification.
+- Requires exactly two controlled drafts once, zero published Phase 3D questions and zero extra records on exact re-import.
+- Phase 4 remains blocked until the complete mobile acceptance checklist passes.
 
 ### Phase 4 — Dynamic question reuse
 
@@ -168,3 +172,8 @@ Test a package containing valid, exact duplicate, alternate-ID duplicate, ID con
 - Security and RLS review
 - Accessibility and Lighthouse review
 - Backup and restore drill
+
+
+## Phase 3E compatibility
+
+AI-proposed answers, canonical topic mapping, dynamic paper completeness, confidence/source-quality metadata and safely labelled supplemental NORMAL questions are supported. AI-proposed answers and unresolved PYQ topics remain blocked from publication until human review.

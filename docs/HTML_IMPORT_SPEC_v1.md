@@ -413,3 +413,78 @@ The following statuses are never imported automatically:
 An exact duplicate PYQ with a matched published master question and a different valid occurrence key may be explicitly linked as another source occurrence. This operation does not create another master question.
 
 Every import action is persistent and idempotent. Repeating the same action must not create a second draft.
+
+
+# Phase 3E compatibility extension
+
+The schema remains `1.0.0` for backward compatibility. The following optional fields are now supported.
+
+## Package version and paper completeness
+
+```json
+{
+  "package_version": 2,
+  "supersedes_package_id": "PREVIOUS-PACKAGE-ID",
+  "paper": {
+    "declared_total_questions": 150,
+    "extracted_source_questions": 149,
+    "missing_question_count": 1,
+    "missing_question_numbers": [87],
+    "generated_supplement_count": 1,
+    "completeness_status": "PARTIAL_WITH_SUPPLEMENTS",
+    "section_plan": [
+      {
+        "section_code": "REASONING",
+        "subject_id": "REASONING",
+        "start_question_no": 1,
+        "end_question_no": 50,
+        "expected_count": 50,
+        "extracted_count": 49,
+        "supplemental_count": 1
+      }
+    ]
+  }
+}
+```
+
+More than 10 missing source questions makes the package invalid and requires `REJECTED` completeness status.
+
+## AI-proposed answer
+
+```json
+{
+  "correct_answer": "C",
+  "answer_source": "AI_PROPOSED",
+  "answer_confidence": "HIGH",
+  "explanation": "Independent solution for admin review.",
+  "verification_status": "NEEDS_CHECK"
+}
+```
+
+The publication guard rejects `AI_PROPOSED`. Human review must replace it with an official or manually verified source.
+
+## Topic suggestion
+
+```json
+{
+  "topic_id": null,
+  "suggested_topic_code": "NUMBER_SERIES",
+  "suggested_topic_name": "Number Series",
+  "topic_confidence": "HIGH"
+}
+```
+
+Exact topic codes/names and approved aliases are mapped automatically. Unresolved suggestions require admin mapping.
+
+## Supplemental question
+
+```json
+{
+  "question_type": "NORMAL",
+  "content_origin": "AI_GENERATED",
+  "is_supplemental": true,
+  "supplement_reason": "MISSING_SOURCE_QUESTION"
+}
+```
+
+Supplemental questions are not original PYQs and cannot use original question-number/source-occurrence identity.
