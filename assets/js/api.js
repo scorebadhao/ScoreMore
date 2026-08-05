@@ -16,7 +16,12 @@ async function withTimeout(operation, timeoutMs = APP_CONFIG.requestTimeoutMs) {
     return await Promise.race([
       operation,
       new Promise((_, reject) => {
-        timer = window.setTimeout(() => reject(new Error('Request timed out. Please retry.')), timeoutMs);
+        timer = window.setTimeout(() => {
+          const timeoutError = new Error('Request timed out. The server may still be processing this operation.');
+          timeoutError.code = 'REQUEST_TIMEOUT';
+          timeoutError.mayStillComplete = true;
+          reject(timeoutError);
+        }, timeoutMs);
       }),
     ]);
   } finally {
@@ -399,6 +404,7 @@ export const api = Object.freeze({
         p_package_checksum_sha256: clean(packageChecksum)?.toLowerCase() || null,
         p_source_checksum_sha256: clean(rawFileChecksum)?.toLowerCase() || null,
       }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 90000),
     ), 'Unable to validate the import package.');
   },
 
@@ -473,7 +479,7 @@ export const api = Object.freeze({
         p_package_checksum_sha256: clean(packageChecksum)?.toLowerCase(),
         p_source_file_id: sourceFileId,
       }),
-      Math.max(APP_CONFIG.requestTimeoutMs, 120000),
+      Math.max(APP_CONFIG.requestTimeoutMs, 300000),
     ), 'Unable to complete the authoritative import dry run.');
   },
 
@@ -483,6 +489,59 @@ export const api = Object.freeze({
       client.rpc('get_import_batch_report', { p_import_batch_id: importBatchId }),
       Math.max(APP_CONFIG.requestTimeoutMs, 60000),
     ), 'Unable to load the import reconciliation report.');
+  },
+
+
+  async findImportBatchByIdentity({ packageId, packageChecksum }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('find_import_batch_by_identity', {
+        p_package_id: clean(packageId)?.toUpperCase() || null,
+        p_package_checksum_sha256: clean(packageChecksum)?.toLowerCase() || null,
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 30000),
+    ), 'Unable to check the server import state.');
+  },
+
+  async reconcileImportBatchState(importBatchId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('reconcile_import_batch_state', { p_import_batch_id: importBatchId }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 90000),
+    ), 'Unable to synchronize the actual draft state.');
+  },
+
+  async repairAiProposedImportChunk({ importBatchId, limit = 20 }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('repair_ai_proposed_import_chunk', {
+        p_import_batch_id: importBatchId,
+        p_limit: Math.min(Math.max(Number(limit) || 20, 1), 50),
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 90000),
+    ), 'Unable to recheck this import batch.');
+  },
+
+  async importNextValidDraftChunk({ importBatchId, limit = 10 }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('import_next_valid_batch_chunk', {
+        p_import_batch_id: importBatchId,
+        p_limit: Math.min(Math.max(Number(limit) || 10, 1), 25),
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 90000),
+    ), 'Unable to create the next draft chunk.');
+  },
+
+  async resetUnreviewedImportDrafts(importBatchId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('reset_unreviewed_import_batch_drafts', {
+        p_import_batch_id: importBatchId,
+        p_confirmation: 'RESET_UNREVIEWED_DRAFTS',
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 120000),
+    ), 'Unable to reset unreviewed drafts.');
   },
 
   async importBatchItemsToDrafts({ importBatchId, importItemIds }) {

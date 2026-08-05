@@ -33,6 +33,14 @@ const elements = {
   importValidDrafts: document.getElementById('importValidDrafts'),
   linkDuplicateOccurrences: document.getElementById('linkDuplicateOccurrences'),
   importSelectionSummary: document.getElementById('importSelectionSummary'),
+  importProgressPanel: document.getElementById('importProgressPanel'),
+  importProgressTitle: document.getElementById('importProgressTitle'),
+  importProgressText: document.getElementById('importProgressText'),
+  importProgressBar: document.getElementById('importProgressBar'),
+  syncImportBatch: document.getElementById('syncImportBatch'),
+  repairImportBatch: document.getElementById('repairImportBatch'),
+  resetImportDrafts: document.getElementById('resetImportDrafts'),
+  loadMoreImportItems: document.getElementById('loadMoreImportItems'),
   recentImportPanel: document.getElementById('recentImportPanel'),
   recentImportList: document.getElementById('recentImportList'),
 };
@@ -48,6 +56,9 @@ let recentImportBatches = [];
 let currentImportBatchId = null;
 let selectedDraftItemIds = new Set();
 let selectedOccurrenceItemIds = new Set();
+let visibleImportItemLimit = 20;
+const IMPORT_ITEM_PAGE_SIZE = 20;
+const DRAFT_IMPORT_CHUNK_SIZE = 10;
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -530,17 +541,48 @@ function syncImportSelections(report) {
   selectedOccurrenceItemIds = new Set([...selectedOccurrenceItemIds].filter((id) => actionableOccurrenceIds.has(id)));
 }
 
+function knownRepairableCount(report = currentImportReport) {
+  const summaryCount = Number(report?.summary?.repairable_items || 0);
+  if (summaryCount > 0) return summaryCount;
+  return report?.items?.filter((item) => (
+    !item.created_draft_id && (
+      (item.validation_status === 'INVALID'
+        && String(item.normalized_payload?.answer_source || '').toUpperCase() === 'AI_PROPOSED')
+      || (item.errors || []).some((issue) => issue?.code === 'DRAFT_INSERT_FAILED')
+      || Boolean(item.matched_draft_id)
+    )
+  )).length || 0;
+}
+
 function updateImportActionControls() {
   const batchId = currentImportReport?.batch?.import_batch_id;
-  const draftCount = selectedDraftItemIds.size;
+  const summary = currentImportReport?.summary || {};
+  const ready = Number(summary.ready_for_draft || 0);
+  const imported = Number(summary.imported_to_draft || 0);
+  const errors = Number(summary.errors || 0);
+  const duplicates = Number(summary.duplicates || 0);
   const occurrenceCount = selectedOccurrenceItemIds.size;
+  const repairable = knownRepairableCount();
 
-  if (elements.importValidDrafts) elements.importValidDrafts.disabled = !batchId || draftCount === 0;
+  if (elements.importValidDrafts) {
+    elements.importValidDrafts.disabled = !batchId || (ready === 0 && repairable === 0 && imported === 0);
+    elements.importValidDrafts.textContent = ready > 0
+      ? `2. Import ${ready} eligible draft${ready === 1 ? '' : 's'}`
+      : repairable > 0
+        ? `2. Repair ${repairable} record${repairable === 1 ? '' : 's'} and import`
+        : imported > 0
+          ? '2. Sync / resume draft import'
+          : '2. Import all eligible drafts';
+  }
+  if (elements.syncImportBatch) elements.syncImportBatch.disabled = !batchId;
+  if (elements.repairImportBatch) elements.repairImportBatch.disabled = !batchId || repairable === 0;
+  if (elements.resetImportDrafts) elements.resetImportDrafts.disabled = !batchId || imported === 0;
   if (elements.linkDuplicateOccurrences) elements.linkDuplicateOccurrences.disabled = !batchId || occurrenceCount === 0;
+
   if (elements.importSelectionSummary) {
     elements.importSelectionSummary.textContent = batchId
-      ? `${draftCount} valid record${draftCount === 1 ? '' : 's'} selected for draft creation · ${occurrenceCount} exact duplicate PYQ occurrence${occurrenceCount === 1 ? '' : 's'} selected for linking.`
-      : 'Run or open a dry-run report to select eligible records.';
+      ? `${ready} ready for draft · ${imported} already drafted · ${errors} errors/conflicts · ${duplicates} duplicates${repairable ? ` · ${repairable} safely repairable` : ''}${occurrenceCount ? ` · ${occurrenceCount} occurrence selected` : ''}.`
+      : 'Validate or open a package to see what is ready.';
   }
 }
 
@@ -591,6 +633,7 @@ function renderImportSummary(summary, batch = null) {
     ['Duplicates skipped', summaryValue(summary, 'skipped_duplicates')],
     ['Occurrences awaiting confirmation', summaryValue(summary, 'actionable_occurrences')],
   ];
+  if (summaryValue(summary, 'repairable_items') > 0) rows.splice(6, 0, ['Safely repairable records', summaryValue(summary, 'repairable_items')]);
   if (batch?.declared_total_questions) rows.unshift(['Declared paper questions', Number(batch.declared_total_questions)]);
   if (batch?.extracted_source_questions !== null && batch?.extracted_source_questions !== undefined) rows.splice(1, 0, ['Extracted source questions', Number(batch.extracted_source_questions)]);
   if (batch?.missing_question_count) rows.splice(2, 0, ['Missing source questions', Number(batch.missing_question_count)]);
@@ -613,12 +656,7 @@ function importItemMatchesFilter(item, filter) {
 
 function importActionMarkup(item) {
   if (isDraftEligible(item)) {
-    return `
-      <label class="import-action-choice">
-        <input type="checkbox" data-import-draft-select="${escapeHtml(item.import_item_id)}" ${selectedDraftItemIds.has(item.import_item_id) ? 'checked' : ''} />
-        <span><strong>Create draft</strong><small>Revalidated again by PostgreSQL before insertion.</small></span>
-      </label>
-    `;
+    return '<div class="import-resolution resolution-success"><strong>Ready for draft</strong><span>The resumable importer will revalidate this record before insertion.</span></div>';
   }
 
   if (isOccurrenceActionable(item)) {
@@ -654,14 +692,6 @@ function importActionMarkup(item) {
 }
 
 function bindImportItemSelections() {
-  elements.importItemList.querySelectorAll('[data-import-draft-select]').forEach((checkbox) => {
-    checkbox.addEventListener('change', () => {
-      if (checkbox.checked) selectedDraftItemIds.add(checkbox.dataset.importDraftSelect);
-      else selectedDraftItemIds.delete(checkbox.dataset.importDraftSelect);
-      updateImportActionControls();
-    });
-  });
-
   elements.importItemList.querySelectorAll('[data-import-occurrence-select]').forEach((checkbox) => {
     checkbox.addEventListener('change', () => {
       if (checkbox.checked) selectedOccurrenceItemIds.add(checkbox.dataset.importOccurrenceSelect);
@@ -674,7 +704,8 @@ function bindImportItemSelections() {
 function renderImportItems() {
   if (!currentImportReport?.items) return;
   const filter = elements.importItemFilter.value;
-  const items = currentImportReport.items.filter((item) => importItemMatchesFilter(item, filter));
+  const allItems = currentImportReport.items.filter((item) => importItemMatchesFilter(item, filter));
+  const items = allItems.slice(0, visibleImportItemLimit);
   const packageErrors = currentImportReport.batch?.package_errors || [];
   const packageWarnings = currentImportReport.batch?.package_warnings || [];
   const packageBlock = (packageErrors.length || packageWarnings.length) ? `
@@ -686,6 +717,7 @@ function renderImportItems() {
   ` : '';
   if (!items.length) {
     elements.importItemList.innerHTML = `${packageBlock}<div class="empty-state">No import items match this filter.</div>`;
+    elements.loadMoreImportItems?.classList.add('hidden');
     updateImportActionControls();
     return;
   }
@@ -735,11 +767,16 @@ function renderImportItems() {
     `;
   }).join('');
   bindImportItemSelections();
+  if (elements.loadMoreImportItems) {
+    elements.loadMoreImportItems.classList.toggle('hidden', allItems.length <= visibleImportItemLimit);
+    elements.loadMoreImportItems.textContent = `Show more records (${Math.min(IMPORT_ITEM_PAGE_SIZE, allItems.length - visibleImportItemLimit)} of ${allItems.length - visibleImportItemLimit} remaining)`;
+  }
   updateImportActionControls();
 }
 
 function renderImportReport(report) {
   currentImportReport = report;
+  visibleImportItemLimit = IMPORT_ITEM_PAGE_SIZE;
   const batch = report?.batch;
   syncImportSelections(report);
   elements.importReportPanel.classList.remove('hidden');
@@ -800,12 +837,68 @@ async function loadRecentImportBatches() {
   }
 }
 
+function setImportProgress({ title, text, value = 0, max = 100 }) {
+  if (!elements.importProgressPanel) return;
+  elements.importProgressPanel.classList.remove('hidden');
+  elements.importProgressTitle.textContent = title;
+  elements.importProgressText.textContent = text;
+  elements.importProgressBar.max = Math.max(Number(max) || 1, 1);
+  elements.importProgressBar.value = Math.min(Math.max(Number(value) || 0, 0), elements.importProgressBar.max);
+}
+
+function hideImportProgress() {
+  elements.importProgressPanel?.classList.add('hidden');
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+async function recoverTimedOutDryRun() {
+  if (!parsedImportPackage) return false;
+  setImportProgress({
+    title: 'Checking server state…',
+    text: 'A timeout does not necessarily mean failure. ScoreMore is checking whether the server finished safely.',
+    value: 10,
+    max: 100,
+  });
+
+  for (let attempt = 1; attempt <= 24; attempt += 1) {
+    try {
+      const batch = await api.findImportBatchByIdentity({
+        packageId: parsedImportPackage.metadata.packageId,
+        packageChecksum: parsedImportPackage.packageChecksum,
+      });
+      if (batch?.import_batch_id && String(batch.status || '').startsWith('DRY_RUN_COMPLETE')) {
+        const report = await api.getImportBatchReport(batch.import_batch_id);
+        renderImportReport(report);
+        await loadRecentImportBatches();
+        hideImportProgress();
+        return true;
+      }
+    } catch {
+      // Keep polling; a still-running transaction is not visible until it commits.
+    }
+    setImportProgress({
+      title: 'Checking server state…',
+      text: `Waiting for the authoritative dry run (${attempt}/24).`,
+      value: attempt,
+      max: 24,
+    });
+    await wait(5000);
+  }
+
+  hideImportProgress();
+  return false;
+}
+
 async function runImportDryRun(event) {
   event.preventDefault();
   const form = event.currentTarget;
   if (!form.reportValidity()) return;
   const file = new FormData(form).get('htmlImportFile');
   setBusy(form, true);
+  currentImportReport = null;
   resetImportSelections();
   elements.downloadImportReport.disabled = true;
   elements.importReportPanel.classList.add('hidden');
@@ -858,10 +951,18 @@ async function runImportDryRun(event) {
     loading.close();
     toast.success(report.reused_existing_batch
       ? 'Existing reconciliation loaded. No duplicate batch or records were created.'
-      : 'Dry validation completed. Select valid records before creating drafts.');
+      : 'Dry validation completed. Review the summary, then import all eligible drafts.');
   } catch (error) {
-    loading.close();
-    toast.error(error.message);
+    if (error.code === 'REQUEST_TIMEOUT' && parsedImportPackage) {
+      loading.update?.('The request timed out. Checking whether the server completed it…');
+      const recovered = await recoverTimedOutDryRun();
+      loading.close();
+      if (recovered) toast.success('The server completed the dry run. Its saved report was recovered automatically.');
+      else toast.warning('The server state could not be confirmed yet. Retry validation or open Recent dry runs; no draft or published question is created by validation.');
+    } else {
+      loading.close();
+      toast.error(error.message);
+    }
   } finally {
     setBusy(form, false);
     elements.downloadImportReport.disabled = !currentImportReport;
@@ -906,34 +1007,206 @@ function requestImportConfirmation({ title, message, buttonLabel }) {
   });
 }
 
+async function repairKnownBatchItems(batchId, estimatedCount = 0) {
+  let processed = 0;
+  let repaired = 0;
+  let remaining = Math.max(Number(estimatedCount) || 0, 1);
+
+  for (let cycle = 0; cycle < 100 && remaining > 0; cycle += 1) {
+    setImportProgress({
+      title: 'Repairing known import-state errors…',
+      text: `${repaired} repaired · ${remaining} remaining.`,
+      value: processed,
+      max: Math.max(Number(estimatedCount) || remaining, 1),
+    });
+    const chunk = await api.repairAiProposedImportChunk({ importBatchId: batchId, limit: 20 });
+    processed += Number(chunk?.processed || 0);
+    repaired += Number(chunk?.repaired || 0);
+    remaining = Number(chunk?.remaining || 0);
+    if (Number(chunk?.processed || 0) === 0 && remaining > 0) break;
+  }
+
+  return { processed, repaired, remaining };
+}
+
 async function importSelectedDrafts() {
   const batchId = currentImportReport?.batch?.import_batch_id;
-  const itemIds = [...selectedDraftItemIds];
-  if (!batchId || !itemIds.length) return toast.warning('Select at least one valid record.');
-
-  const confirmed = await requestImportConfirmation({
-    title: `Create ${itemIds.length} question draft${itemIds.length === 1 ? '' : 's'}?`,
-    message: 'ScoreMore will revalidate every selected record against the current database, skip new duplicates, and create only pending drafts for human review.',
-    buttonLabel: 'Create controlled drafts',
-  });
-  if (!confirmed) return;
+  if (!batchId) return toast.warning('Open an import report first.');
 
   elements.importValidDrafts.disabled = true;
   elements.linkDuplicateOccurrences.disabled = true;
-  const loading = toast.loading('Revalidating and creating controlled drafts…');
+  let loading = toast.loading('Checking the actual database state…');
+
   try {
-    const report = await api.importBatchItemsToDrafts({ importBatchId: batchId, importItemIds: itemIds });
+    await api.reconcileImportBatchState(batchId);
+    let report = await api.getImportBatchReport(batchId);
+    let repairable = knownRepairableCount(report);
+
+    if (repairable > 0) {
+      loading.update?.(`Repairing ${repairable} known false-error or stale-state record${repairable === 1 ? '' : 's'}…`);
+      await repairKnownBatchItems(batchId, repairable);
+      await api.reconcileImportBatchState(batchId);
+      report = await api.getImportBatchReport(batchId);
+    }
+
+    renderImportReport(report);
+    await loadRecentImportBatches();
+
+    const ready = Number(report?.summary?.ready_for_draft || 0);
+    const importedBefore = Number(report?.summary?.imported_to_draft || 0);
+
+    if (ready === 0) {
+      hideImportProgress();
+      loading.close();
+      if (importedBefore > 0) {
+        toast.info(`${importedBefore} actual draft${importedBefore === 1 ? '' : 's'} already exist for this batch. No duplicate draft was created.`);
+      } else {
+        toast.warning('No eligible record is ready. Review the remaining genuine errors, conflicts or duplicate statuses.');
+      }
+      return;
+    }
+
+    loading.close();
+    const confirmed = await requestImportConfirmation({
+      title: `Import ${ready} eligible record${ready === 1 ? '' : 's'}?`,
+      message: 'ScoreMore will create drafts in small resumable chunks. Every record is revalidated, duplicates are skipped, and nothing is published automatically.',
+      buttonLabel: 'Import all eligible drafts',
+    });
+    if (!confirmed) {
+      hideImportProgress();
+      return;
+    }
+
+    loading = toast.loading('Creating controlled drafts in small chunks…');
+    let totalImportedThisRun = 0;
+    let remaining = ready;
+    const totalTarget = importedBefore + ready;
+
+    for (let cycle = 0; cycle < 100 && remaining > 0; cycle += 1) {
+      const beforeRemaining = remaining;
+      setImportProgress({
+        title: 'Creating controlled drafts…',
+        text: `${totalImportedThisRun} created in this run · ${remaining} remaining.`,
+        value: totalTarget - remaining,
+        max: totalTarget,
+      });
+
+      try {
+        const chunk = await api.importNextValidDraftChunk({
+          importBatchId: batchId,
+          limit: DRAFT_IMPORT_CHUNK_SIZE,
+        });
+        totalImportedThisRun += Number(chunk?.imported || 0);
+        remaining = Number(chunk?.remaining || 0);
+        if (Number(chunk?.processed || 0) === 0 && remaining > 0) {
+          throw new Error('Draft import did not make progress. Use Sync actual draft state, then retry.');
+        }
+      } catch (error) {
+        if (error.code !== 'REQUEST_TIMEOUT') throw error;
+        loading.update?.('A chunk timed out. Synchronizing the actual database state…');
+        await api.reconcileImportBatchState(batchId);
+        const recoveredReport = await api.getImportBatchReport(batchId);
+        remaining = Number(recoveredReport?.summary?.ready_for_draft || 0);
+        if (remaining >= beforeRemaining) throw error;
+      }
+    }
+
+    await api.reconcileImportBatchState(batchId);
+    report = await api.getImportBatchReport(batchId);
     renderImportReport(report);
     await Promise.all([loadDrafts(), loadRecentImportBatches()]);
-    const result = report.draft_import_result || {};
+    hideImportProgress();
     loading.close();
-    toast.success(`${Number(result.imported || 0)} draft${Number(result.imported || 0) === 1 ? '' : 's'} created. Human review is still required.`);
+    toast.success(`${totalImportedThisRun} new draft${totalImportedThisRun === 1 ? '' : 's'} created. Existing drafts were reused and no question was published.`);
     document.getElementById('importReportPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (error) {
+    hideImportProgress();
+    loading.close();
+    try {
+      await api.reconcileImportBatchState(batchId);
+      const report = await api.getImportBatchReport(batchId);
+      renderImportReport(report);
+      await loadRecentImportBatches();
+    } catch {
+      // Preserve the original actionable error.
+    }
+    toast.error(error.code === 'REQUEST_TIMEOUT'
+      ? 'The connection timed out. The actual draft state has been synchronized; tap Sync / resume draft import to continue safely.'
+      : error.message);
+  } finally {
+    updateImportActionControls();
+  }
+}
+
+async function syncCurrentImportBatch() {
+  const batchId = currentImportReport?.batch?.import_batch_id;
+  if (!batchId) return toast.warning('Open an import report first.');
+  const loading = toast.loading('Synchronizing actual drafts with the import ledger…');
+  try {
+    const result = await api.reconcileImportBatchState(batchId);
+    const report = await api.getImportBatchReport(batchId);
+    renderImportReport(report);
+    await Promise.all([loadDrafts(), loadRecentImportBatches()]);
+    loading.close();
+    toast.success(`Synchronized: ${Number(result?.drafts_found || 0)} actual drafts found; ${Number(result?.stale_items_released || 0)} stale records released.`);
   } catch (error) {
     loading.close();
     toast.error(error.message);
-  } finally {
-    updateImportActionControls();
+  }
+}
+
+async function repairCurrentImportBatch() {
+  const batchId = currentImportReport?.batch?.import_batch_id;
+  const repairable = knownRepairableCount();
+  if (!batchId || repairable === 0) return toast.warning('This report has no known false-invalid, failed-insert or stale draft-match records to repair.');
+
+  const confirmed = await requestImportConfirmation({
+    title: `Recheck ${repairable} repairable record${repairable === 1 ? '' : 's'}?`,
+    message: 'This revalidates known Phase 3E false-invalid answers, failed insert records and stale draft matches in small chunks. It does not create drafts or publish questions.',
+    buttonLabel: 'Recheck batch',
+  });
+  if (!confirmed) return;
+
+  const loading = toast.loading('Rechecking the batch with the corrected validator…');
+  try {
+    const result = await repairKnownBatchItems(batchId, repairable);
+    await api.reconcileImportBatchState(batchId);
+    const report = await api.getImportBatchReport(batchId);
+    renderImportReport(report);
+    await loadRecentImportBatches();
+    hideImportProgress();
+    loading.close();
+    toast.success(`${result.repaired} record${result.repaired === 1 ? '' : 's'} repaired. Review the updated counters before importing drafts.`);
+  } catch (error) {
+    hideImportProgress();
+    loading.close();
+    toast.error(error.message);
+  }
+}
+
+async function resetCurrentImportDrafts() {
+  const batchId = currentImportReport?.batch?.import_batch_id;
+  const imported = Number(currentImportReport?.summary?.imported_to_draft || 0);
+  if (!batchId || imported === 0) return toast.warning('This batch has no imported drafts to reset.');
+
+  const confirmed = await requestImportConfirmation({
+    title: `Reset up to ${imported} untouched draft${imported === 1 ? '' : 's'}?`,
+    message: 'Only PENDING, unreviewed and unpublished drafts from this batch will be removed. Import history and audit records remain. Reviewed or published content is protected.',
+    buttonLabel: 'Reset unreviewed drafts',
+  });
+  if (!confirmed) return;
+
+  const loading = toast.loading('Resetting untouched drafts safely…');
+  try {
+    const result = await api.resetUnreviewedImportDrafts(batchId);
+    const report = await api.getImportBatchReport(batchId);
+    renderImportReport(report);
+    await Promise.all([loadDrafts(), loadRecentImportBatches()]);
+    loading.close();
+    toast.success(`${Number(result?.deleted_unreviewed_drafts || 0)} untouched draft${Number(result?.deleted_unreviewed_drafts || 0) === 1 ? '' : 's'} reset. Protected drafts were not changed.`);
+  } catch (error) {
+    loading.close();
+    toast.error(error.message);
   }
 }
 
@@ -1010,10 +1283,14 @@ function bindEvents() {
   });
 
   elements.htmlImportForm?.addEventListener('submit', runImportDryRun);
-  elements.importItemFilter?.addEventListener('change', renderImportItems);
+  elements.importItemFilter?.addEventListener('change', () => { visibleImportItemLimit = IMPORT_ITEM_PAGE_SIZE; renderImportItems(); });
   elements.downloadImportReport?.addEventListener('click', downloadCurrentImportReport);
   elements.importValidDrafts?.addEventListener('click', importSelectedDrafts);
+  elements.syncImportBatch?.addEventListener('click', syncCurrentImportBatch);
+  elements.repairImportBatch?.addEventListener('click', repairCurrentImportBatch);
+  elements.resetImportDrafts?.addEventListener('click', resetCurrentImportDrafts);
   elements.linkDuplicateOccurrences?.addEventListener('click', linkSelectedOccurrences);
+  elements.loadMoreImportItems?.addEventListener('click', () => { visibleImportItemLimit += IMPORT_ITEM_PAGE_SIZE; renderImportItems(); });
   document.getElementById('refreshImportBatches')?.addEventListener('click', async () => {
     await loadRecentImportBatches();
     elements.recentImportPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1024,6 +1301,8 @@ function bindEvents() {
     elements.importPackagePreview.classList.add('hidden');
     elements.importReportPanel.classList.add('hidden');
     elements.downloadImportReport.disabled = true;
+    hideImportProgress();
+    visibleImportItemLimit = IMPORT_ITEM_PAGE_SIZE;
     resetImportSelections();
   });
 
