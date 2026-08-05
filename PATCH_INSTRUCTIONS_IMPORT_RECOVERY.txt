@@ -1,0 +1,75 @@
+SCOREMORE — IMPORT RECOVERY + FAST RESUMABLE DRAFTS
+
+CAUSE CONFIRMED FROM THE ANDROID RECORDING
+1. Large validation/report requests used a short generic timeout. The server could still finish after the browser showed “Request timed out”.
+2. Phase 3E removed the old AI_PROPOSED answer-source error but left the inherited item status as INVALID. This produced 100 false INVALID records.
+3. The old all-at-once draft import and full report response were too heavy for a mobile connection.
+4. A timeout could leave the ledger unclear even when no draft—or some drafts—actually existed.
+
+PHASE A — DATABASE FIRST
+Upload exactly:
+supabase/migrations/20260805010000_import_recovery_fast_drafts.sql
+
+Commit:
+Fix ScoreMore import recovery and resumable drafts
+
+Run:
+GitHub Actions -> Deploy ScoreMore Database -> Run workflow
+Confirmation: DEPLOY_SCOREMORE
+
+Wait for a completely green database workflow before uploading frontend files.
+Do not edit or replace any already-applied migration.
+
+PHASE B — FRONTEND AND DOCUMENTATION
+Replace:
+admin.html
+assets/js/api.js
+assets/js/admin.js
+assets/css/main.css
+
+Add/replace:
+docs/IMPORT_RECOVERY_FAST_DRAFTS.md
+PATCH_INSTRUCTIONS_IMPORT_RECOVERY.txt
+README.md
+docs/ARCHITECTURE_LOCK.md
+docs/DEVELOPMENT_ROADMAP.md
+supabase/migrations/README.md
+
+Commit:
+Simplify and resume ScoreMore draft imports
+
+Wait for Deploy ScoreMore to GitHub Pages to become green.
+
+TEST URL
+https://scorebadhao.github.io/ScoreMore/admin.html?v=import-recovery
+
+RECOVER GSSSB-CCE-2024-0401-S3-REAL-PYQ-V1
+1. Open Recent dry runs -> Open report.
+2. The main Step 2 button should offer to repair/import the eligible records.
+3. Tap it. ScoreMore first synchronizes actual drafts, repairs the false INVALID records in small chunks, then asks before creating drafts.
+4. Confirm the progress bar completes.
+5. Verify 100 draft records (99 source PYQs + 1 clearly labelled supplemental NORMAL question) and 0 published questions.
+6. Reopen the same report and tap Step 2 again. It must create 0 additional drafts.
+
+RECOVER GSSSB-CCE-2024-0401-S1-REAL-PYQ-V1
+Version 1 is superseded and should not be imported.
+1. Open its saved report.
+2. Open Recovery and advanced tools -> Sync actual draft state.
+3. If the database contains no draft rows, the false/stale “done” state is released automatically.
+4. If a timed-out request actually created untouched drafts, use Reset unreviewed drafts. This cannot delete reviewed or published content.
+5. Import GSSSB-CCE-2024-0401-S1-REAL-PYQ-V2 instead.
+
+VERIFY SHIFT 1 VERSION 2
+1. Validate the V2 HTML package.
+2. Confirm 100 source PYQs, 0 missing, 0 supplemental.
+3. Tap Step 2.
+4. Draft creation runs in chunks of 10 and resumes safely after a timeout.
+5. Confirm 100 drafts and 0 published questions.
+
+SAFETY
+- Validation and repair never publish questions.
+- Draft import writes only to draft_questions.
+- Every item is revalidated immediately before insertion.
+- Duplicate master questions remain blocked.
+- Report responses omit embedded source-image data for speed; the complete source preview remains stored for draft review.
+- Reimporting the same package reuses existing batch/item/draft identity.

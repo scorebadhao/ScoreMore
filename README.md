@@ -161,3 +161,7 @@ Synthetic HTML packages under `examples/import/phase3d/` verify duplicate, confl
 ## Phase 3E compatibility
 
 AI-proposed answers, canonical topic mapping, dynamic paper completeness, confidence/source-quality metadata and safely labelled supplemental NORMAL questions are supported. AI-proposed answers and unresolved PYQ topics remain blocked from publication until human review.
+
+## Import recovery and resumable drafts
+
+Large PYQ packages use compact mobile reports, timeout recovery and small idempotent draft chunks. The primary Step 2 action synchronizes actual state, repairs known false-invalid/stale records and resumes safely; advanced tools can reset only untouched unpublished drafts. See `docs/IMPORT_RECOVERY_FAST_DRAFTS.md`.

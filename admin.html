@@ -115,9 +115,9 @@
         <section id="htmlImportSection" class="section panel-card import-panel">
           <div class="section-heading">
             <div>
-              <span class="eyebrow">Phase 3C · controlled draft import</span>
+              <span class="eyebrow">Import centre · resumable and audited</span>
               <h2>HTML Question Import</h2>
-              <p class="muted">Safely validate a versioned ScoreMore HTML package, reconcile duplicates, and import only selected valid records into draft_questions. Human review and protected publication remain mandatory.</p>
+              <p class="muted">Validate a versioned ScoreMore HTML package, repair old false-error batches, and import every eligible record into draft_questions in small resumable chunks. Human review and protected publication remain mandatory.</p>
             </div>
             <button id="refreshImportBatches" class="button button-secondary" type="button">Recent dry runs</button>
           </div>
@@ -130,13 +130,26 @@
               <strong>Safe parser and controlled write</strong>
               <span>Only the JSON inside <code>#scoremore-import-data</code> is read. HTML/scripts are never rendered. Draft creation is performed only by an admin-only PostgreSQL RPC after current-state revalidation.</span>
             </div>
-            <div class="button-row">
-              <button id="runImportDryRun" class="button button-primary" type="submit">Run dry validation</button>
+            <div class="button-row import-primary-actions">
+              <button id="runImportDryRun" class="button button-primary" type="submit">1. Validate package</button>
+              <button id="importValidDrafts" class="button button-primary" type="button" disabled>2. Import all eligible drafts</button>
               <button id="downloadImportReport" class="button button-ghost" type="button" disabled>Download report</button>
-              <button id="importValidDrafts" class="button button-primary" type="button" disabled>Import selected valid records to drafts</button>
-              <button id="linkDuplicateOccurrences" class="button button-secondary" type="button" disabled>Link selected PYQ occurrences</button>
             </div>
-            <p id="importSelectionSummary" class="muted import-selection-summary">Run or open a dry-run report to select eligible records.</p>
+            <div id="importProgressPanel" class="import-progress-panel hidden" aria-live="polite">
+              <div class="import-progress-copy"><strong id="importProgressTitle">Processing import…</strong><span id="importProgressText">Please keep this page open.</span></div>
+              <progress id="importProgressBar" max="100" value="0">0%</progress>
+            </div>
+            <p id="importSelectionSummary" class="muted import-selection-summary">Validate or open a package to see what is ready.</p>
+            <details class="import-recovery-tools">
+              <summary>Recovery and advanced tools</summary>
+              <p class="muted">Use these only when a previous request timed out, an old batch needs rechecking, or an exact PYQ occurrence must be linked.</p>
+              <div class="button-row">
+                <button id="syncImportBatch" class="button button-secondary" type="button" disabled>Sync actual draft state</button>
+                <button id="repairImportBatch" class="button button-secondary" type="button" disabled>Repair report status</button>
+                <button id="resetImportDrafts" class="button button-danger" type="button" disabled>Reset unreviewed drafts</button>
+                <button id="linkDuplicateOccurrences" class="button button-secondary" type="button" disabled>Link selected PYQ occurrences</button>
+              </div>
+            </details>
           </form>
 
           <div id="importPackagePreview" class="import-package-preview hidden" aria-live="polite"></div>
@@ -162,6 +175,7 @@
             </div>
             <div id="importSummaryGrid" class="import-summary-grid"></div>
             <div id="importItemList" class="import-item-list" aria-live="polite"></div>
+            <button id="loadMoreImportItems" class="button button-ghost import-load-more hidden" type="button">Show more records</button>
           </div>
 
           <div id="recentImportPanel" class="import-history hidden">
