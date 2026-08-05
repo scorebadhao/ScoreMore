@@ -14,14 +14,17 @@ const ENUMS = Object.freeze({
   verification_status: ['UNVERIFIED', 'NEEDS_CHECK', 'VERIFIED', 'DISPUTED'],
   answer_source: [
     'OFFICIAL_FINAL_KEY', 'OFFICIAL_PROVISIONAL_KEY', 'MANUALLY_VERIFIED',
-    'SOURCE_BOOK', 'ADMIN_CORRECTED', null,
+    'SOURCE_BOOK', 'ADMIN_CORRECTED', 'AI_PROPOSED', null,
   ],
   correct_answer: ['A', 'B', 'C', 'D', null],
+  confidence: ['HIGH', 'MEDIUM', 'LOW', null],
+  source_quality: ['CLEAR', 'LOW_RESOLUTION', 'CROPPED', 'DIAGRAM_REVIEW', 'UNREADABLE', null],
+  completeness_status: ['COMPLETE', 'PARTIAL', 'PARTIAL_WITH_SUPPLEMENTS', 'REJECTED'],
 });
 
 const TOP_LEVEL_KEYS = new Set([
   'schema', 'schema_version', 'package_id', 'generated_at', 'generator',
-  'source', 'defaults', 'questions',
+  'source', 'defaults', 'questions', 'package_version', 'supersedes_package_id', 'paper',
 ]);
 const SOURCE_KEYS = new Set([
   'source_type', 'original_file_name', 'board_id', 'exam_id', 'exam_year',
@@ -31,7 +34,8 @@ const SOURCE_KEYS = new Set([
 const DEFAULT_KEYS = new Set([
   'question_type', 'board_id', 'exam_id', 'exam_year', 'exam_date', 'shift_no',
   'paper_code', 'section_code', 'language', 'difficulty', 'content_origin',
-  'verification_status', 'answer_source', 'tags',
+  'verification_status', 'answer_source', 'transcription_confidence',
+  'answer_confidence', 'topic_confidence', 'source_quality', 'tags',
 ]);
 const QUESTION_KEYS = new Set([
   'source_record_id', 'proposed_question_id', 'question_type', 'board_id',
@@ -41,9 +45,20 @@ const QUESTION_KEYS = new Set([
   'source_question_id', 'content_origin', 'verification_status',
   'question_text', 'options', 'correct_answer', 'answer_source',
   'explanation', 'image_refs', 'content_id', 'group_id', 'group_type',
-  'group_text', 'tags',
+  'group_text', 'tags', 'suggested_topic_code', 'suggested_topic_name',
+  'topic_confidence', 'transcription_confidence', 'answer_confidence',
+  'answer_review_note', 'source_quality', 'is_supplemental', 'supplement_reason',
 ]);
 const IMAGE_REF_KEYS = new Set(['ref', 'alt', 'source_page']);
+const PAPER_KEYS = new Set([
+  'declared_total_questions', 'extracted_source_questions', 'missing_question_count',
+  'missing_question_numbers', 'generated_supplement_count', 'completeness_status',
+  'rejection_reason', 'section_plan',
+]);
+const SECTION_PLAN_KEYS = new Set([
+  'section_code', 'subject_id', 'start_question_no', 'end_question_no',
+  'expected_count', 'extracted_count', 'supplemental_count',
+]);
 const REQUIRED_TOP = ['schema', 'schema_version', 'package_id', 'source', 'defaults', 'questions'];
 const REQUIRED_SOURCE = ['source_type', 'original_file_name', 'board_id', 'exam_id'];
 const REQUIRED_RAW_QUESTION = [
@@ -196,7 +211,106 @@ function validateDefaults(defaults, errors) {
   if (defaults.exam_date !== undefined && defaults.exam_date !== null && !isDate(defaults.exam_date)) {
     errors.push(issue('INVALID_DATE', 'exam_date must use YYYY-MM-DD.', '$.defaults.exam_date'));
   }
+  ['transcription_confidence', 'answer_confidence', 'topic_confidence'].forEach((key) => {
+    if (defaults[key] !== undefined && !ENUMS.confidence.includes(defaults[key])) {
+      errors.push(issue('INVALID_CONFIDENCE', `${key} must be HIGH, MEDIUM or LOW.`, `$.defaults.${key}`));
+    }
+  });
+  if (defaults.source_quality !== undefined && !ENUMS.source_quality.includes(defaults.source_quality)) {
+    errors.push(issue('INVALID_SOURCE_QUALITY', 'source_quality has an unsupported value.', '$.defaults.source_quality'));
+  }
   validateTags(defaults.tags, '$.defaults.tags', errors);
+}
+
+function validatePaper(paper, manifest, errors) {
+  if (paper === undefined) return;
+  if (!isPlainObject(paper)) {
+    errors.push(issue('INVALID_PAPER_OBJECT', 'paper must be an object.', '$.paper'));
+    return;
+  }
+  checkAdditionalKeys(paper, PAPER_KEYS, '$.paper', errors);
+  const integerKeys = [
+    'declared_total_questions', 'extracted_source_questions', 'missing_question_count',
+    'generated_supplement_count',
+  ];
+  integerKeys.forEach((key) => validateNullableInteger(paper[key], `$.paper.${key}`, errors, { min: key === 'declared_total_questions' ? 1 : 0 }));
+  if (!Array.isArray(paper.missing_question_numbers)) {
+    errors.push(issue('INVALID_MISSING_NUMBERS', 'missing_question_numbers must be an array.', '$.paper.missing_question_numbers'));
+  } else {
+    const unique = new Set();
+    paper.missing_question_numbers.forEach((value, index) => {
+      if (!isPositiveInteger(value)) errors.push(issue('INVALID_MISSING_NUMBER', 'Every missing question number must be a positive integer.', `$.paper.missing_question_numbers[${index}]`));
+      if (unique.has(value)) errors.push(issue('DUPLICATE_MISSING_NUMBER', 'Missing question numbers must be unique.', `$.paper.missing_question_numbers[${index}]`));
+      unique.add(value);
+    });
+  }
+  if (!ENUMS.completeness_status.includes(paper.completeness_status)) {
+    errors.push(issue('INVALID_COMPLETENESS_STATUS', 'completeness_status is unsupported.', '$.paper.completeness_status'));
+  }
+  if (!Array.isArray(paper.section_plan)) {
+    errors.push(issue('INVALID_SECTION_PLAN', 'section_plan must be an array.', '$.paper.section_plan'));
+  } else {
+    let previousEnd = 0;
+    let totalExpected = 0;
+    let totalExtracted = 0;
+    let totalSupplemental = 0;
+    paper.section_plan.forEach((row, index) => {
+      const path = `$.paper.section_plan[${index}]`;
+      if (!isPlainObject(row)) return errors.push(issue('INVALID_SECTION_PLAN_ROW', 'Each section row must be an object.', path));
+      checkAdditionalKeys(row, SECTION_PLAN_KEYS, path, errors);
+      ['section_code', 'subject_id'].forEach((key) => {
+        if (!isNonEmptyString(row[key])) errors.push(issue('MISSING_SECTION_FIELD', `${key} is required.`, `${path}.${key}`));
+      });
+      ['start_question_no', 'end_question_no', 'expected_count', 'extracted_count', 'supplemental_count'].forEach((key) => {
+        validateNullableInteger(row[key], `${path}.${key}`, errors, { min: key === 'supplemental_count' || key === 'extracted_count' ? 0 : 1 });
+      });
+      const start = Number(row.start_question_no);
+      const end = Number(row.end_question_no);
+      const expected = Number(row.expected_count);
+      const extractedCount = Number(row.extracted_count);
+      const supplementalCount = Number(row.supplemental_count);
+      if ([start, end, expected, extractedCount, supplementalCount].every(Number.isInteger)) {
+        if (end < start) errors.push(issue('INVALID_SECTION_BOUNDARY', 'end_question_no cannot be smaller than start_question_no.', `${path}.end_question_no`));
+        if (expected !== end - start + 1) errors.push(issue('SECTION_EXPECTED_COUNT_MISMATCH', 'expected_count must equal the inclusive question-number range.', `${path}.expected_count`));
+        if (index === 0 && start !== 1) errors.push(issue('SECTION_PLAN_MUST_START_AT_ONE', 'The first section must start at question 1.', `${path}.start_question_no`));
+        if (index > 0 && start !== previousEnd + 1) errors.push(issue('SECTION_PLAN_NOT_CONTIGUOUS', 'Section ranges must be ordered and contiguous.', `${path}.start_question_no`));
+        if (extractedCount + supplementalCount > expected) errors.push(issue('SECTION_RECORD_COUNT_EXCEEDED', 'Extracted plus supplemental records cannot exceed the section expected count.', path));
+        previousEnd = end;
+        totalExpected += expected;
+        totalExtracted += extractedCount;
+        totalSupplemental += supplementalCount;
+      }
+    });
+    if (paper.section_plan.length && Number.isInteger(Number(paper.declared_total_questions))) {
+      if (previousEnd !== Number(paper.declared_total_questions)) errors.push(issue('SECTION_PLAN_END_MISMATCH', 'The last section must end at declared_total_questions.', '$.paper.section_plan'));
+      if (totalExpected !== Number(paper.declared_total_questions)) errors.push(issue('SECTION_EXPECTED_TOTAL_MISMATCH', 'Section expected counts must sum to declared_total_questions.', '$.paper.section_plan'));
+      if (totalExtracted !== Number(paper.extracted_source_questions)) errors.push(issue('SECTION_EXTRACTED_TOTAL_MISMATCH', 'Section extracted counts must sum to extracted_source_questions.', '$.paper.section_plan'));
+      if (totalSupplemental !== Number(paper.generated_supplement_count || 0)) errors.push(issue('SECTION_SUPPLEMENT_TOTAL_MISMATCH', 'Section supplemental counts must sum to generated_supplement_count.', '$.paper.section_plan'));
+    }
+  }
+
+  const declared = Number(paper.declared_total_questions);
+  const extracted = Number(paper.extracted_source_questions);
+  const missing = Number(paper.missing_question_count || 0);
+  const generated = Number(paper.generated_supplement_count || 0);
+  const missingNumbers = Array.isArray(paper.missing_question_numbers) ? paper.missing_question_numbers : [];
+  const questionCount = Array.isArray(manifest.questions) ? manifest.questions.length : 0;
+  const actualSupplements = Array.isArray(manifest.questions)
+    ? manifest.questions.filter((question) => question?.is_supplemental === true).length
+    : 0;
+
+  if (Number.isInteger(missing) && missing !== missingNumbers.length) errors.push(issue('MISSING_COUNT_MISMATCH', 'missing_question_count must equal missing_question_numbers length.', '$.paper.missing_question_count'));
+  if (Number.isInteger(declared) && missingNumbers.some((value) => Number.isInteger(value) && value > declared)) errors.push(issue('MISSING_NUMBER_OUT_OF_RANGE', 'Missing question numbers cannot exceed declared_total_questions.', '$.paper.missing_question_numbers'));
+  if (Number.isInteger(declared) && Number.isInteger(extracted) && declared !== extracted + missing) errors.push(issue('PAPER_TOTAL_MISMATCH', 'declared_total_questions must equal extracted_source_questions plus missing_question_count.', '$.paper'));
+  if (missing > 10) errors.push(issue('MISSING_QUESTION_LIMIT_EXCEEDED', 'More than 10 missing source questions rejects the PYQ package.', '$.paper.missing_question_count'));
+  if (actualSupplements !== generated) errors.push(issue('SUPPLEMENT_COUNT_MISMATCH', 'generated_supplement_count must equal supplemental records.', '$.paper.generated_supplement_count'));
+  if (Number.isInteger(extracted) && questionCount !== extracted + generated) errors.push(issue('PACKAGE_RECORD_COUNT_MISMATCH', 'questions length must equal extracted_source_questions plus generated_supplement_count.', '$.questions'));
+  if (generated > missing) errors.push(issue('TOO_MANY_SUPPLEMENTS', 'Supplemental questions cannot exceed missing source questions.', '$.paper.generated_supplement_count'));
+  if (missing === 0 && (paper.completeness_status !== 'COMPLETE' || generated !== 0)) errors.push(issue('COMPLETENESS_STATUS_MISMATCH', 'Complete papers cannot contain missing or supplemental questions.', '$.paper.completeness_status'));
+  if (missing >= 1 && missing <= 10 && generated === 0 && paper.completeness_status !== 'PARTIAL') errors.push(issue('COMPLETENESS_STATUS_MISMATCH', 'Missing questions without supplements requires PARTIAL status.', '$.paper.completeness_status'));
+  if (missing >= 1 && missing <= 10 && generated === missing && paper.completeness_status !== 'PARTIAL_WITH_SUPPLEMENTS') errors.push(issue('COMPLETENESS_STATUS_MISMATCH', 'Fully supplemented incomplete papers require PARTIAL_WITH_SUPPLEMENTS.', '$.paper.completeness_status'));
+  if (missing > 10 && paper.completeness_status !== 'REJECTED') errors.push(issue('COMPLETENESS_STATUS_MISMATCH', 'More than 10 missing questions requires REJECTED status.', '$.paper.completeness_status'));
+  if (paper.completeness_status === 'REJECTED' && !isNonEmptyString(paper.rejection_reason)) errors.push(issue('REJECTION_REASON_REQUIRED', 'Rejected packages require a clear rejection_reason.', '$.paper.rejection_reason'));
 }
 
 function sourceDefaults(source = {}) {
@@ -246,6 +360,14 @@ function validateRawQuestion(question, index, manifest, errors, warnings) {
   });
   if (question.correct_answer !== undefined && !ENUMS.correct_answer.includes(question.correct_answer)) errors.push(issue('INVALID_CORRECT_ANSWER', 'correct_answer must be A, B, C, D or null.', `${base}.correct_answer`));
   if (question.answer_source !== undefined && !ENUMS.answer_source.includes(question.answer_source)) errors.push(issue('INVALID_ANSWER_SOURCE', 'answer_source has an unsupported value.', `${base}.answer_source`));
+  ['topic_confidence', 'transcription_confidence', 'answer_confidence'].forEach((key) => {
+    if (question[key] !== undefined && !ENUMS.confidence.includes(question[key])) errors.push(issue('INVALID_CONFIDENCE', `${key} must be HIGH, MEDIUM or LOW.`, `${base}.${key}`));
+  });
+  if (question.source_quality !== undefined && !ENUMS.source_quality.includes(question.source_quality)) errors.push(issue('INVALID_SOURCE_QUALITY', 'source_quality has an unsupported value.', `${base}.source_quality`));
+  if (question.is_supplemental !== undefined && typeof question.is_supplemental !== 'boolean') errors.push(issue('INVALID_BOOLEAN', 'is_supplemental must be true or false.', `${base}.is_supplemental`));
+  ['suggested_topic_code', 'suggested_topic_name', 'answer_review_note', 'supplement_reason'].forEach((key) => {
+    if (question[key] !== undefined && question[key] !== null && typeof question[key] !== 'string') errors.push(issue('INVALID_TEXT', `${key} must be text or null.`, `${base}.${key}`));
+  });
 
   validateNullableInteger(question.exam_year, `${base}.exam_year`, errors, { min: 1900, max: 2200 });
   validateNullableInteger(question.shift_no, `${base}.shift_no`, errors, { min: 1 });
@@ -277,6 +399,18 @@ function validateRawQuestion(question, index, manifest, errors, warnings) {
     warnings.push(issue('MISSING_CORRECT_ANSWER', 'The record may enter a dry run, but publication will require a verified answer.', `${base}.correct_answer`));
   }
   if (!merged.explanation) warnings.push(issue('MISSING_EXPLANATION', 'Explanation can be added during human review.', `${base}.explanation`));
+  if (merged.answer_source === 'AI_PROPOSED') {
+    if (!merged.correct_answer) errors.push(issue('AI_ANSWER_MISSING', 'AI_PROPOSED requires a proposed correct_answer.', `${base}.correct_answer`));
+    if (!['HIGH', 'MEDIUM', 'LOW'].includes(merged.answer_confidence)) errors.push(issue('AI_ANSWER_CONFIDENCE_REQUIRED', 'AI_PROPOSED requires answer_confidence.', `${base}.answer_confidence`));
+    if (!merged.explanation) errors.push(issue('AI_EXPLANATION_REQUIRED', 'AI_PROPOSED requires an explanation.', `${base}.explanation`));
+    if (merged.verification_status === 'VERIFIED') errors.push(issue('AI_ANSWER_CANNOT_BE_PREVERIFIED', 'AI_PROPOSED must remain NEEDS_CHECK until human review.', `${base}.verification_status`));
+    warnings.push(issue('AI_PROPOSED_ANSWER_REQUIRES_REVIEW', 'Admin confirmation is required before publication.', `${base}.answer_source`));
+  }
+  if (merged.is_supplemental === true) {
+    if (merged.question_type !== 'NORMAL' || merged.content_origin !== 'AI_GENERATED') errors.push(issue('INVALID_SUPPLEMENTAL_ORIGIN', 'Supplemental questions must be NORMAL and AI_GENERATED.', base));
+    if (!merged.supplement_reason) errors.push(issue('MISSING_SUPPLEMENT_REASON', 'Supplemental questions require supplement_reason.', `${base}.supplement_reason`));
+    if (merged.original_question_no || merged.source_question_id) errors.push(issue('SUPPLEMENT_CANNOT_IMPERSONATE_PYQ', 'Supplemental questions cannot carry original PYQ identity.', base));
+  }
   return merged;
 }
 
@@ -320,9 +454,12 @@ function validateManifestSchema(manifest) {
   if (manifest.generated_at !== undefined && !isDateTime(manifest.generated_at)) errors.push(issue('INVALID_GENERATED_AT', 'generated_at must be an ISO date-time.', '$.generated_at'));
   if (manifest.generated_at === undefined) warnings.push(issue('MISSING_GENERATED_AT', 'generated_at is recommended for audit history.', '$.generated_at'));
   if (manifest.generator !== undefined && (typeof manifest.generator !== 'string' || manifest.generator.length > 200)) errors.push(issue('INVALID_GENERATOR', 'generator must be text of at most 200 characters.', '$.generator'));
+  if (manifest.package_version !== undefined && !isPositiveInteger(manifest.package_version)) errors.push(issue('INVALID_PACKAGE_VERSION', 'package_version must be a positive integer.', '$.package_version'));
+  if (manifest.supersedes_package_id !== undefined && manifest.supersedes_package_id !== null && !isNonEmptyString(manifest.supersedes_package_id)) errors.push(issue('INVALID_SUPERSEDES_PACKAGE', 'supersedes_package_id must be text or null.', '$.supersedes_package_id'));
 
   validateSource(manifest.source, errors);
   validateDefaults(manifest.defaults, errors);
+  validatePaper(manifest.paper, manifest, errors);
 
   if (!Array.isArray(manifest.questions)) {
     errors.push(issue('INVALID_QUESTIONS_ARRAY', 'questions must be an array.', '$.questions'));
@@ -459,6 +596,8 @@ async function parseImportHtml(file) {
       packageId: manifest?.package_id || '—',
       schemaVersion: manifest?.schema_version || '—',
       questionCount: Array.isArray(manifest?.questions) ? manifest.questions.length : 0,
+      packageVersion: manifest?.package_version || 1,
+      paper: manifest?.paper || null,
     },
   };
 }

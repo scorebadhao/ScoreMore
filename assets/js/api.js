@@ -237,7 +237,7 @@ export const api = Object.freeze({
       withTimeout(client.from('boards').select('board_id, board_name, status, sort_order').order('sort_order')),
       withTimeout(client.from('exams').select('exam_id, board_id, exam_name, status, sort_order').order('sort_order')),
       withTimeout(client.from('subjects').select('subject_id, exam_id, subject_name, status, sort_order').order('sort_order')),
-      withTimeout(client.from('topics').select('topic_id, subject_id, topic_name, status, sort_order').order('sort_order')),
+      withTimeout(client.from('topics').select('topic_id, subject_id, topic_name, topic_code, status, sort_order').order('sort_order')),
     ]);
     return {
       boards: unwrap(boards, 'Unable to load boards.') || [],
@@ -347,7 +347,9 @@ export const api = Object.freeze({
       difficulty: clean(input.difficulty).toUpperCase(),
       source_file_id: input.sourceFileId || null,
       review_status: 'PENDING',
-      verification_status: 'UNVERIFIED',
+      answer_source: 'MANUALLY_VERIFIED',
+      verification_status: 'NEEDS_CHECK',
+      topic_resolution_status: input.topicId ? 'ADMIN_CONFIRMED' : 'UNRESOLVED',
       question_status: 'DRAFT',
       created_by: user.id,
     };
@@ -355,6 +357,21 @@ export const api = Object.freeze({
     return unwrap(await withTimeout(
       client.from('draft_questions').insert(payload).select('*').single(),
     ), 'Unable to save the draft.');
+  },
+
+  async reviewDraftAnswerTopic({ draftId, correctAnswer, answerSource, explanation, topicId, answerReviewNote, adminNotes }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('review_draft_answer_topic', {
+        p_draft_id: draftId,
+        p_correct_answer: clean(correctAnswer)?.toUpperCase(),
+        p_answer_source: clean(answerSource)?.toUpperCase(),
+        p_explanation: clean(explanation),
+        p_topic_id: clean(topicId)?.toUpperCase() || null,
+        p_answer_review_note: clean(answerReviewNote) || null,
+        p_admin_notes: clean(adminNotes) || null,
+      }),
+    ), 'Unable to save the human answer and topic review.');
   },
 
   async publishDraft(draftId) {
@@ -500,7 +517,7 @@ export const api = Object.freeze({
     const client = requireSupabase();
     return unwrap(await withTimeout(
       client.from('import_batches')
-        .select('import_batch_id, package_id, schema_version, status, draft_import_status, total_raw, total_valid, total_warning, total_error, total_duplicate, total_draft, total_linked, total_skipped, created_at, completed_at, draft_import_completed_at, source_files(original_file_name, checksum_sha256)')
+        .select('import_batch_id, package_id, package_version, supersedes_package_id, schema_version, status, draft_import_status, total_raw, total_valid, total_warning, total_error, total_duplicate, total_draft, total_linked, total_skipped, declared_total_questions, extracted_source_questions, missing_question_count, generated_supplement_count, paper_completeness_status, paper_rejection_reason, created_at, completed_at, draft_import_completed_at, source_files(original_file_name, checksum_sha256)')
         .eq('import_method', 'HTML_PACKAGE')
         .order('created_at', { ascending: false })
         .limit(Math.min(Math.max(Number(pageSize) || 20, 1), 50)),

@@ -93,12 +93,26 @@ async function showAdmin() {
   await Promise.all([loadDrafts(), loadConfiguredTests(), loadRecentImportBatches()]);
 }
 
+function isDraftPublishReady(draft) {
+  return Boolean(
+    draft?.correct_answer
+    && draft?.answer_source
+    && draft.answer_source !== 'AI_PROPOSED'
+    && draft.verification_status === 'VERIFIED'
+    && draft.explanation
+    && (draft.question_type !== 'PYQ' || draft.topic_id)
+    && draft.source_quality !== 'UNREADABLE'
+  );
+}
+
 function renderDrafts() {
   if (!drafts.length) {
     elements.draftList.innerHTML = '<div class="empty-state">No drafts match this status.</div>';
     return;
   }
-  elements.draftList.innerHTML = drafts.map((draft) => `
+  elements.draftList.innerHTML = drafts.map((draft) => {
+    const ready = isDraftPublishReady(draft);
+    return `
     <article class="draft-item">
       <div class="draft-item-header">
         <div>
@@ -108,15 +122,23 @@ function renderDrafts() {
         <span class="chip">${escapeHtml(draft.subject_id || 'No subject')}</span>
       </div>
       <p>${escapeHtml(draft.question_text)}</p>
+      <div class="test-meta">
+        <span class="chip">Answer: ${escapeHtml(draft.answer_source || 'NOT REVIEWED')}</span>
+        <span class="chip">Topic: ${escapeHtml(draft.topic_id || draft.suggested_topic_code || 'UNRESOLVED')}</span>
+        ${draft.answer_confidence ? `<span class="chip">Answer confidence: ${escapeHtml(draft.answer_confidence)}</span>` : ''}
+        ${draft.source_quality ? `<span class="chip">Source: ${escapeHtml(draft.source_quality)}</span>` : ''}
+        ${draft.is_supplemental ? '<span class="chip warning-chip">SUPPLEMENTAL NORMAL QUESTION</span>' : ''}
+      </div>
       <div class="draft-item-actions">
-        <button class="button button-ghost" data-review="${draft.draft_id}" type="button">Review</button>
-        ${['PENDING','IN_REVIEW','REJECTED'].includes(draft.review_status)
+        <button class="button button-ghost" data-review="${draft.draft_id}" type="button">Review and verify</button>
+        ${['PENDING','IN_REVIEW','REJECTED'].includes(draft.review_status) && ready
           ? `<button class="button button-primary" data-publish="${draft.draft_id}" type="button">Publish</button>` : ''}
         ${draft.review_status !== 'PUBLISHED'
           ? `<button class="button button-danger" data-reject="${draft.draft_id}" type="button">Reject</button>` : ''}
       </div>
-    </article>
-  `).join('');
+      ${!ready && draft.review_status !== 'PUBLISHED' ? '<p class="review-required-note">Human answer confirmation, explanation and approved topic are required before publication.</p>' : ''}
+    </article>`;
+  }).join('');
 
   elements.draftList.querySelectorAll('[data-review]').forEach((button) => button.addEventListener('click', () => openReview(button.dataset.review)));
   elements.draftList.querySelectorAll('[data-publish]').forEach((button) => button.addEventListener('click', () => publish(button.dataset.publish)));
@@ -281,27 +303,96 @@ async function loadConfiguredTests() {
   }
 }
 
+function topicOptionsForDraft(draft) {
+  return referenceData.topics
+    .filter((topic) => topic.status === 'ACTIVE' && topic.subject_id === draft.subject_id)
+    .map((topic) => `<option value="${escapeHtml(topic.topic_id)}" ${topic.topic_id === draft.topic_id ? 'selected' : ''}>${escapeHtml(topic.topic_name)} (${escapeHtml(topic.topic_code || topic.topic_id)})</option>`)
+    .join('');
+}
+
 function openReview(draftId) {
   const draft = drafts.find((item) => item.draft_id === draftId);
   if (!draft) return;
   const options = draft.options || {};
+  const proposedSource = draft.answer_source || 'AI_PROPOSED';
+  const reviewSource = proposedSource === 'AI_PROPOSED' ? 'MANUALLY_VERIFIED' : proposedSource;
   elements.dialogContent.innerHTML = `
-    <div class="review-content">
-      <span class="eyebrow">Human review</span>
+    <div class="review-content phase3e-review">
+      <span class="eyebrow">Human answer and topic verification</span>
       <h2>${escapeHtml(draft.proposed_question_id || 'Draft question')}</h2>
-      <p><strong>Board:</strong> ${escapeHtml(draft.board_id)} · <strong>Exam:</strong> ${escapeHtml(draft.exam_id || '—')} · <strong>Subject:</strong> ${escapeHtml(draft.subject_id)}</p>
+      <div class="review-audit-grid">
+        <span><strong>Board</strong>${escapeHtml(draft.board_id)}</span>
+        <span><strong>Exam</strong>${escapeHtml(draft.exam_id || '—')}</span>
+        <span><strong>Subject</strong>${escapeHtml(draft.subject_id)}</span>
+        <span><strong>Source quality</strong>${escapeHtml(draft.source_quality || 'Not set')}</span>
+        <span><strong>Transcription confidence</strong>${escapeHtml(draft.transcription_confidence || 'Not set')}</span>
+        <span><strong>AI answer confidence</strong>${escapeHtml(draft.answer_confidence || 'Not set')}</span>
+      </div>
+      ${draft.is_supplemental ? `<div class="import-resolution resolution-warning"><strong>Supplemental normal question</strong><span>${escapeHtml(draft.supplement_reason || 'Missing source question replacement')}</span></div>` : ''}
+      ${(draft.suggested_topic_code || draft.suggested_topic_name) ? `<div class="import-resolution"><strong>Suggested topic</strong><span>${escapeHtml(draft.suggested_topic_name || '')} ${draft.suggested_topic_code ? `(${escapeHtml(draft.suggested_topic_code)})` : ''} · Confidence ${escapeHtml(draft.topic_confidence || 'not set')}</span></div>` : ''}
       <div class="question-text">${escapeHtml(draft.question_text)}</div>
       <div class="review-options">
-        ${['A','B','C','D'].map((key) => `<div class="review-option ${draft.correct_answer === key ? 'correct' : ''}"><strong>${key}.</strong> ${escapeHtml(options[key])}</div>`).join('')}
+        ${['A','B','C','D'].map((key) => `<label class="review-option selectable-option ${draft.correct_answer === key ? 'correct' : ''}"><input type="radio" name="reviewCorrectAnswer" value="${key}" ${draft.correct_answer === key ? 'checked' : ''} /><strong>${key}.</strong> ${escapeHtml(options[key])}</label>`).join('')}
       </div>
-      <p><strong>Explanation:</strong> ${escapeHtml(draft.explanation || 'Not provided')}</p>
-      <p><strong>Verification:</strong> ${escapeHtml(draft.verification_status)} · <strong>Answer source:</strong> ${escapeHtml(draft.answer_source || 'Not set')}</p>
-      <div class="draft-item-actions">
-        ${draft.review_status !== 'PUBLISHED' ? `<button id="dialogPublish" class="button button-primary" type="button">Publish reviewed question</button>` : ''}
-        ${draft.review_status !== 'PUBLISHED' ? `<button id="dialogReject" class="button button-danger" type="button">Reject</button>` : ''}
-      </div>
+      <form id="draftVerificationForm" class="stack-form" novalidate>
+        <div class="form-row">
+          <label>Verified answer source
+            <select name="answerSource" required>
+              <option value="MANUALLY_VERIFIED" ${reviewSource === 'MANUALLY_VERIFIED' ? 'selected' : ''}>Manually verified</option>
+              <option value="OFFICIAL_FINAL_KEY" ${reviewSource === 'OFFICIAL_FINAL_KEY' ? 'selected' : ''}>Official final key</option>
+              <option value="OFFICIAL_PROVISIONAL_KEY" ${reviewSource === 'OFFICIAL_PROVISIONAL_KEY' ? 'selected' : ''}>Official provisional key</option>
+              <option value="SOURCE_BOOK" ${reviewSource === 'SOURCE_BOOK' ? 'selected' : ''}>Source book</option>
+              <option value="ADMIN_CORRECTED" ${reviewSource === 'ADMIN_CORRECTED' ? 'selected' : ''}>Admin corrected</option>
+            </select>
+          </label>
+          <label>Approved primary topic
+            <select name="topicId" ${draft.question_type === 'PYQ' ? 'required' : ''}>
+              <option value="">${draft.question_type === 'PYQ' ? 'Select required topic' : 'Optional topic'}</option>
+              ${topicOptionsForDraft(draft)}
+            </select>
+          </label>
+        </div>
+        <label>Reviewed explanation<textarea name="explanation" rows="6" required>${escapeHtml(draft.explanation || '')}</textarea></label>
+        <label>Answer review note<textarea name="answerReviewNote" rows="3" placeholder="How the answer was checked or corrected">${escapeHtml(draft.answer_review_note || '')}</textarea></label>
+        <label>Admin notes<textarea name="adminNotes" rows="3" placeholder="Transcription or topic corrections">${escapeHtml(draft.admin_notes || '')}</textarea></label>
+        <div class="draft-item-actions">
+          <button id="saveDraftVerification" class="button button-secondary" type="submit">Save human review</button>
+          ${isDraftPublishReady(draft) ? `<button id="dialogPublish" class="button button-primary" type="button">Publish reviewed question</button>` : ''}
+          <button id="dialogReject" class="button button-danger" type="button">Reject</button>
+        </div>
+      </form>
+      ${draft.answer_source === 'AI_PROPOSED' ? '<p class="review-required-note">AI_PROPOSED is only a suggestion. Saving this review records your selected human-verifiable answer source.</p>' : ''}
     </div>
   `;
+  const form = elements.dialogContent.querySelector('#draftVerificationForm');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    const selected = elements.dialogContent.querySelector('input[name="reviewCorrectAnswer"]:checked')?.value;
+    if (!selected) return toast.warning('Select the verified correct answer.');
+    const values = Object.fromEntries(new FormData(form).entries());
+    setBusy(form, true);
+    const loading = toast.loading('Saving human answer and topic review…');
+    try {
+      await api.reviewDraftAnswerTopic({
+        draftId,
+        correctAnswer: selected,
+        answerSource: values.answerSource,
+        explanation: values.explanation,
+        topicId: values.topicId,
+        answerReviewNote: values.answerReviewNote,
+        adminNotes: values.adminNotes,
+      });
+      loading.close();
+      toast.success('Human answer and topic review saved.');
+      elements.dialog.close();
+      await loadDrafts();
+    } catch (error) {
+      loading.close();
+      toast.error(error.message);
+      setBusy(form, false);
+    }
+  });
   elements.dialogContent.querySelector('#dialogPublish')?.addEventListener('click', async () => { elements.dialog.close(); await publish(draftId); });
   elements.dialogContent.querySelector('#dialogReject')?.addEventListener('click', () => openRejectDialog(draftId));
   elements.dialog.showModal();
@@ -392,6 +483,8 @@ function renderClientPackagePreview(parsed) {
       <span><strong>Size</strong>${escapeHtml(parsed.metadata.fileSizeLabel)}</span>
       <span><strong>Schema</strong>${escapeHtml(parsed.metadata.schemaVersion)}</span>
       <span><strong>Records</strong>${escapeHtml(parsed.metadata.questionCount)}</span>
+      <span><strong>Package version</strong>${escapeHtml(parsed.metadata.packageVersion)}</span>
+      ${parsed.metadata.paper ? `<span><strong>Declared paper</strong>${escapeHtml(parsed.metadata.paper.declared_total_questions || '—')}</span><span><strong>Missing</strong>${escapeHtml(parsed.metadata.paper.missing_question_count || 0)}</span><span><strong>Supplements</strong>${escapeHtml(parsed.metadata.paper.generated_supplement_count || 0)}</span>` : ''}
     </div>
     <div class="checksum-list">
       <div><strong>Raw HTML SHA-256</strong><code>${escapeHtml(parsed.rawChecksum)}</code></div>
@@ -473,7 +566,7 @@ function renderPackageValidationFailure(packageValidation) {
   elements.importReportPanel.classList.remove('hidden');
   elements.importReportTitle.textContent = 'Package validation stopped';
   elements.importReportMeta.textContent = packageValidation?.status || 'INVALID';
-  renderImportSummary(currentImportReport.summary);
+  renderImportSummary(currentImportReport.summary, currentImportReport.batch);
   const issues = [...(packageValidation?.errors || []), ...(packageValidation?.warnings || [])];
   elements.importItemList.innerHTML = issues.length
     ? `<div class="import-package-errors"><ul>${issues.map(formatIssue).join('')}</ul></div>`
@@ -485,7 +578,7 @@ function summaryValue(summary, key) {
   return Number(summary?.[key] || 0);
 }
 
-function renderImportSummary(summary) {
+function renderImportSummary(summary, batch = null) {
   const rows = [
     ['Total records', summaryValue(summary, 'total')],
     ['Valid', summaryValue(summary, 'valid')],
@@ -498,6 +591,10 @@ function renderImportSummary(summary) {
     ['Duplicates skipped', summaryValue(summary, 'skipped_duplicates')],
     ['Occurrences awaiting confirmation', summaryValue(summary, 'actionable_occurrences')],
   ];
+  if (batch?.declared_total_questions) rows.unshift(['Declared paper questions', Number(batch.declared_total_questions)]);
+  if (batch?.extracted_source_questions !== null && batch?.extracted_source_questions !== undefined) rows.splice(1, 0, ['Extracted source questions', Number(batch.extracted_source_questions)]);
+  if (batch?.missing_question_count) rows.splice(2, 0, ['Missing source questions', Number(batch.missing_question_count)]);
+  if (batch?.generated_supplement_count) rows.splice(3, 0, ['Supplemental normal questions', Number(batch.generated_supplement_count)]);
   elements.importSummaryGrid.innerHTML = rows.map(([label, value]) => `
     <div class="import-summary-card"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>
   `).join('');
@@ -615,6 +712,10 @@ function renderImportItems() {
           <span class="chip">${escapeHtml(question.language || '—')}</span>
           <span class="chip">${escapeHtml(question.difficulty || '—')}</span>
           <span class="chip">Duplicate: ${escapeHtml(item.duplicate_kind || 'NONE')}</span>
+          ${question.answer_source ? `<span class="chip">Answer: ${escapeHtml(question.answer_source)}${question.answer_confidence ? ` · ${escapeHtml(question.answer_confidence)}` : ''}</span>` : ''}
+          ${question.topic_id || question.suggested_topic_code ? `<span class="chip">Topic: ${escapeHtml(question.topic_id || question.suggested_topic_code)}${question.topic_confidence ? ` · ${escapeHtml(question.topic_confidence)}` : ''}</span>` : ''}
+          ${question.source_quality ? `<span class="chip">Source: ${escapeHtml(question.source_quality)}</span>` : ''}
+          ${question.is_supplemental ? '<span class="chip warning-chip">SUPPLEMENTAL NORMAL</span>' : ''}
           ${item.resolution_action && item.resolution_action !== 'NONE' ? `<span class="chip">Action: ${escapeHtml(item.resolution_action)}</span>` : ''}
         </div>
         ${duplicateMatch ? `<p class="import-match"><strong>Matched record:</strong> ${escapeHtml(duplicateMatch)}</p>` : ''}
@@ -646,7 +747,7 @@ function renderImportReport(report) {
   elements.importReportMeta.textContent = batch
     ? `${batch.status} · Draft import ${batch.draft_import_status || 'NOT_STARTED'} · Batch ${batch.import_batch_id} · ${batch.source_file?.original_file_name || 'HTML package'}`
     : report?.package_validation?.status || 'Package validation';
-  renderImportSummary(report?.summary || {});
+  renderImportSummary(report?.summary || {}, batch);
   renderImportItems();
   elements.downloadImportReport.disabled = false;
   updateImportActionControls();
@@ -673,6 +774,8 @@ async function loadRecentImportBatches() {
           <span>${escapeHtml(batch.total_draft || 0)} drafts</span>
           <span>${escapeHtml(batch.total_linked || 0)} linked</span>
           <span>${escapeHtml(batch.total_duplicate)} duplicates</span>
+          ${batch.missing_question_count ? `<span>${escapeHtml(batch.missing_question_count)} missing</span>` : ''}
+          ${batch.generated_supplement_count ? `<span>${escapeHtml(batch.generated_supplement_count)} supplements</span>` : ''}
         </div>
         <button class="button button-ghost" type="button" data-import-batch="${escapeHtml(batch.import_batch_id)}">Open report</button>
       </article>
