@@ -180,3 +180,11 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 Large HTML packages must not create all drafts in one browser request. Draft creation is resumable and chunked, every record is revalidated server-side, timeouts are reconciled against actual database state, and recovery/reset actions remain admin-only and audited.
 
 - Compact mobile import reports must omit embedded source-image data and duplicate raw payload copies while retaining full source data in the database for review.
+
+## Visual Question Fingerprint Lock — Version 2
+
+Visual question duplicate identity must include a SHA-256 digest of `image_refs` in addition to language, question text, ordered options, content ID and group text. Generic diagram wording and placeholder option labels must never be sufficient to mark two visual questions as exact duplicates.
+
+Old unresolved import items may be revalidated in place. Existing real drafts, import items and audit history must not be deleted merely to upgrade the fingerprint algorithm.
+
+The admin draft list must use lightweight summary queries. Full options, explanations and source images are loaded only for the single draft currently under human review.

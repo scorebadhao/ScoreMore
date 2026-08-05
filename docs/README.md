@@ -21,3 +21,6 @@
 ## Phase 3E compatibility
 
 AI-proposed answers, canonical topic mapping, dynamic paper completeness, confidence/source-quality metadata and safely labelled supplemental NORMAL questions are supported. AI-proposed answers and unresolved PYQ topics remain blocked from publication until human review.
+
+- `VISUAL_FINGERPRINT_REVIEW_FLOW.md` — visual duplicate fix and simplified one-question-at-a-time human review.
+- `VISUAL_FINGERPRINT_REVIEW_VERIFICATION.sql` — read-only recovery checks for Shift 3 and Shift 1 batches.

@@ -181,3 +181,12 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 ## Import reliability patch
 
 Completed: AI_PROPOSED status repair, timeout-state recovery, compact mobile reports, automatic safe preparation, chunked draft creation, mobile record pagination, and protected reset of untouched drafts.
+
+## Import recovery refinement — completed patch
+
+- Visual-aware fingerprint Version 2
+- Old batch recheck without re-upload
+- True duplicate reuse/linking instead of copy creation
+- Deferred PYQ occurrence linking after canonical draft publication
+- Lightweight draft list and one-draft-at-a-time review
+- Verify-and-next mobile workflow
