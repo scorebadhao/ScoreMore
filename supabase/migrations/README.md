@@ -33,3 +33,5 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 ### `20260805010000_import_recovery_fast_drafts.sql`
 
 Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile reports, timeout reconciliation, resumable mobile-safe draft chunks, import-state synchronization and protected reset of untouched unpublished drafts.
+
+- `20260805020000_visual_fingerprint_and_review_flow.sql` upgrades duplicate identity to visual-aware fingerprint Version 2, repairs old blocked visual records, reuses true duplicates and supports deferred occurrence linking.
