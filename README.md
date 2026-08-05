@@ -151,3 +151,13 @@ The Vite base path is `/ScoreMore/`. Change `vite.config.js` only if the reposit
 ### Phase 3C controlled draft import
 
 The Admin HTML Import panel can now select reconciled valid records and create pending drafts through an admin-only RPC. Every record is revalidated before insertion, exact duplicates are skipped, possible duplicates remain blocked, and confirmed exact duplicate PYQ occurrences can be linked to an existing master question without duplicating content. Human review and protected publication remain mandatory.
+
+
+## Phase 3D controlled acceptance suite
+
+Synthetic HTML packages under `examples/import/phase3d/` verify duplicate, conflict, malformed-input, package-identity and controlled-draft guarantees before a genuine paper is imported. Follow `docs/PHASE3D_ACCEPTANCE_TESTS.md`. No migration or frontend replacement is required for Phase 3D.
+
+
+## Phase 3E compatibility
+
+AI-proposed answers, canonical topic mapping, dynamic paper completeness, confidence/source-quality metadata and safely labelled supplemental NORMAL questions are supported. AI-proposed answers and unresolved PYQ topics remain blocked from publication until human review.
