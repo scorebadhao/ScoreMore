@@ -165,3 +165,7 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 ## Import recovery and resumable drafts
 
 Large PYQ packages use compact mobile reports, timeout recovery and small idempotent draft chunks. The primary Step 2 action synchronizes actual state, repairs known false-invalid/stale records and resumes safely; advanced tools can reset only untouched unpublished drafts. See `docs/IMPORT_RECOVERY_FAST_DRAFTS.md`.
+
+### Visual fingerprint V2 and fast review
+
+The current import flow distinguishes diagram/image questions using a visual digest, repairs old false duplicate states in place, imports remaining drafts in resumable chunks and provides a compact one-question-at-a-time human review screen.

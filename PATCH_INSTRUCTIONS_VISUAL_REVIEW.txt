@@ -1,0 +1,53 @@
+SCOREMORE VISUAL FINGERPRINT V2 + SIMPLE HUMAN REVIEW
+
+ROOT CAUSE CONFIRMED
+The recording shows Shift 3 with 98 drafts and two blocked visual questions (records 10 and 37).
+Fingerprint Version 1 ignored image_refs, so generic diagram wording/options caused false exact-content collisions.
+
+PHASE A — DATABASE FIRST
+Upload:
+supabase/migrations/20260805020000_visual_fingerprint_and_review_flow.sql
+
+Commit:
+Fix visual duplicate detection and draft recovery
+
+Run:
+Actions -> Deploy ScoreMore Database -> Run workflow
+Confirmation: DEPLOY_SCOREMORE
+
+Wait for a fully green workflow.
+
+PHASE B — FRONTEND
+Replace:
+admin.html
+assets/js/admin.js
+assets/js/api.js
+assets/css/main.css
+
+Upload documentation:
+docs/VISUAL_FINGERPRINT_REVIEW_FLOW.md
+docs/VISUAL_FINGERPRINT_REVIEW_VERIFICATION.sql
+docs/ARCHITECTURE_LOCK.md
+docs/DEVELOPMENT_ROADMAP.md
+README.md
+PATCH_INSTRUCTIONS_VISUAL_REVIEW.txt
+
+Commit:
+Simplify ScoreMore human review workflow
+
+RECOVER SHIFT 3
+1. Open admin.html?v=visual-review-v2
+2. Open GSSSB-CCE-2024-0401-S3-REAL-PYQ-V1
+3. Tap Import remaining drafts once.
+4. The two older blocked items are rechecked automatically.
+5. Expected final count: 100 drafts.
+6. Run the same action again. Expected: 0 additional drafts.
+
+SHIFT 1 V1
+Do not import the superseded V1 package. Synchronize it and reset only untouched V1 drafts if any exist.
+Use Shift 1 Version 2 for the real draft workflow.
+
+HUMAN REVIEW
+Use Review next. The dialog loads one full draft/source image at a time.
+Confirm answer and topic, then tap Verify & next.
+No question is published by this action.
