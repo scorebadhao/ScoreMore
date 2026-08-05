@@ -995,3 +995,34 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 @media (min-width: 920px) {
   .import-summary-grid { grid-template-columns: repeat(5, minmax(0,1fr)); }
 }
+
+
+/* Phase 3E answer/topic review compatibility */
+.review-required-note {
+  margin: .85rem 0 0;
+  padding: .8rem 1rem;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-weight: 700;
+}
+.warning-chip { background: #fff7ed !important; color: #9a3412 !important; }
+.review-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+  margin: 1rem 0;
+}
+.review-audit-grid span {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  padding: .8rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.selectable-option { cursor: pointer; display: flex; align-items: flex-start; gap: .65rem; }
+.selectable-option input { width: auto; margin-top: .2rem; }
+.phase3e-review .stack-form { margin-top: 1rem; }
+@media (max-width: 560px) { .review-audit-grid { grid-template-columns: 1fr; } }
