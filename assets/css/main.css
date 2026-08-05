@@ -1026,3 +1026,49 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 .selectable-option input { width: auto; margin-top: .2rem; }
 .phase3e-review .stack-form { margin-top: 1rem; }
 @media (max-width: 560px) { .review-audit-grid { grid-template-columns: 1fr; } }
+
+/* ScoreMore import recovery + resumable draft UI */
+.import-primary-actions {
+  align-items: stretch;
+}
+.import-progress-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #a9d8d2;
+  border-radius: 14px;
+  background: #eef9f7;
+}
+.import-progress-copy {
+  display: grid;
+  gap: 3px;
+}
+.import-progress-copy strong { color: var(--primary-dark); }
+.import-progress-copy span { color: var(--muted); font-size: .76rem; }
+.import-progress-panel progress {
+  width: 100%;
+  height: 14px;
+  accent-color: var(--primary);
+}
+.import-recovery-tools {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+}
+.import-recovery-tools > summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+.import-recovery-tools[open] > summary { margin-bottom: 10px; }
+.import-load-more {
+  width: 100%;
+  margin-top: 12px;
+}
+@media (max-width: 720px) {
+  .import-primary-actions .button,
+  .import-recovery-tools .button-row .button {
+    width: 100%;
+  }
+}
