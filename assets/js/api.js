@@ -314,17 +314,49 @@ export const api = Object.freeze({
     ), 'Unable to save the test configuration.');
   },
 
-  async listDrafts({ status = 'PENDING', page = 0, pageSize = 30 } = {}) {
+  async listDrafts({ status = 'PENDING', page = 0, pageSize = 24 } = {}) {
     const client = requireSupabase();
     const from = page * pageSize;
     const to = from + pageSize - 1;
+    const summaryFields = [
+      'draft_id',
+      'proposed_question_id',
+      'review_status',
+      'question_type',
+      'subject_id',
+      'question_text',
+      'correct_answer',
+      'answer_source',
+      'verification_status',
+      'topic_id',
+      'suggested_topic_code',
+      'suggested_topic_name',
+      'answer_confidence',
+      'transcription_confidence',
+      'source_quality',
+      'is_supplemental',
+      'explanation',
+      'created_at',
+      'updated_at',
+    ].join(',');
     let query = client
       .from('draft_questions')
-      .select('*')
+      .select(summaryFields)
       .order('created_at', { ascending: false })
       .range(from, to);
     if (status) query = query.eq('review_status', status);
     return unwrap(await withTimeout(query), 'Unable to load draft questions.') || [];
+  },
+
+  async getDraftReview(draftId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client
+        .from('draft_questions')
+        .select('*')
+        .eq('draft_id', draftId)
+        .single(),
+    ), 'Unable to load this draft for review.');
   },
 
   async createDraft(input) {
