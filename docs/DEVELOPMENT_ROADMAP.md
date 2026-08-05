@@ -177,3 +177,7 @@ Acceptance before Phase 3D:
 ## Phase 3E compatibility
 
 AI-proposed answers, canonical topic mapping, dynamic paper completeness, confidence/source-quality metadata and safely labelled supplemental NORMAL questions are supported. AI-proposed answers and unresolved PYQ topics remain blocked from publication until human review.
+
+## Import reliability patch
+
+Completed: AI_PROPOSED status repair, timeout-state recovery, compact mobile reports, automatic safe preparation, chunked draft creation, mobile record pagination, and protected reset of untouched drafts.

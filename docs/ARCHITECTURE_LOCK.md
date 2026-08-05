@@ -160,7 +160,7 @@ The user approved the Phase 3 design on 4 August 2026.
    - Phase 3A database identity, duplicate constraints, validation RPCs and specification — COMPLETED and deployed.
    - Phase 3B admin safe parser, checksum identity, persistent dry-run staging and reconciliation UI — COMPLETED AND DEPLOYED.
    - Phase 3C controlled draft import and occurrence linking — COMPLETED AND DEPLOYED.
-   - Phase 3D duplicate/conflict acceptance testing — CONTROLLED TEST SUITE PREPARED; execution pending.
+   - Phase 3D duplicate/conflict acceptance testing — COMPLETED; all controlled tests passed.
 4. Reuse imported master questions across original papers, sectional tests and topic practice without duplication.
 5. Build Results history, detailed review and Mistake Revision.
 
@@ -174,3 +174,9 @@ Any change to this document requires explicit user approval before implementatio
 ## Phase 3E compatibility
 
 AI-proposed answers, canonical topic mapping, dynamic paper completeness, confidence/source-quality metadata and safely labelled supplemental NORMAL questions are supported. AI-proposed answers and unresolved PYQ topics remain blocked from publication until human review.
+
+## Import execution lock — recovery and chunking
+
+Large HTML packages must not create all drafts in one browser request. Draft creation is resumable and chunked, every record is revalidated server-side, timeouts are reconciled against actual database state, and recovery/reset actions remain admin-only and audited.
+
+- Compact mobile import reports must omit embedded source-image data and duplicate raw payload copies while retaining full source data in the database for review.
