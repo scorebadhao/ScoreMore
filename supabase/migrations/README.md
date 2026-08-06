@@ -37,3 +37,5 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260805020000_visual_fingerprint_and_review_flow.sql` upgrades duplicate identity to visual-aware fingerprint Version 2, repairs old blocked visual records, reuses true duplicates and supports deferred occurrence linking.
 
 - `20260806000000_source_option_anomaly_publish_centre.sql` preserves explicitly confirmed printed duplicate options in genuine PYQs, repairs Shift 1 V2 Q55 in place, and adds the admin-only verified Publish Centre RPCs.
+
+- `20260806010000_simple_test_builder_catalogue.sql` adds paper-aware fixed-test saving and an audited admin-only test status RPC for the simplified Test Builder and Catalogue Control.
