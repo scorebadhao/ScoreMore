@@ -1,0 +1,56 @@
+SCOREMORE — SIMPLE TEST BUILDER + CATALOGUE CONTROL
+
+PHASE A — DATABASE FIRST
+
+Upload:
+supabase/migrations/20260806010000_simple_test_builder_catalogue.sql
+
+Commit:
+Add simple ScoreMore test builder RPCs
+
+Run:
+GitHub -> Actions -> Deploy ScoreMore Database -> Run workflow
+Confirmation: DEPLOY_SCOREMORE
+
+Wait until the database workflow is fully green.
+
+PHASE B — FRONTEND AND DOCUMENTATION
+
+Replace/upload:
+admin.html
+assets/css/main.css
+assets/js/admin.js
+assets/js/api.js
+README.md
+docs/ARCHITECTURE_LOCK.md
+docs/DEVELOPMENT_ROADMAP.md
+docs/README.md
+docs/SIMPLE_TEST_BUILDER_CATALOGUE.md
+docs/SIMPLE_TEST_BUILDER_CATALOGUE_VERIFICATION.sql
+supabase/migrations/README.md
+PATCH_INSTRUCTIONS_SIMPLE_TEST_BUILDER.txt
+
+Commit:
+Simplify ScoreMore test builder and catalogue control
+
+Wait for Deploy ScoreMore to GitHub Pages to become green.
+
+Open:
+https://scorebadhao.github.io/ScoreMore/admin.html?v=simple-test-builder
+
+ACCEPTANCE TEST
+
+1. Open Tests from the admin section navigation.
+2. Select Full PYQ Paper.
+3. Choose GSSSB and CCE.
+4. Enter 2024, the shift number and exact paper code.
+5. Tap Load questions.
+6. Confirm only that paper's published questions load in original order.
+7. Use Select visible, then save as Draft.
+8. Confirm the test appears in Catalogue Control.
+9. Tap Edit and confirm the same fixed question list reloads.
+10. Publish from the builder or Catalogue Control.
+11. Confirm Student view displays the published test.
+12. Archive it, confirm it disappears publicly, then Restore draft if needed.
+
+No existing migration should be edited.

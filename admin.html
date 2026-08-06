@@ -51,7 +51,8 @@
           <a href="#htmlImportSection">Import</a>
           <a href="#reviewSection">Review</a>
           <a href="#publishSection">Publish</a>
-          <a href="#testManagerSection">Tests</a>
+          <a href="#testManagerSection">Build tests</a>
+          <a href="#catalogueControlSection">Catalogue</a>
         </nav>
 
         <div class="admin-grid">
@@ -240,98 +241,147 @@
           <button id="loadMorePublishQueue" class="button button-ghost publish-load-more hidden" type="button">Load more verified drafts</button>
         </section>
 
-        <section id="testManagerSection" class="section panel-card">
-          <div class="section-heading">
+        <section id="testManagerSection" class="section panel-card test-builder-panel">
+          <div class="section-heading test-builder-heading">
             <div>
-              <span class="eyebrow">Test configuration</span>
-              <h2>Fixed Question Test Manager</h2>
-              <p class="muted">Select published master questions once and link them to a free test. No question is duplicated.</p>
+              <span class="eyebrow">Simple fixed-question builder</span>
+              <h2>Test Builder</h2>
+              <p class="muted">Choose the test type, filter the published question bank, select questions, then save or publish. Master questions are linked, never copied.</p>
             </div>
-            <button id="refreshTests" class="button button-secondary" type="button">Refresh tests</button>
+            <div class="test-builder-heading-actions">
+              <span id="testBuilderMode" class="status-pill status-draft">New test</span>
+              <button id="newTest" class="button button-secondary" type="button">New test</button>
+            </div>
           </div>
 
-          <form id="testForm" class="stack-form" novalidate>
-            <div class="form-row">
-              <label>Test ID
-                <input name="testId" placeholder="GSSSB-CCE-REASONING-SECTIONAL-0001" pattern="[A-Z0-9]+(?:-[A-Z0-9]+)+" required />
-              </label>
-              <label>Test name
-                <input name="testName" placeholder="Reasoning Practice Test 1" required />
-              </label>
-            </div>
-
-            <div class="form-row">
-              <label>Board
-                <select id="testBoardId" name="boardId" required><option value="">Select board</option></select>
-              </label>
-              <label>Exam
-                <select id="testExamId" name="examId" required><option value="">Select exam</option></select>
-              </label>
-              <label>Subject
-                <select id="testSubjectId" name="subjectId"><option value="">Optional for full tests</option></select>
-              </label>
-              <label>Topic
-                <select id="testTopicId" name="topicId"><option value="">Optional topic</option></select>
-              </label>
-            </div>
-
-            <div class="form-row">
-              <label>Test type
-                <select name="testType" required>
-                  <option value="SECTIONAL_MOCK" selected>Sectional Mock</option>
-                  <option value="FULL_MOCK">Full Mock</option>
-                  <option value="TOPIC_PRACTICE">Topic Practice</option>
-                  <option value="DAILY_QUIZ">Daily Quiz</option>
-                  <option value="PYQ_SECTIONAL">Sectional PYQ</option>
-                  <option value="PYQ_FULL">Full PYQ Paper</option>
-                </select>
-              </label>
-              <label>Duration in minutes<input name="durationMinutes" type="number" min="0" step="1" value="5" required /></label>
-              <label>Marks per question<input name="marksPerQuestion" type="number" min="0.001" step="0.001" value="1" required /></label>
-              <label>Negative marks<input name="negativeMarks" type="number" min="0" step="0.001" value="0" required /></label>
-            </div>
-
-            <div class="form-row">
-              <label>Catalogue sort order<input name="sortOrder" type="number" step="1" value="1" /></label>
-              <div class="inline-note">
-                <strong>Selection mode</strong>
-                <span>Fixed question list</span>
+          <form id="testForm" class="test-builder-form" novalidate>
+            <section class="test-builder-step">
+              <div class="test-step-heading"><span>1</span><div><strong>Test details</strong><small>Name the test and choose its purpose.</small></div></div>
+              <div class="test-builder-grid test-builder-grid-main">
+                <label>Test type
+                  <select id="testType" name="testType" required>
+                    <option value="PYQ_FULL" selected>Full PYQ Paper</option>
+                    <option value="PYQ_SECTIONAL">Sectional PYQ</option>
+                    <option value="SECTIONAL_MOCK">Sectional Mock</option>
+                    <option value="FULL_MOCK">Full Mock</option>
+                    <option value="TOPIC_PRACTICE">Topic Practice</option>
+                    <option value="DAILY_QUIZ">Daily Quiz</option>
+                  </select>
+                </label>
+                <label>Test name
+                  <input name="testName" placeholder="GSSSB CCE Shift 1 Full Paper" required />
+                </label>
+                <label class="test-id-field">Test ID
+                  <span class="input-action-row">
+                    <input name="testId" placeholder="GSSSB-CCE-2024-S1-PYQ-FULL-0001" pattern="[A-Z0-9]+(?:-[A-Z0-9]+)+" required />
+                    <button id="suggestTestId" class="button button-ghost" type="button">Suggest</button>
+                  </span>
+                </label>
               </div>
-              <div class="inline-note">
-                <strong>Access</strong>
-                <span>Free during this phase</span>
-              </div>
-            </div>
+            </section>
 
-            <div class="question-picker-heading">
+            <section class="test-builder-step">
+              <div class="test-step-heading"><span>2</span><div><strong>Catalogue and paper</strong><small>Use paper filters to load only the correct shift or section.</small></div></div>
+              <div class="test-builder-grid">
+                <label>Board
+                  <select id="testBoardId" name="boardId" required><option value="">Select board</option></select>
+                </label>
+                <label>Exam
+                  <select id="testExamId" name="examId" required><option value="">Select exam</option></select>
+                </label>
+                <label>Subject
+                  <select id="testSubjectId" name="subjectId"><option value="">All subjects</option></select>
+                </label>
+                <label>Topic
+                  <select id="testTopicId" name="topicId"><option value="">All topics</option></select>
+                </label>
+              </div>
+
+              <div id="testPaperFields" class="test-paper-fields">
+                <label>Exam year<input id="testExamYear" name="examYear" type="number" min="1900" max="2200" placeholder="2024" /></label>
+                <label>Exam date<input id="testExamDate" name="examDate" type="date" /></label>
+                <label>Shift<input id="testShiftNo" name="shiftNo" type="number" min="1" step="1" placeholder="1" /></label>
+                <label>Paper code<input id="testPaperCode" name="paperCode" placeholder="0401S1" /></label>
+                <label>Section code<input id="testSectionCode" name="sectionCode" placeholder="Optional" /></label>
+              </div>
+            </section>
+
+            <section class="test-builder-step question-selection-step">
+              <div class="test-step-heading question-step-heading">
+                <span>3</span>
+                <div><strong>Select published questions</strong><small id="questionSelectionMeta">0 loaded · 0 selected</small></div>
+                <button id="loadPublishedQuestions" class="button button-primary" type="button">Load questions</button>
+              </div>
+
+              <div class="question-picker-toolbar">
+                <label class="question-search-field">Search loaded questions
+                  <input id="testQuestionSearch" type="search" placeholder="Question ID, text, topic or section" autocomplete="off" />
+                </label>
+                <div class="question-picker-actions">
+                  <button id="selectAllQuestions" class="button button-ghost" type="button">Select visible</button>
+                  <button id="clearQuestionSelection" class="button button-ghost" type="button">Clear</button>
+                </div>
+              </div>
+
+              <div id="publishedQuestionList" class="question-picker simplified-question-picker" aria-live="polite">
+                <div class="empty-state">Choose catalogue or paper filters, then load published questions.</div>
+              </div>
+            </section>
+
+            <details class="test-advanced-settings">
+              <summary>Advanced test settings</summary>
+              <div class="test-builder-grid advanced-test-grid">
+                <label>Duration (minutes)<input name="durationMinutes" type="number" min="0" step="1" value="60" required /></label>
+                <label>Marks per question<input name="marksPerQuestion" type="number" min="0.001" step="0.001" value="1" required /></label>
+                <label>Negative marks<input name="negativeMarks" type="number" min="0" step="0.001" value="0" required /></label>
+                <label>Catalogue order<input name="sortOrder" type="number" step="1" value="1" /></label>
+              </div>
+              <div class="test-static-facts">
+                <span><strong>Selection</strong> Fixed question list</span>
+                <span><strong>Access</strong> Free during this phase</span>
+              </div>
+            </details>
+
+            <div class="test-builder-actions">
               <div>
-                <strong>Published questions</strong>
-                <span id="selectedQuestionCount" class="muted">0 selected</span>
+                <strong id="selectedQuestionCount">0 selected</strong>
+                <span class="muted">Only published, matching questions can be linked.</span>
               </div>
-              <button id="loadPublishedQuestions" class="button button-ghost" type="button">Load matching questions</button>
-            </div>
-            <div id="publishedQuestionList" class="question-picker" aria-live="polite">
-              <div class="empty-state">Choose catalogue fields, then load published questions.</div>
-            </div>
-
-            <div class="draft-item-actions">
-              <button class="button button-ghost" type="submit" name="testAction" value="DRAFT">Save test as draft</button>
-              <button class="button button-primary" type="submit" name="testAction" value="PUBLISH">Publish test</button>
+              <div class="button-row">
+                <button class="button button-ghost" type="submit" name="testAction" value="DRAFT">Save draft</button>
+                <button class="button button-primary" type="submit" name="testAction" value="PUBLISH">Publish test</button>
+              </div>
             </div>
           </form>
         </section>
 
-        <section class="section panel-card">
-          <div class="section-heading">
-            <div><span class="eyebrow">Catalogue control</span><h2>Configured tests</h2></div>
-            <select id="testStatusFilter" aria-label="Test status filter">
-              <option value="">All</option>
-              <option value="DRAFT">Draft</option>
-              <option value="PUBLISHED">Published</option>
-              <option value="ARCHIVED">Archived</option>
-            </select>
+        <section id="catalogueControlSection" class="section panel-card test-catalogue-control">
+          <div class="section-heading catalogue-control-heading">
+            <div>
+              <span class="eyebrow">Simple catalogue control</span>
+              <h2>Configured Tests</h2>
+              <p class="muted">Find a test, edit its fixed question list, or change whether students can see it.</p>
+            </div>
+            <button id="refreshTests" class="button button-secondary" type="button">Refresh</button>
           </div>
-          <div id="adminTestList" class="test-admin-list" aria-live="polite"></div>
+
+          <div id="testCatalogueStats" class="test-catalogue-stats" aria-live="polite"></div>
+
+          <div class="test-catalogue-toolbar">
+            <label>Search
+              <input id="testCatalogueSearch" type="search" placeholder="Test name, ID, type or paper" autocomplete="off" />
+            </label>
+            <label>Status
+              <select id="testStatusFilter" aria-label="Test status filter">
+                <option value="">All statuses</option>
+                <option value="DRAFT">Draft</option>
+                <option value="PUBLISHED">Published</option>
+                <option value="ARCHIVED">Archived</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="adminTestList" class="test-admin-list simplified-test-list" aria-live="polite"></div>
         </section>
       </section>
     </main>

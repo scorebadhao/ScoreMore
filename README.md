@@ -173,3 +173,7 @@ The current import flow distinguishes diagram/image questions using a visual dig
 ## Printed option anomaly and separate Publish Centre
 
 ScoreMore now preserves a genuine PYQ when the source itself prints duplicate option values, but only through explicit source confirmation and human review. The Admin Review Centre no longer publishes directly; verified drafts move to a separate compact Publish Centre for individual or safe chunked publication.
+
+## Simple Test Builder and Catalogue Control
+
+The admin test workflow is now a compact three-step builder with exact PYQ paper filters, local question search, visible-question selection, ID suggestions, paper-aware test metadata and a separate searchable catalogue with Edit, Publish, Archive and Restore actions. See `docs/SIMPLE_TEST_BUILDER_CATALOGUE.md`.
