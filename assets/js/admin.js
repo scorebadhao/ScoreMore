@@ -23,6 +23,12 @@ const elements = {
   selectedQuestionCount: document.getElementById('selectedQuestionCount'),
   adminTestList: document.getElementById('adminTestList'),
   testStatusFilter: document.getElementById('testStatusFilter'),
+  testBuilderMode: document.getElementById('testBuilderMode'),
+  testCatalogueStats: document.getElementById('testCatalogueStats'),
+  testCatalogueSearch: document.getElementById('testCatalogueSearch'),
+  testQuestionSearch: document.getElementById('testQuestionSearch'),
+  questionSelectionMeta: document.getElementById('questionSelectionMeta'),
+  testPaperFields: document.getElementById('testPaperFields'),
   htmlImportForm: document.getElementById('htmlImportForm'),
   htmlImportFile: document.getElementById('htmlImportFile'),
   importPackagePreview: document.getElementById('importPackagePreview'),
@@ -61,6 +67,8 @@ let drafts = [];
 let referenceData = { boards: [], exams: [], subjects: [], topics: [] };
 let publishedQuestions = [];
 let configuredTests = [];
+let selectedTestQuestionIds = new Set();
+let editingTestId = null;
 let parsedImportPackage = null;
 let currentImportReport = null;
 let recentImportBatches = [];
@@ -466,52 +474,115 @@ function refreshTestReferenceSelects() {
   const exams = referenceData.exams.filter((row) => !boardSelect?.value || row.board_id === boardSelect.value);
   fillSelect(examSelect, exams, 'exam_id', 'exam_name', 'Select exam');
   const subjects = referenceData.subjects.filter((row) => !examSelect?.value || row.exam_id === examSelect.value);
-  fillSelect(subjectSelect, subjects, 'subject_id', 'subject_name', 'Optional for full tests');
+  fillSelect(subjectSelect, subjects, 'subject_id', 'subject_name', 'All subjects');
   const topics = referenceData.topics.filter((row) => !subjectSelect?.value || row.subject_id === subjectSelect.value);
-  fillSelect(topicSelect, topics, 'topic_id', 'topic_name', 'Optional topic');
+  fillSelect(topicSelect, topics, 'topic_id', 'topic_name', 'All topics');
 }
 
 async function loadReferenceData() {
   referenceData = await api.getAdminReferenceData();
   refreshDraftReferenceSelects();
   refreshTestReferenceSelects();
+  updateTestTypeUi();
 }
 
-function resetQuestionPicker() {
+function isPyqTestType(testType) {
+  return ['PYQ_FULL', 'PYQ_SECTIONAL'].includes(testType);
+}
+
+function testTypeRequiresSubject(testType) {
+  return ['PYQ_SECTIONAL', 'SECTIONAL_MOCK', 'TOPIC_PRACTICE'].includes(testType);
+}
+
+function updateTestTypeUi() {
+  const form = elements.testForm;
+  if (!form) return;
+  const testType = form.elements.testType.value;
+  const pyq = isPyqTestType(testType);
+  const paperAware = pyq || testType === 'FULL_MOCK';
+  elements.testPaperFields?.classList.toggle('hidden', !paperAware);
+  ['examYear', 'shiftNo', 'paperCode'].forEach((name) => {
+    if (form.elements[name]) form.elements[name].required = pyq;
+  });
+  if (form.elements.subjectId) form.elements.subjectId.required = testTypeRequiresSubject(testType);
+}
+
+function resetQuestionPicker(message = 'Catalogue selection changed. Load matching questions again.') {
   publishedQuestions = [];
-  elements.publishedQuestionList.innerHTML = '<div class="empty-state">Catalogue selection changed. Load matching questions again.</div>';
+  selectedTestQuestionIds.clear();
+  if (elements.testQuestionSearch) elements.testQuestionSearch.value = '';
+  elements.publishedQuestionList.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
   updateSelectedQuestionCount();
 }
 
+function visiblePublishedQuestions() {
+  const term = String(elements.testQuestionSearch?.value || '').trim().toLowerCase();
+  if (!term) return publishedQuestions;
+  return publishedQuestions.filter((question) => [
+    question.question_id,
+    question.question_text,
+    question.subject_id,
+    question.topic_id,
+    question.section_code,
+    question.paper_code,
+    question.original_question_no,
+  ].some((value) => String(value ?? '').toLowerCase().includes(term)));
+}
+
 function updateSelectedQuestionCount() {
-  const count = elements.publishedQuestionList?.querySelectorAll('[data-question-id]:checked').length || 0;
-  elements.selectedQuestionCount.textContent = `${count} selected`;
+  const selected = selectedTestQuestionIds.size;
+  const loaded = publishedQuestions.length;
+  if (elements.selectedQuestionCount) elements.selectedQuestionCount.textContent = `${selected} selected`;
+  if (elements.questionSelectionMeta) elements.questionSelectionMeta.textContent = `${loaded} loaded · ${selected} selected`;
+}
+
+function questionSourceLabel(question) {
+  const parts = [];
+  if (question.exam_year) parts.push(question.exam_year);
+  if (question.shift_no) parts.push(`Shift ${question.shift_no}`);
+  if (question.original_question_no) parts.push(`Q${question.original_question_no}`);
+  return parts.join(' · ');
 }
 
 function renderPublishedQuestions() {
   if (!publishedQuestions.length) {
-    elements.publishedQuestionList.innerHTML = '<div class="empty-state">No published questions match these catalogue fields.</div>';
+    elements.publishedQuestionList.innerHTML = '<div class="empty-state">No published questions match these filters.</div>';
     updateSelectedQuestionCount();
     return;
   }
 
-  elements.publishedQuestionList.innerHTML = publishedQuestions.map((question) => `
-    <label class="question-picker-item">
-      <input type="checkbox" data-question-id="${escapeHtml(question.question_id)}" />
-      <span>
-        <strong>${escapeHtml(question.question_id)}</strong>
+  const visible = visiblePublishedQuestions();
+  if (!visible.length) {
+    elements.publishedQuestionList.innerHTML = '<div class="empty-state">No loaded question matches this search.</div>';
+    updateSelectedQuestionCount();
+    return;
+  }
+
+  elements.publishedQuestionList.innerHTML = visible.map((question, index) => {
+    const source = questionSourceLabel(question);
+    return `
+    <label class="question-picker-item simplified-question-item">
+      <input type="checkbox" data-question-id="${escapeHtml(question.question_id)}" ${selectedTestQuestionIds.has(question.question_id) ? 'checked' : ''} />
+      <span class="question-order">${escapeHtml(question.sort_order || question.original_question_no || index + 1)}</span>
+      <span class="question-picker-main">
+        <span class="question-picker-title"><strong>${escapeHtml(question.question_id)}</strong>${source ? `<small>${escapeHtml(source)}</small>` : ''}</span>
         <span class="question-picker-meta">
-          <span class="chip">${escapeHtml(question.question_type)}</span>
           <span class="chip">${escapeHtml(question.subject_id)}</span>
-          <span class="chip">${escapeHtml(question.difficulty)}</span>
+          ${question.topic_id ? `<span class="chip">${escapeHtml(question.topic_id)}</span>` : ''}
+          ${question.section_code ? `<span class="chip">${escapeHtml(question.section_code)}</span>` : ''}
         </span>
         <span class="question-picker-text">${escapeHtml(question.question_text)}</span>
       </span>
-    </label>
-  `).join('');
+    </label>`;
+  }).join('');
 
   elements.publishedQuestionList.querySelectorAll('[data-question-id]').forEach((checkbox) => {
-    checkbox.addEventListener('change', updateSelectedQuestionCount);
+    checkbox.addEventListener('change', () => {
+      const questionId = checkbox.dataset.questionId;
+      if (checkbox.checked) selectedTestQuestionIds.add(questionId);
+      else selectedTestQuestionIds.delete(questionId);
+      updateSelectedQuestionCount();
+    });
   });
   updateSelectedQuestionCount();
 }
@@ -522,8 +593,15 @@ async function loadPublishedQuestions() {
   if (!values.boardId || !values.examId) {
     return toast.warning('Select a board and exam before loading questions.');
   }
+  if (testTypeRequiresSubject(values.testType) && !values.subjectId) {
+    return toast.warning('Select a subject for this test type.');
+  }
+  if (isPyqTestType(values.testType) && (!values.examYear || !values.shiftNo || !values.paperCode)) {
+    return toast.warning('For a PYQ test, enter exam year, shift and paper code to load the exact paper.');
+  }
 
-  elements.publishedQuestionList.innerHTML = '<div class="loading-state">Loading published questions…</div>';
+  elements.publishedQuestionList.innerHTML = '<div class="loading-state">Loading matching published questions…</div>';
+  selectedTestQuestionIds.clear();
   updateSelectedQuestionCount();
   try {
     publishedQuestions = await api.listPublishedQuestions({
@@ -531,51 +609,261 @@ async function loadPublishedQuestions() {
       examId: values.examId,
       subjectId: values.subjectId,
       topicId: values.topicId,
-      pageSize: 200,
+      questionType: isPyqTestType(values.testType) ? 'PYQ' : '',
+      examYear: values.examYear,
+      examDate: values.examDate,
+      shiftNo: values.shiftNo,
+      paperCode: values.paperCode,
+      sectionCode: values.sectionCode,
+      pageSize: 500,
     });
+    publishedQuestions.sort((a, b) => (
+      (Number(a.sort_order) || Number.MAX_SAFE_INTEGER) - (Number(b.sort_order) || Number.MAX_SAFE_INTEGER)
+      || (Number(a.original_question_no) || Number.MAX_SAFE_INTEGER) - (Number(b.original_question_no) || Number.MAX_SAFE_INTEGER)
+      || String(a.question_id).localeCompare(String(b.question_id))
+    ));
     renderPublishedQuestions();
+    toast.success(`${publishedQuestions.length} matching published question${publishedQuestions.length === 1 ? '' : 's'} loaded.`);
   } catch (error) {
     elements.publishedQuestionList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     toast.error(error.message);
   }
 }
 
+function selectedOptionLabel(select) {
+  return select?.selectedOptions?.[0]?.textContent?.trim() || '';
+}
+
+function slugPart(value) {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function suggestTestIdentity() {
+  const form = elements.testForm;
+  const values = Object.fromEntries(new FormData(form).entries());
+  if (!values.boardId || !values.examId) return toast.warning('Select a board and exam first.');
+
+  const typeCode = {
+    PYQ_FULL: 'PYQ-FULL',
+    PYQ_SECTIONAL: 'PYQ-SECTIONAL',
+    SECTIONAL_MOCK: 'SECTIONAL',
+    FULL_MOCK: 'FULL-MOCK',
+    TOPIC_PRACTICE: 'TOPIC',
+    DAILY_QUIZ: 'DAILY',
+  }[values.testType] || values.testType;
+
+  const idParts = [values.boardId, values.examId];
+  if (values.examYear) idParts.push(values.examYear);
+  if (values.shiftNo) idParts.push(`S${values.shiftNo}`);
+  if (values.subjectId) idParts.push(values.subjectId);
+  idParts.push(typeCode);
+  const base = idParts.map(slugPart).filter(Boolean).join('-');
+  const usedNumbers = configuredTests
+    .map((test) => String(test.test_id || ''))
+    .filter((testId) => testId.startsWith(`${base}-`))
+    .map((testId) => Number(testId.match(/-(\d{4})$/)?.[1] || 0));
+  const sequence = String(Math.max(0, ...usedNumbers) + 1).padStart(4, '0');
+  form.elements.testId.value = `${base}-${sequence}`;
+
+  if (!String(form.elements.testName.value || '').trim()) {
+    const board = selectedOptionLabel(form.elements.boardId);
+    const exam = selectedOptionLabel(form.elements.examId);
+    const subject = selectedOptionLabel(form.elements.subjectId);
+    const shift = values.shiftNo ? `Shift ${values.shiftNo}` : '';
+    const names = {
+      PYQ_FULL: [board, exam, shift, 'Full PYQ Paper'],
+      PYQ_SECTIONAL: [subject, shift, 'PYQ Section'],
+      SECTIONAL_MOCK: [subject, 'Sectional Mock'],
+      FULL_MOCK: [board, exam, shift, 'Full Mock'],
+      TOPIC_PRACTICE: [selectedOptionLabel(form.elements.topicId) || subject, 'Practice'],
+      DAILY_QUIZ: [board, exam, 'Daily Quiz'],
+    }[values.testType] || [board, exam, 'Test'];
+    form.elements.testName.value = names.filter(Boolean).join(' — ');
+  }
+}
+
+function renderTestCatalogueStats() {
+  if (!elements.testCatalogueStats) return;
+  const counts = configuredTests.reduce((result, test) => {
+    result.ALL += 1;
+    result[test.status] = (result[test.status] || 0) + 1;
+    return result;
+  }, { ALL: 0, DRAFT: 0, PUBLISHED: 0, ARCHIVED: 0 });
+  elements.testCatalogueStats.innerHTML = [
+    ['ALL', 'All tests'],
+    ['DRAFT', 'Draft'],
+    ['PUBLISHED', 'Published'],
+    ['ARCHIVED', 'Archived'],
+  ].map(([key, label]) => `<button type="button" class="test-stat-card ${elements.testStatusFilter?.value === (key === 'ALL' ? '' : key) ? 'active' : ''}" data-test-stat="${key === 'ALL' ? '' : key}"><strong>${counts[key]}</strong><span>${label}</span></button>`).join('');
+  elements.testCatalogueStats.querySelectorAll('[data-test-stat]').forEach((button) => {
+    button.addEventListener('click', () => {
+      elements.testStatusFilter.value = button.dataset.testStat;
+      renderConfiguredTests();
+    });
+  });
+}
+
+function filteredConfiguredTests() {
+  const status = elements.testStatusFilter?.value || '';
+  const search = String(elements.testCatalogueSearch?.value || '').trim().toLowerCase();
+  return configuredTests.filter((test) => {
+    if (status && test.status !== status) return false;
+    if (!search) return true;
+    return [test.test_id, test.test_name, test.test_type, test.paper_code, test.subjects?.subject_name, test.exams?.exam_name]
+      .some((value) => String(value ?? '').toLowerCase().includes(search));
+  });
+}
+
+function testPaperLabel(test) {
+  const parts = [];
+  if (test.exam_year) parts.push(test.exam_year);
+  if (test.shift_no) parts.push(`Shift ${test.shift_no}`);
+  if (test.paper_code) parts.push(test.paper_code);
+  if (test.section_code) parts.push(test.section_code);
+  return parts.join(' · ');
+}
+
+function nextStatusAction(test) {
+  if (test.status === 'DRAFT') return { label: 'Publish', status: 'PUBLISHED', className: 'button-primary' };
+  if (test.status === 'PUBLISHED') return { label: 'Archive', status: 'ARCHIVED', className: 'button-ghost' };
+  return { label: 'Restore draft', status: 'DRAFT', className: 'button-ghost' };
+}
+
 function renderConfiguredTests() {
-  if (!configuredTests.length) {
-    elements.adminTestList.innerHTML = '<div class="empty-state">No tests match this status.</div>';
+  renderTestCatalogueStats();
+  const tests = filteredConfiguredTests();
+  if (!tests.length) {
+    elements.adminTestList.innerHTML = '<div class="empty-state">No configured test matches this filter.</div>';
     return;
   }
 
-  elements.adminTestList.innerHTML = configuredTests.map((test) => `
-    <article class="test-admin-item">
-      <div class="draft-item-header">
-        <div>
-          <span class="eyebrow">${escapeHtml(test.status)} · ${escapeHtml(test.test_type)}</span>
-          <h3>${escapeHtml(test.test_name)}</h3>
-          <p class="muted">${escapeHtml(test.test_id)}</p>
+  elements.adminTestList.innerHTML = tests.map((test) => {
+    const action = nextStatusAction(test);
+    const paper = testPaperLabel(test);
+    return `
+    <article class="test-admin-item simplified-test-item">
+      <div class="test-admin-card-main">
+        <div class="test-admin-card-topline">
+          <span class="status-pill status-${escapeHtml(test.status.toLowerCase())}">${escapeHtml(test.status)}</span>
+          <span class="chip">${escapeHtml(test.test_type)}</span>
         </div>
-        <span class="chip">${escapeHtml(test.question_count)} question${Number(test.question_count) === 1 ? '' : 's'}</span>
+        <h3>${escapeHtml(test.test_name)}</h3>
+        <p class="test-admin-id">${escapeHtml(test.test_id)}</p>
+        <div class="test-admin-facts">
+          <span><strong>${escapeHtml(test.question_count)}</strong> questions</span>
+          <span><strong>${escapeHtml(test.duration_minutes)}</strong> min</span>
+          <span><strong>${escapeHtml(test.marks_per_question)}</strong> mark/question</span>
+          ${Number(test.negative_marks) > 0 ? `<span><strong>−${escapeHtml(test.negative_marks)}</strong> negative</span>` : ''}
+        </div>
+        <div class="test-meta">
+          ${test.boards?.board_name ? `<span class="chip">${escapeHtml(test.boards.board_name)}</span>` : ''}
+          ${test.exams?.exam_name ? `<span class="chip">${escapeHtml(test.exams.exam_name)}</span>` : ''}
+          ${test.subjects?.subject_name ? `<span class="chip">${escapeHtml(test.subjects.subject_name)}</span>` : ''}
+          ${paper ? `<span class="chip">${escapeHtml(paper)}</span>` : ''}
+        </div>
       </div>
-      <div class="test-meta">
-        ${test.boards?.board_name ? `<span class="chip">${escapeHtml(test.boards.board_name)}</span>` : ''}
-        ${test.exams?.exam_name ? `<span class="chip">${escapeHtml(test.exams.exam_name)}</span>` : ''}
-        ${test.subjects?.subject_name ? `<span class="chip">${escapeHtml(test.subjects.subject_name)}</span>` : ''}
-        <span class="chip">${escapeHtml(test.duration_minutes)} min</span>
-        <span class="chip">${escapeHtml(test.selection_mode)}</span>
+      <div class="test-admin-actions">
+        <button class="button button-secondary" data-edit-test="${escapeHtml(test.test_id)}" type="button">Edit</button>
+        ${test.status === 'PUBLISHED' ? '<a class="button button-ghost" href="./student.html#tests">Student view</a>' : ''}
+        <button class="button ${action.className}" data-status-test="${escapeHtml(test.test_id)}" data-next-status="${action.status}" type="button">${action.label}</button>
       </div>
-    </article>
-  `).join('');
+    </article>`;
+  }).join('');
+
+  elements.adminTestList.querySelectorAll('[data-edit-test]').forEach((button) => {
+    button.addEventListener('click', () => loadTestIntoBuilder(button.dataset.editTest));
+  });
+  elements.adminTestList.querySelectorAll('[data-status-test]').forEach((button) => {
+    button.addEventListener('click', () => changeTestStatus(button.dataset.statusTest, button.dataset.nextStatus));
+  });
 }
 
 async function loadConfiguredTests() {
   elements.adminTestList.innerHTML = '<div class="loading-state">Loading configured tests…</div>';
   try {
-    configuredTests = await api.listAdminTests({ status: elements.testStatusFilter.value });
+    configuredTests = await api.listAdminTests({ pageSize: 200 });
     renderConfiguredTests();
   } catch (error) {
     elements.adminTestList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     toast.error(error.message);
   }
+}
+
+async function changeTestStatus(testId, status) {
+  const loading = toast.loading(`Changing ${testId} to ${status.toLowerCase()}…`);
+  try {
+    await api.setAdminTestStatus(testId, status);
+    loading.close();
+    toast.success(`${testId} is now ${status}.`);
+    await loadConfiguredTests();
+  } catch (error) {
+    loading.close();
+    toast.error(error.message);
+  }
+}
+
+function setTestSelectValue(name, value) {
+  const field = elements.testForm?.elements?.[name];
+  if (field) field.value = value ?? '';
+}
+
+async function loadTestIntoBuilder(testId) {
+  const loading = toast.loading(`Loading ${testId}…`);
+  try {
+    const detail = await api.getAdminTestDetail(testId);
+    const test = detail.test;
+    const form = elements.testForm;
+    form.reset();
+    setTestSelectValue('testType', test.test_type);
+    updateTestTypeUi();
+    setTestSelectValue('boardId', test.board_id);
+    refreshTestReferenceSelects();
+    setTestSelectValue('examId', test.exam_id);
+    refreshTestReferenceSelects();
+    setTestSelectValue('subjectId', test.subject_id);
+    refreshTestReferenceSelects();
+    setTestSelectValue('topicId', test.topic_id);
+    setTestSelectValue('testId', test.test_id);
+    setTestSelectValue('testName', test.test_name);
+    setTestSelectValue('examYear', test.exam_year);
+    setTestSelectValue('examDate', test.exam_date);
+    setTestSelectValue('shiftNo', test.shift_no);
+    setTestSelectValue('paperCode', test.paper_code);
+    setTestSelectValue('sectionCode', test.section_code);
+    setTestSelectValue('durationMinutes', test.duration_minutes);
+    setTestSelectValue('marksPerQuestion', test.marks_per_question);
+    setTestSelectValue('negativeMarks', test.negative_marks);
+    setTestSelectValue('sortOrder', test.sort_order);
+
+    editingTestId = test.test_id;
+    elements.testBuilderMode.textContent = `Editing ${test.test_id}`;
+    elements.testBuilderMode.className = `status-pill status-${String(test.status).toLowerCase()}`;
+    publishedQuestions = detail.questions;
+    selectedTestQuestionIds = new Set(detail.questions.map((question) => question.question_id));
+    if (elements.testQuestionSearch) elements.testQuestionSearch.value = '';
+    renderPublishedQuestions();
+    updateTestTypeUi();
+    document.getElementById('testManagerSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    loading.close();
+    toast.info('Test loaded. Save with the same ID to update it. Tests with attempts cannot change their structure.');
+  } catch (error) {
+    loading.close();
+    toast.error(error.message);
+  }
+}
+
+function resetTestBuilder() {
+  const form = elements.testForm;
+  form?.reset();
+  editingTestId = null;
+  if (elements.testBuilderMode) {
+    elements.testBuilderMode.textContent = 'New test';
+    elements.testBuilderMode.className = 'status-pill status-draft';
+  }
+  refreshTestReferenceSelects();
+  updateTestTypeUi();
+  resetQuestionPicker('Choose catalogue or paper filters, then load published questions.');
+  document.getElementById('testManagerSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function topicOptionsForDraft(draft) {
@@ -1689,12 +1977,36 @@ function bindEvents() {
   document.getElementById('draftSubjectId')?.addEventListener('change', refreshDraftReferenceSelects);
 
   document.getElementById('refreshTests')?.addEventListener('click', loadConfiguredTests);
-  elements.testStatusFilter?.addEventListener('change', loadConfiguredTests);
+  elements.testStatusFilter?.addEventListener('change', renderConfiguredTests);
+  elements.testCatalogueSearch?.addEventListener('input', renderConfiguredTests);
   document.getElementById('loadPublishedQuestions')?.addEventListener('click', loadPublishedQuestions);
+  document.getElementById('newTest')?.addEventListener('click', resetTestBuilder);
+  document.getElementById('suggestTestId')?.addEventListener('click', suggestTestIdentity);
+  elements.testQuestionSearch?.addEventListener('input', renderPublishedQuestions);
+  document.getElementById('selectAllQuestions')?.addEventListener('click', () => {
+    visiblePublishedQuestions().forEach((question) => selectedTestQuestionIds.add(question.question_id));
+    renderPublishedQuestions();
+  });
+  document.getElementById('clearQuestionSelection')?.addEventListener('click', () => {
+    selectedTestQuestionIds.clear();
+    renderPublishedQuestions();
+  });
+  document.getElementById('testType')?.addEventListener('change', () => {
+    updateTestTypeUi();
+    resetQuestionPicker();
+  });
   ['testBoardId', 'testExamId', 'testSubjectId', 'testTopicId'].forEach((id) => {
     document.getElementById(id)?.addEventListener('change', () => {
       refreshTestReferenceSelects();
       resetQuestionPicker();
+    });
+  });
+  ['testExamYear', 'testExamDate', 'testShiftNo', 'testPaperCode', 'testSectionCode'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', () => resetQuestionPicker());
+  });
+  ['testId', 'paperCode', 'sectionCode'].forEach((name) => {
+    elements.testForm?.elements?.[name]?.addEventListener('input', (event) => {
+      event.target.value = event.target.value.toUpperCase().replace(/\s+/g, '-');
     });
   });
 
@@ -1744,11 +2056,12 @@ function bindEvents() {
   elements.testForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    updateTestTypeUi();
     if (!form.reportValidity()) return;
 
-    const questionIds = [...elements.publishedQuestionList.querySelectorAll('[data-question-id]:checked')]
-      .map((checkbox) => checkbox.dataset.questionId)
-      .filter(Boolean);
+    const questionIds = publishedQuestions
+      .filter((question) => selectedTestQuestionIds.has(question.question_id))
+      .map((question) => question.question_id);
 
     if (!questionIds.length) return toast.warning('Select at least one published question.');
 
@@ -1762,6 +2075,9 @@ function bindEvents() {
         questionIds,
         publish: publishTest,
       });
+      editingTestId = result.test_id;
+      elements.testBuilderMode.textContent = `Editing ${result.test_id}`;
+      elements.testBuilderMode.className = `status-pill status-${String(result.status).toLowerCase()}`;
       loading.close();
       toast.success(`${result.test_id} saved as ${result.status}.`);
       await loadConfiguredTests();

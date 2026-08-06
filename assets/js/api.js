@@ -252,41 +252,104 @@ export const api = Object.freeze({
     };
   },
 
-  async listPublishedQuestions({ boardId = '', examId = '', subjectId = '', topicId = '', pageSize = 100 } = {}) {
+  async listPublishedQuestions({
+    boardId = '',
+    examId = '',
+    subjectId = '',
+    topicId = '',
+    questionType = '',
+    examYear = '',
+    examDate = '',
+    shiftNo = '',
+    paperCode = '',
+    sectionCode = '',
+    pageSize = 100,
+  } = {}) {
     const client = requireSupabase();
     let query = client
       .from('questions')
-      .select('question_id, question_type, board_id, exam_id, subject_id, topic_id, language, difficulty, question_text')
+      .select(`
+        question_id, question_type, board_id, exam_id, exam_year, exam_date,
+        shift_no, paper_code, original_question_no, section_code,
+        subject_id, topic_id, language, difficulty, question_text, sort_order
+      `)
       .eq('question_status', 'PUBLISHED')
-      .order('question_id', { ascending: true })
-      .limit(Math.min(Math.max(Number(pageSize) || 100, 1), 200));
+      .limit(Math.min(Math.max(Number(pageSize) || 100, 1), 500));
 
     if (boardId) query = query.eq('board_id', clean(boardId).toUpperCase());
     if (examId) query = query.eq('exam_id', clean(examId).toUpperCase());
     if (subjectId) query = query.eq('subject_id', clean(subjectId).toUpperCase());
     if (topicId) query = query.eq('topic_id', clean(topicId).toUpperCase());
+    if (questionType) query = query.eq('question_type', clean(questionType).toUpperCase());
+    if (examYear) query = query.eq('exam_year', Number(examYear));
+    if (examDate) query = query.eq('exam_date', clean(examDate));
+    if (shiftNo) query = query.eq('shift_no', Number(shiftNo));
+    if (paperCode) query = query.eq('paper_code', clean(paperCode).toUpperCase());
+    if (sectionCode) query = query.eq('section_code', clean(sectionCode).toUpperCase());
 
     return unwrap(await withTimeout(query), 'Unable to load published questions.') || [];
   },
 
-  async listAdminTests({ status = '', pageSize = 50 } = {}) {
+  async listAdminTests({ status = '', pageSize = 200 } = {}) {
     const client = requireSupabase();
     let query = client
       .from('tests')
       .select(`
-        test_id, test_name, test_type, selection_mode, question_count,
+        test_id, board_id, exam_id, subject_id, topic_id,
+        test_name, test_type, selection_mode, question_count,
         duration_minutes, marks_per_question, negative_marks, status,
-        is_free, sort_order, created_at, updated_at,
+        is_free, sort_order, exam_year, exam_date, shift_no, paper_code,
+        section_code, created_at, updated_at,
         boards (board_id, board_name),
         exams (exam_id, exam_name),
         subjects (subject_id, subject_name),
         topics (topic_id, topic_name)
       `)
-      .order('created_at', { ascending: false })
-      .limit(Math.min(Math.max(Number(pageSize) || 50, 1), 100));
+      .order('sort_order', { ascending: true })
+      .order('updated_at', { ascending: false })
+      .limit(Math.min(Math.max(Number(pageSize) || 200, 1), 500));
 
     if (status) query = query.eq('status', clean(status).toUpperCase());
     return unwrap(await withTimeout(query), 'Unable to load configured tests.') || [];
+  },
+
+  async getAdminTestDetail(testId) {
+    const client = requireSupabase();
+    const normalizedTestId = clean(testId).toUpperCase();
+    const test = unwrap(await withTimeout(
+      client
+        .from('tests')
+        .select(`
+          test_id, board_id, exam_id, subject_id, topic_id,
+          test_name, test_type, selection_mode, question_count,
+          duration_minutes, marks_per_question, negative_marks, status,
+          is_free, sort_order, exam_year, exam_date, shift_no, paper_code,
+          section_code, created_at, updated_at
+        `)
+        .eq('test_id', normalizedTestId)
+        .single(),
+    ), 'Unable to load the test configuration.');
+
+    const links = unwrap(await withTimeout(
+      client
+        .from('test_question_links')
+        .select(`
+          position,
+          question_id,
+          questions (
+            question_id, question_type, board_id, exam_id, exam_year, exam_date,
+            shift_no, paper_code, original_question_no, section_code,
+            subject_id, topic_id, language, difficulty, question_text, sort_order
+          )
+        `)
+        .eq('test_id', normalizedTestId)
+        .order('position', { ascending: true }),
+    ), 'Unable to load the test question list.') || [];
+
+    return {
+      test,
+      questions: links.map((link) => link.questions).filter(Boolean),
+    };
   },
 
   async saveFixedQuestionTest(input) {
@@ -296,7 +359,7 @@ export const api = Object.freeze({
       : [];
 
     return unwrap(await withTimeout(
-      client.rpc('save_fixed_question_test', {
+      client.rpc('save_fixed_question_test_v2', {
         p_test_id: clean(input.testId).toUpperCase(),
         p_test_name: clean(input.testName),
         p_board_id: clean(input.boardId).toUpperCase(),
@@ -310,8 +373,23 @@ export const api = Object.freeze({
         p_sort_order: Math.round(Number(input.sortOrder) || 0),
         p_question_ids: questionIds,
         p_publish: Boolean(input.publish),
+        p_exam_year: input.examYear ? Math.round(Number(input.examYear)) : null,
+        p_exam_date: clean(input.examDate) || null,
+        p_shift_no: input.shiftNo ? Math.round(Number(input.shiftNo)) : null,
+        p_paper_code: clean(input.paperCode)?.toUpperCase() || null,
+        p_section_code: clean(input.sectionCode)?.toUpperCase() || null,
       }),
     ), 'Unable to save the test configuration.');
+  },
+
+  async setAdminTestStatus(testId, status) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('set_admin_test_status', {
+        p_test_id: clean(testId).toUpperCase(),
+        p_status: clean(status).toUpperCase(),
+      }),
+    ), 'Unable to change the test status.');
   },
 
   async listDrafts({ status = 'PENDING', page = 0, pageSize = 24 } = {}) {
