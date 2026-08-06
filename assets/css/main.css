@@ -1305,3 +1305,196 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
     grid-column: 1 / -1;
   }
 }
+
+/* Source option anomaly recovery + separate Publish Centre */
+.admin-section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  margin: 0 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,.94);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(15,23,42,.06);
+}
+.admin-section-nav a {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 8px;
+  border-radius: 11px;
+  color: var(--text-strong);
+  font-weight: 800;
+  text-decoration: none;
+}
+.admin-section-nav a:hover,
+.admin-section-nav a:focus-visible {
+  color: var(--primary-dark);
+  background: var(--surface-soft);
+}
+
+.review-publish-handoff {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 700;
+}
+.simple-review-actions {
+  grid-template-columns: minmax(0,1.35fr) minmax(0,1fr) auto;
+}
+
+.publish-centre {
+  scroll-margin-top: 78px;
+}
+.publish-centre-heading {
+  align-items: flex-start;
+}
+.publish-toolbar {
+  position: sticky;
+  top: 70px;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(10px);
+}
+.publish-selection-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.publish-queue-list {
+  display: grid;
+  gap: 10px;
+}
+.publish-queue-item {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+}
+.publish-check {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.publish-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+}
+.publish-queue-main {
+  min-width: 0;
+}
+.publish-queue-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.publish-queue-title h3 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  word-break: break-word;
+}
+.publish-queue-main > p {
+  margin: 8px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.publish-queue-actions {
+  display: grid;
+  gap: 7px;
+}
+.publish-load-more {
+  width: 100%;
+  margin-top: 12px;
+}
+.publish-preview-summary {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f8fbfb;
+}
+.publish-preview-summary p {
+  margin: 0;
+}
+.publish-preview-options .review-option {
+  grid-template-columns: auto minmax(0,1fr);
+}
+
+@media (max-width: 680px) {
+  .admin-section-nav {
+    top: 0;
+    gap: 5px;
+    padding: 7px;
+    border-radius: 12px;
+  }
+  .admin-section-nav a {
+    min-height: 38px;
+    padding: 5px 2px;
+    font-size: .76rem;
+  }
+  .publish-toolbar {
+    top: 54px;
+    display: grid;
+  }
+  .publish-toolbar > .button {
+    width: 100%;
+  }
+  .publish-selection-tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .publish-selection-tools .muted {
+    grid-column: 1 / -1;
+  }
+  .publish-queue-item {
+    grid-template-columns: auto minmax(0,1fr);
+    align-items: start;
+  }
+  .publish-queue-title {
+    display: grid;
+  }
+  .publish-queue-title .chip {
+    justify-self: start;
+  }
+  .publish-queue-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 1fr;
+  }
+  .simple-review-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+  .simple-review-actions .button:first-child,
+  .review-publish-handoff {
+    grid-column: 1 / -1;
+  }
+}
