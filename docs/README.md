@@ -27,3 +27,6 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 
 - `SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE.md` documents genuine printed duplicate-option handling and the separate verified publication workflow.
 - `SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE_VERIFICATION.sql` provides read-only production checks.
+
+- `SIMPLE_TEST_BUILDER_CATALOGUE.md` — locked mobile test-builder and catalogue-control behaviour.
+- `SIMPLE_TEST_BUILDER_CATALOGUE_VERIFICATION.sql` — read-only post-deployment checks.

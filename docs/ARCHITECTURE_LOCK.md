@@ -196,3 +196,9 @@ Duplicate option values remain blocking by default. A genuine PYQ may preserve r
 ## Separate publication workflow lock
 
 Human review and publication are separate admin operations. Review verification moves a draft into a dedicated Publish Centre; it does not publish. The Publish Centre lists only server-qualified verified drafts and may publish individually or in small audited batches. Every item still passes through `publish_draft_question()` and failures remain unpublished.
+
+## Test Builder and Catalogue Control lock
+
+Fixed-question tests use a three-step mobile-first builder: test details, catalogue/paper identity and published-question selection. PYQ tests require year, shift and paper code so the selected list belongs to one exact paper. Question order must preserve `original_question_no` for original papers. Advanced marking settings remain secondary.
+
+Configured tests are controlled through a separate searchable catalogue. Editing reloads the existing fixed question links; status changes use an admin-only audited RPC. Master questions remain stored once and are reused only through `test_question_links`.

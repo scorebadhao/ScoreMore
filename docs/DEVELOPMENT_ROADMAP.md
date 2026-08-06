@@ -198,3 +198,14 @@ Completed: AI_PROPOSED status repair, timeout-state recovery, compact mobile rep
 - Separate Review Centre and Publish Centre
 - Compact verified publish queue
 - Individual and chunked verified publication with per-item failure isolation
+
+## Test administration refinement — completed patch
+
+- Three-step mobile Test Builder
+- Exact PYQ year/shift/paper filtering
+- Original-question chronology in fixed lists
+- Local search and visible-question selection
+- Test ID/name suggestion
+- Paper metadata stored on tests
+- Searchable catalogue with status counts
+- Edit, Publish, Archive and Restore Draft actions
