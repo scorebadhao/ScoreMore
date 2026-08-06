@@ -1498,3 +1498,225 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
     grid-column: 1 / -1;
   }
 }
+
+/* Simple Test Builder + Catalogue Control */
+.test-builder-panel,
+.test-catalogue-control { scroll-margin-top: 110px; }
+.test-builder-heading,
+.catalogue-control-heading { align-items: flex-start; }
+.test-builder-heading-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 9px; }
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-2);
+  font-size: .68rem;
+  font-weight: 850;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+}
+.status-pill.status-draft { color: #7a5300; border-color: #ead391; background: #fff8df; }
+.status-pill.status-published { color: #176542; border-color: #a9ddc0; background: #edf9f2; }
+.status-pill.status-archived { color: #536168; border-color: #d5dde0; background: #f4f6f7; }
+
+.test-builder-form { display: grid; gap: 14px; }
+.test-builder-step {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: #fff;
+}
+.test-step-heading {
+  display: grid;
+  grid-template-columns: 36px minmax(0,1fr);
+  align-items: center;
+  gap: 11px;
+}
+.test-step-heading > span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--primary);
+  font-weight: 900;
+}
+.test-step-heading > div { min-width: 0; display: grid; gap: 2px; }
+.test-step-heading strong { font-size: .92rem; }
+.test-step-heading small { color: var(--muted); font-size: .7rem; line-height: 1.45; }
+.question-step-heading { grid-template-columns: 36px minmax(0,1fr) auto; }
+
+.test-builder-grid,
+.test-paper-fields {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+}
+.test-builder-grid-main { grid-template-columns: minmax(170px,.7fr) minmax(220px,1.3fr); }
+.test-builder-grid-main .test-id-field { grid-column: 1 / -1; }
+.input-action-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+.input-action-row .button { min-width: 94px; }
+.test-paper-fields {
+  padding: 13px;
+  border: 1px dashed #b9d6d2;
+  border-radius: 14px;
+  background: #f4fbfa;
+}
+.test-paper-fields label:last-child { grid-column: span 2; }
+
+.question-picker-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px,1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+.question-picker-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.simplified-question-picker { max-height: 560px; padding: 8px; }
+.simplified-question-item {
+  grid-template-columns: 22px 34px minmax(0,1fr);
+  align-items: start;
+  gap: 9px;
+  padding: 11px;
+  cursor: pointer;
+}
+.simplified-question-item:has(input:checked) { border-color: #79c9bf; background: #f0fbf9; }
+.question-order {
+  display: grid;
+  place-items: center;
+  min-width: 31px;
+  height: 31px;
+  padding: 0 5px;
+  border-radius: 10px;
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+  font-size: .7rem;
+  font-weight: 900;
+}
+.question-picker-main { min-width: 0; }
+.question-picker-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.question-picker-title strong { overflow-wrap: anywhere; font-size: .76rem; }
+.question-picker-title small { flex: 0 0 auto; color: var(--muted); font-size: .62rem; }
+
+.test-advanced-settings {
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface-2);
+}
+.test-advanced-settings > summary { cursor: pointer; font-weight: 850; }
+.test-advanced-settings[open] > summary { margin-bottom: 13px; }
+.test-static-facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.test-static-facts span { padding: 9px 11px; border-radius: 11px; color: var(--muted); background: #fff; font-size: .72rem; }
+.test-static-facts strong { color: var(--text); margin-right: 5px; }
+.test-builder-actions {
+  position: sticky;
+  bottom: 8px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #b7d7d3;
+  border-radius: 15px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 30px rgba(15,23,42,.12);
+  backdrop-filter: blur(12px);
+}
+.test-builder-actions > div:first-child { display: grid; gap: 2px; }
+.test-builder-actions > div:first-child span { font-size: .67rem; }
+
+.test-catalogue-stats {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 9px;
+  margin-bottom: 12px;
+}
+.test-stat-card {
+  min-height: 72px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  color: var(--text);
+  background: #fff;
+  text-align: left;
+}
+.test-stat-card strong { font-size: 1.25rem; }
+.test-stat-card span { color: var(--muted); font-size: .67rem; }
+.test-stat-card.active { color: var(--primary-dark); border-color: #79c9bf; background: var(--primary-soft); }
+.test-catalogue-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px,1fr) minmax(150px,.35fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.simplified-test-list { gap: 10px; }
+.simplified-test-item {
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 15px;
+}
+.test-admin-card-main { min-width: 0; display: grid; gap: 8px; }
+.test-admin-card-topline { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.simplified-test-item h3 { margin: 0; font-size: 1rem; }
+.test-admin-id { margin: -3px 0 0; color: var(--muted); overflow-wrap: anywhere; font-size: .72rem; }
+.test-admin-facts { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--muted); font-size: .69rem; }
+.test-admin-facts strong { color: var(--text); }
+.test-admin-actions { display: grid; min-width: 125px; gap: 8px; }
+.test-admin-actions .button { width: 100%; }
+
+@media (min-width: 900px) {
+  .test-builder-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .test-builder-grid-main { grid-template-columns: minmax(190px,.7fr) minmax(260px,1.25fr) minmax(300px,1.35fr); }
+  .test-builder-grid-main .test-id-field { grid-column: auto; }
+  .test-paper-fields { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .test-paper-fields label:last-child { grid-column: auto; }
+  .advanced-test-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+}
+
+@media (max-width: 720px) {
+  .test-builder-heading-actions,
+  .catalogue-control-heading .button { width: 100%; }
+  .test-builder-heading-actions .button { flex: 1; }
+  .test-builder-grid,
+  .test-builder-grid-main,
+  .test-paper-fields,
+  .question-picker-toolbar,
+  .test-catalogue-toolbar { grid-template-columns: 1fr; }
+  .test-builder-grid-main .test-id-field,
+  .test-paper-fields label:last-child { grid-column: auto; }
+  .question-step-heading { grid-template-columns: 36px minmax(0,1fr); }
+  .question-step-heading .button { grid-column: 1 / -1; width: 100%; }
+  .question-picker-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .simplified-question-item { grid-template-columns: 22px 31px minmax(0,1fr); }
+  .question-picker-title { display: grid; gap: 3px; }
+  .test-builder-actions { align-items: stretch; flex-direction: column; bottom: 6px; }
+  .test-builder-actions .button-row { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .test-catalogue-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .simplified-test-item { grid-template-columns: 1fr; }
+  .test-admin-actions { grid-template-columns: repeat(2,minmax(0,1fr)); min-width: 0; }
+  .test-admin-actions > :last-child:nth-child(3) { grid-column: 1 / -1; }
+}
+
+@media (max-width: 430px) {
+  .panel-card { padding: 16px; }
+  .test-builder-step { padding: 13px; }
+  .input-action-row { grid-template-columns: 1fr; }
+  .input-action-row .button { width: 100%; }
+  .test-builder-actions .button-row,
+  .test-admin-actions { grid-template-columns: 1fr; }
+  .test-admin-actions > :last-child:nth-child(3) { grid-column: auto; }
+}
