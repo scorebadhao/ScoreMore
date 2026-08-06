@@ -188,3 +188,11 @@ Visual question duplicate identity must include a SHA-256 digest of `image_refs`
 Old unresolved import items may be revalidated in place. Existing real drafts, import items and audit history must not be deleted merely to upgrade the fingerprint algorithm.
 
 The admin draft list must use lightweight summary queries. Full options, explanations and source images are loaded only for the single draft currently under human review.
+
+## Printed source option anomaly lock
+
+Duplicate option values remain blocking by default. A genuine PYQ may preserve repeated option values only when an administrator confirms `DUPLICATE_OPTIONS_PRINTED`, records a source traceability note, and completes normal human answer/topic review. ScoreMore must never invent a replacement option merely to satisfy validation.
+
+## Separate publication workflow lock
+
+Human review and publication are separate admin operations. Review verification moves a draft into a dedicated Publish Centre; it does not publish. The Publish Centre lists only server-qualified verified drafts and may publish individually or in small audited batches. Every item still passes through `publish_draft_question()` and failures remain unpublished.

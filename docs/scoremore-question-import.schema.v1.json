@@ -345,6 +345,16 @@
         },
         "source_quality": {
           "$ref": "#/$defs/sourceQuality"
+        },
+        "source_option_anomaly": {
+          "$ref": "#/$defs/sourceOptionAnomaly"
+        },
+        "source_option_anomaly_note": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000
         }
       }
     },
@@ -567,6 +577,16 @@
             "string",
             "null"
           ]
+        },
+        "source_option_anomaly": {
+          "$ref": "#/$defs/sourceOptionAnomaly"
+        },
+        "source_option_anomaly_note": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000
         }
       }
     },
@@ -698,6 +718,17 @@
           }
         }
       }
+    },
+    "sourceOptionAnomaly": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "NONE",
+        "DUPLICATE_OPTIONS_PRINTED",
+        null
+      ]
     }
   }
 }

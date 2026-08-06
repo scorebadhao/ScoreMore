@@ -488,3 +488,29 @@ Exact topic codes/names and approved aliases are mapped automatically. Unresolve
 ```
 
 Supplemental questions are not original PYQs and cannot use original question-number/source-occurrence identity.
+
+## Genuine printed duplicate-option anomaly
+
+The optional question fields below are supported:
+
+```json
+{
+  "source_option_anomaly": "DUPLICATE_OPTIONS_PRINTED",
+  "source_option_anomaly_note": "Verified against source page 29: options B and D are both printed as 640."
+}
+```
+
+Allowed values:
+
+```text
+NONE
+DUPLICATE_OPTIONS_PRINTED
+```
+
+Rules:
+
+- Duplicate options remain invalid when this metadata is absent.
+- The exception is allowed only for a genuine PYQ with source-page and source-question identity.
+- The note is mandatory.
+- The source values must be preserved exactly; do not invent a replacement option.
+- The record remains subject to normal human answer, explanation and topic review.

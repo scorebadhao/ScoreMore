@@ -190,3 +190,11 @@ Completed: AI_PROPOSED status repair, timeout-state recovery, compact mobile rep
 - Deferred PYQ occurrence linking after canonical draft publication
 - Lightweight draft list and one-draft-at-a-time review
 - Verify-and-next mobile workflow
+
+## Import and publication refinement — completed patch
+
+- Genuine printed duplicate-option anomaly support with explicit source traceability
+- In-place recovery of Shift 1 V2 Q55 without deleting the batch or 99 valid drafts
+- Separate Review Centre and Publish Centre
+- Compact verified publish queue
+- Individual and chunked verified publication with per-item failure isolation

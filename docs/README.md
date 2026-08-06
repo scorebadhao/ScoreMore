@@ -24,3 +24,6 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 
 - `VISUAL_FINGERPRINT_REVIEW_FLOW.md` — visual duplicate fix and simplified one-question-at-a-time human review.
 - `VISUAL_FINGERPRINT_REVIEW_VERIFICATION.sql` — read-only recovery checks for Shift 3 and Shift 1 batches.
+
+- `SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE.md` documents genuine printed duplicate-option handling and the separate verified publication workflow.
+- `SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE_VERIFICATION.sql` provides read-only production checks.
