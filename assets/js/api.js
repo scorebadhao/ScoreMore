@@ -334,6 +334,8 @@ export const api = Object.freeze({
       'answer_confidence',
       'transcription_confidence',
       'source_quality',
+      'source_option_anomaly',
+      'source_option_anomaly_note',
       'is_supplemental',
       'explanation',
       'created_at',
@@ -416,6 +418,39 @@ export const api = Object.freeze({
     return unwrap(await withTimeout(
       client.rpc('publish_draft_question', { p_draft_id: draftId }),
     ), 'Unable to publish the draft.');
+  },
+
+  async listPublishQueue({ page = 0, pageSize = 25 } = {}) {
+    const client = requireSupabase();
+    const limit = Math.min(Math.max(Math.round(Number(pageSize) || 25), 1), 100);
+    const offset = Math.max(Math.round(Number(page) || 0), 0) * limit;
+    return unwrap(await withTimeout(
+      client.rpc('list_publish_queue', {
+        p_limit: limit,
+        p_offset: offset,
+      }),
+    ), 'Unable to load the verified publish queue.');
+  },
+
+  async publishVerifiedDrafts(draftIds) {
+    const client = requireSupabase();
+    const ids = [...new Set((Array.isArray(draftIds) ? draftIds : []).filter(Boolean))];
+    if (!ids.length) throw new Error('Select at least one verified draft.');
+    if (ids.length > 25) throw new Error('Publish at most 25 verified drafts per request.');
+    return unwrap(await withTimeout(
+      client.rpc('publish_verified_drafts', { p_draft_ids: ids }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 90000),
+    ), 'Unable to publish the selected verified drafts.');
+  },
+
+  async confirmImportSourceOptionAnomaly({ importItemId, note }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('confirm_import_source_option_anomaly', {
+        p_import_item_id: importItemId,
+        p_note: clean(note),
+      }),
+    ), 'Unable to confirm the printed source option anomaly.');
   },
 
   async rejectDraft(draftId, notes) {

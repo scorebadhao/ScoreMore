@@ -46,6 +46,14 @@ const elements = {
   loadMoreImportItems: document.getElementById('loadMoreImportItems'),
   recentImportPanel: document.getElementById('recentImportPanel'),
   recentImportList: document.getElementById('recentImportList'),
+  publishQueueMeta: document.getElementById('publishQueueMeta'),
+  publishQueueList: document.getElementById('publishQueueList'),
+  publishSelectionCount: document.getElementById('publishSelectionCount'),
+  publishSelectedDrafts: document.getElementById('publishSelectedDrafts'),
+  selectAllPublishReady: document.getElementById('selectAllPublishReady'),
+  clearPublishSelection: document.getElementById('clearPublishSelection'),
+  refreshPublishQueue: document.getElementById('refreshPublishQueue'),
+  loadMorePublishQueue: document.getElementById('loadMorePublishQueue'),
 };
 
 let profile = null;
@@ -63,8 +71,15 @@ let visibleImportItemLimit = 20;
 const IMPORT_ITEM_PAGE_SIZE = 20;
 const DRAFT_IMPORT_CHUNK_SIZE = 10;
 const DRAFT_PAGE_SIZE = 24;
+const PUBLISH_PAGE_SIZE = 25;
+const PUBLISH_CHUNK_SIZE = 10;
 let draftPage = 0;
 let draftHasMore = false;
+let publishQueue = [];
+let publishQueueTotal = 0;
+let publishQueuePage = 0;
+let publishQueueHasMore = false;
+let selectedPublishDraftIds = new Set();
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -107,7 +122,7 @@ async function showAdmin() {
   elements.adminPanel.classList.remove('hidden');
   elements.signOut.classList.remove('hidden');
   await loadReferenceData();
-  await Promise.all([loadDrafts(), loadConfiguredTests(), loadRecentImportBatches()]);
+  await Promise.all([loadDrafts(), loadPublishQueue(), loadConfiguredTests(), loadRecentImportBatches()]);
 }
 
 function isDraftPublishReady(draft) {
@@ -119,11 +134,15 @@ function isDraftPublishReady(draft) {
     && draft.explanation
     && (draft.question_type !== 'PYQ' || draft.topic_id)
     && draft.source_quality !== 'UNREADABLE'
+    && (draft.source_option_anomaly !== 'DUPLICATE_OPTIONS_PRINTED' || draft.source_option_anomaly_note)
   );
 }
 
 function reviewableDrafts() {
-  return drafts.filter((draft) => !['PUBLISHED', 'REJECTED'].includes(draft.review_status));
+  return drafts.filter((draft) => (
+    !['PUBLISHED', 'REJECTED'].includes(draft.review_status)
+    && !isDraftPublishReady(draft)
+  ));
 }
 
 function nextReviewableDraftId(excludeDraftId = null) {
@@ -134,7 +153,7 @@ function renderDrafts() {
   const reviewable = reviewableDrafts();
   if (elements.draftListMeta) {
     const label = elements.statusFilter.value || 'ALL';
-    elements.draftListMeta.textContent = `${drafts.length} ${label.toLowerCase()} draft${drafts.length === 1 ? '' : 's'} loaded · ${reviewable.length} ready for human review.`;
+    elements.draftListMeta.textContent = `${drafts.length} ${label.toLowerCase()} draft${drafts.length === 1 ? '' : 's'} loaded · ${reviewable.length} still need human review. Verified drafts are published separately.`;
   }
   if (elements.reviewNextDraft) elements.reviewNextDraft.disabled = reviewable.length === 0 && !draftHasMore;
   elements.loadMoreDrafts?.classList.toggle('hidden', !draftHasMore);
@@ -169,15 +188,12 @@ function renderDrafts() {
       </div>
       <div class="draft-compact-actions">
         ${!['PUBLISHED','REJECTED'].includes(draft.review_status)
-          ? `<button class="button button-primary" data-review="${draft.draft_id}" type="button">Review</button>` : ''}
-        ${ready && draft.review_status !== 'PUBLISHED'
-          ? `<button class="button button-ghost" data-publish="${draft.draft_id}" type="button">Publish</button>` : ''}
+          ? `<button class="button button-primary" data-review="${draft.draft_id}" type="button">${ready ? 'View review' : 'Review'}</button>` : ''}
       </div>
     </article>`;
   }).join('');
 
   elements.draftList.querySelectorAll('[data-review]').forEach((button) => button.addEventListener('click', () => openReview(button.dataset.review)));
-  elements.draftList.querySelectorAll('[data-publish]').forEach((button) => button.addEventListener('click', () => publish(button.dataset.publish)));
 }
 
 async function loadDrafts({ reset = true } = {}) {
@@ -205,6 +221,200 @@ async function loadDrafts({ reset = true } = {}) {
     toast.error(error.message);
   } finally {
     if (elements.loadMoreDrafts) elements.loadMoreDrafts.disabled = false;
+  }
+}
+
+
+function updatePublishSelectionControls() {
+  const selected = selectedPublishDraftIds.size;
+  if (elements.publishSelectionCount) elements.publishSelectionCount.textContent = `${selected} selected`;
+  if (elements.publishSelectedDrafts) {
+    elements.publishSelectedDrafts.disabled = selected === 0;
+    elements.publishSelectedDrafts.textContent = selected ? `Publish selected (${selected})` : 'Publish selected';
+  }
+  if (elements.clearPublishSelection) elements.clearPublishSelection.disabled = selected === 0;
+  if (elements.selectAllPublishReady) elements.selectAllPublishReady.disabled = publishQueue.length === 0;
+}
+
+function renderPublishQueue() {
+  if (!elements.publishQueueList) return;
+  if (elements.publishQueueMeta) {
+    elements.publishQueueMeta.textContent = `${publishQueueTotal} verified draft${publishQueueTotal === 1 ? '' : 's'} ready to publish. Publishing is separate from human review.`;
+  }
+  elements.loadMorePublishQueue?.classList.toggle('hidden', !publishQueueHasMore);
+
+  if (!publishQueue.length) {
+    elements.publishQueueList.innerHTML = '<div class="empty-state">No verified draft is ready to publish yet.</div>';
+    updatePublishSelectionControls();
+    return;
+  }
+
+  elements.publishQueueList.innerHTML = publishQueue.map((draft, index) => `
+    <article class="publish-queue-item">
+      <label class="publish-check" aria-label="Select ${escapeHtml(draft.proposed_question_id)}">
+        <input type="checkbox" data-publish-select="${draft.draft_id}" ${selectedPublishDraftIds.has(draft.draft_id) ? 'checked' : ''} />
+      </label>
+      <div class="publish-queue-main">
+        <div class="publish-queue-title">
+          <div>
+            <span class="eyebrow">Ready ${index + 1}</span>
+            <h3>${escapeHtml(draft.proposed_question_id || 'Verified draft')}</h3>
+          </div>
+          <span class="chip">Answer ${escapeHtml(draft.correct_answer || '—')}</span>
+        </div>
+        <p>${escapeHtml(draft.question_text || '')}</p>
+        <div class="draft-quick-status">
+          <span>${escapeHtml(draft.subject_id || 'No subject')}</span>
+          <span>${escapeHtml(draft.topic_id || 'No topic')}</span>
+          <span>${escapeHtml(draft.answer_source || 'No source')}</span>
+          ${draft.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED' ? '<span class="warning-chip">Printed duplicate options</span>' : ''}
+          ${draft.is_supplemental ? '<span class="warning-chip">Supplemental</span>' : ''}
+        </div>
+      </div>
+      <div class="publish-queue-actions">
+        <button class="button button-ghost" data-publish-preview="${draft.draft_id}" type="button">Preview</button>
+        <button class="button button-primary" data-publish-one="${draft.draft_id}" type="button">Publish</button>
+      </div>
+    </article>
+  `).join('');
+
+  elements.publishQueueList.querySelectorAll('[data-publish-select]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const id = checkbox.dataset.publishSelect;
+      if (checkbox.checked) selectedPublishDraftIds.add(id);
+      else selectedPublishDraftIds.delete(id);
+      updatePublishSelectionControls();
+    });
+  });
+  elements.publishQueueList.querySelectorAll('[data-publish-preview]').forEach((button) => {
+    button.addEventListener('click', () => openPublishPreview(button.dataset.publishPreview));
+  });
+  elements.publishQueueList.querySelectorAll('[data-publish-one]').forEach((button) => {
+    button.addEventListener('click', () => publishSelectedQueue([button.dataset.publishOne]));
+  });
+  updatePublishSelectionControls();
+}
+
+async function loadPublishQueue({ reset = true } = {}) {
+  if (!elements.publishQueueList) return;
+  if (reset) {
+    publishQueuePage = 0;
+    publishQueue = [];
+    publishQueueTotal = 0;
+    publishQueueHasMore = false;
+    selectedPublishDraftIds.clear();
+    elements.publishQueueList.innerHTML = '<div class="loading-state">Loading verified publish queue…</div>';
+  } else if (elements.loadMorePublishQueue) {
+    elements.loadMorePublishQueue.disabled = true;
+  }
+
+  try {
+    const result = await api.listPublishQueue({ page: publishQueuePage, pageSize: PUBLISH_PAGE_SIZE });
+    const rows = Array.isArray(result?.items) ? result.items : [];
+    const existing = new Set(publishQueue.map((draft) => draft.draft_id));
+    publishQueue = [...publishQueue, ...rows.filter((draft) => !existing.has(draft.draft_id))];
+    publishQueueTotal = Number(result?.total || publishQueue.length);
+    publishQueueHasMore = publishQueue.length < publishQueueTotal;
+    if (rows.length) publishQueuePage += 1;
+    renderPublishQueue();
+  } catch (error) {
+    if (!publishQueue.length) elements.publishQueueList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    toast.error(error.message);
+  } finally {
+    if (elements.loadMorePublishQueue) elements.loadMorePublishQueue.disabled = false;
+  }
+}
+
+async function openPublishPreview(draftId) {
+  elements.dialogContent.innerHTML = '<div class="review-content"><div class="loading-state">Loading verified question preview…</div></div>';
+  if (!elements.dialog.open) elements.dialog.showModal();
+
+  let draft;
+  try {
+    draft = await api.getDraftReview(draftId);
+  } catch (error) {
+    elements.dialogContent.innerHTML = `<div class="review-content"><div class="empty-state">${escapeHtml(error.message)}</div></div>`;
+    toast.error(error.message);
+    return;
+  }
+
+  const options = draft.options || {};
+  const images = draftSourceImages(draft);
+  elements.dialogContent.innerHTML = `
+    <div class="review-content publish-preview">
+      <span class="eyebrow">Verified question preview</span>
+      <h2>${escapeHtml(draft.proposed_question_id || 'Verified draft')}</h2>
+      ${draft.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED' ? `<div class="import-resolution resolution-warning"><strong>Printed duplicate options</strong><span>${escapeHtml(draft.source_option_anomaly_note || 'The source prints repeated values. The human-verified answer will be published exactly as reviewed.')}</span></div>` : ''}
+      <div class="simple-question-text">${escapeHtml(draft.question_text)}</div>
+      <div class="review-options publish-preview-options">
+        ${['A','B','C','D'].map((key) => `
+          <div class="review-option ${draft.correct_answer === key ? 'correct' : ''}">
+            <strong>${key}.</strong><span>${escapeHtml(options[key])}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="publish-preview-summary">
+        <p><strong>Verified answer:</strong> ${escapeHtml(draft.correct_answer || '—')}</p>
+        <p><strong>Answer source:</strong> ${escapeHtml(draft.answer_source || '—')}</p>
+        <p><strong>Topic:</strong> ${escapeHtml(draft.topic_id || '—')}</p>
+        <p><strong>Explanation:</strong> ${escapeHtml(draft.explanation || '—')}</p>
+      </div>
+      ${images.length ? `<details class="source-review-panel"><summary>Source preview</summary><div class="source-review-images">${images.map((image) => `<img loading="lazy" src="${escapeHtml(image.ref)}" alt="${escapeHtml(image.alt)}" />`).join('')}</div></details>` : ''}
+      <div class="simple-review-actions">
+        <button id="publishPreviewConfirm" class="button button-primary" type="button">Publish question</button>
+        <button id="publishPreviewClose" class="button button-ghost" type="button">Close</button>
+      </div>
+    </div>
+  `;
+  elements.dialogContent.querySelector('#publishPreviewClose')?.addEventListener('click', () => elements.dialog.close());
+  elements.dialogContent.querySelector('#publishPreviewConfirm')?.addEventListener('click', async () => {
+    elements.dialog.close();
+    await publishSelectedQueue([draftId]);
+  });
+}
+
+async function publishSelectedQueue(draftIds) {
+  const ids = [...new Set((Array.isArray(draftIds) ? draftIds : []).filter(Boolean))];
+  if (!ids.length) return toast.warning('Select at least one verified draft.');
+
+  const confirmed = await requestAdminConfirmation({
+    eyebrow: 'Separate Publish Centre',
+    title: `Publish ${ids.length} verified question${ids.length === 1 ? '' : 's'}?`,
+    message: 'Only drafts that already passed human answer, explanation and topic verification are selected. This creates published master questions and their source occurrences.',
+    safetyTitle: 'Publication protection',
+    safetyMessage: 'The database rechecks every draft. A failed item remains unpublished and is reported separately.',
+    buttonLabel: ids.length === 1 ? 'Publish question' : 'Publish verified questions',
+  });
+  if (!confirmed) return;
+
+  const loading = toast.loading(`Publishing 0 of ${ids.length} verified questions…`);
+  let published = 0;
+  let already = 0;
+  const failures = [];
+
+  try {
+    for (let start = 0; start < ids.length; start += PUBLISH_CHUNK_SIZE) {
+      const chunkIds = ids.slice(start, start + PUBLISH_CHUNK_SIZE);
+      loading.update?.(`Publishing ${Math.min(start + chunkIds.length, ids.length)} of ${ids.length} verified questions…`);
+      const result = await api.publishVerifiedDrafts(chunkIds);
+      published += Number(result?.published || 0);
+      already += Number(result?.already_published || 0);
+      (result?.items || []).filter((item) => item.status === 'FAILED').forEach((item) => failures.push(item));
+    }
+
+    selectedPublishDraftIds.clear();
+    await Promise.all([loadPublishQueue({ reset: true }), loadDrafts({ reset: true })]);
+    loading.close();
+
+    if (failures.length) {
+      toast.warning(`${published} published, ${already} already published, ${failures.length} failed. The failed drafts remain in the Publish Centre.`);
+    } else {
+      toast.success(`${published} question${published === 1 ? '' : 's'} published${already ? ` · ${already} already published` : ''}.`);
+    }
+  } catch (error) {
+    loading.close();
+    toast.error(error.message);
+    await loadPublishQueue({ reset: true });
   }
 }
 
@@ -422,9 +632,10 @@ async function openReview(draftId) {
       </div>
 
       ${draft.is_supplemental ? `<div class="import-resolution resolution-warning"><strong>Supplemental normal question</strong><span>${escapeHtml(draft.supplement_reason || 'Missing source question replacement')}</span></div>` : ''}
+      ${draft.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED' ? `<div class="import-resolution resolution-warning"><strong>Printed duplicate options</strong><span>${escapeHtml(draft.source_option_anomaly_note || 'The genuine source prints repeated option values. Preserve them exactly and verify the correct answer carefully.')}</span></div>` : ''}
 
       ${images.length ? `
-        <details class="source-review-panel" open>
+        <details class="source-review-panel" ${draft.source_quality !== 'CLEAR' || draft.source_option_anomaly !== 'NONE' ? 'open' : ''}>
           <summary>Source preview</summary>
           <div class="source-review-images">
             ${images.map((image) => `<img loading="lazy" src="${escapeHtml(image.ref)}" alt="${escapeHtml(image.alt)}" />`).join('')}
@@ -467,7 +678,7 @@ async function openReview(draftId) {
         </div>
 
         <details class="review-details">
-          <summary>Explanation and optional notes</summary>
+          <summary>Explanation and notes</summary>
           <label>Reviewed explanation
             <textarea name="explanation" rows="5" required>${escapeHtml(draft.explanation || '')}</textarea>
           </label>
@@ -482,9 +693,9 @@ async function openReview(draftId) {
         <div class="simple-review-actions">
           <button class="button button-primary" type="submit" name="reviewAction" value="SAVE_NEXT">Verify & next</button>
           <button class="button button-secondary" type="submit" name="reviewAction" value="SAVE">Save review</button>
-          ${isDraftPublishReady(draft) ? `<button id="dialogPublish" class="button button-ghost" type="button">Publish now</button>` : ''}
           <button id="dialogReject" class="button button-danger button-small" type="button">Reject</button>
         </div>
+        <p class="review-publish-handoff">Verified questions move to the separate Publish Centre. Nothing is published from this review screen.</p>
       </form>
 
       ${draft.answer_source === 'AI_PROPOSED' ? '<p class="review-required-note">The highlighted answer is only an AI proposal. Your save changes it to the selected human-verifiable answer source.</p>' : ''}
@@ -522,8 +733,9 @@ async function openReview(draftId) {
       }
       renderDrafts();
 
+      await loadPublishQueue({ reset: true });
       loading.close();
-      toast.success('Human answer and topic review saved.');
+      toast.success('Human review saved. This question is now available in the Publish Centre.');
       elements.dialog.close();
 
       if (reviewAction === 'SAVE_NEXT') {
@@ -542,10 +754,6 @@ async function openReview(draftId) {
     }
   });
 
-  elements.dialogContent.querySelector('#dialogPublish')?.addEventListener('click', async () => {
-    elements.dialog.close();
-    await publish(draftId);
-  });
   elements.dialogContent.querySelector('#dialogReject')?.addEventListener('click', () => openRejectDialog(draftId));
 
   if (listDraft?.proposed_question_id && listDraft.proposed_question_id !== draft.proposed_question_id) {
@@ -554,16 +762,7 @@ async function openReview(draftId) {
 }
 
 async function publish(draftId) {
-  const loading = toast.loading('Publishing reviewed question…');
-  try {
-    const result = await api.publishDraft(draftId);
-    loading.close();
-    toast.success(`Published ${result.question_id || 'question'}.`);
-    await loadDrafts();
-  } catch (error) {
-    loading.close();
-    toast.error(error.message);
-  }
+  return publishSelectedQueue([draftId]);
 }
 
 function openRejectDialog(draftId) {
@@ -595,7 +794,7 @@ async function reject(draftId, notes) {
     await api.rejectDraft(draftId, notes);
     loading.close();
     toast.success('Draft rejected with review notes.');
-    await loadDrafts();
+    await Promise.all([loadDrafts(), loadPublishQueue({ reset: true })]);
   } catch (error) {
     loading.close();
     toast.error(error.message);
@@ -888,6 +1087,7 @@ function renderImportItems() {
           ${question.answer_source ? `<span class="chip">Answer: ${escapeHtml(question.answer_source)}${question.answer_confidence ? ` · ${escapeHtml(question.answer_confidence)}` : ''}</span>` : ''}
           ${question.topic_id || question.suggested_topic_code ? `<span class="chip">Topic: ${escapeHtml(question.topic_id || question.suggested_topic_code)}${question.topic_confidence ? ` · ${escapeHtml(question.topic_confidence)}` : ''}</span>` : ''}
           ${question.source_quality ? `<span class="chip">Source: ${escapeHtml(question.source_quality)}</span>` : ''}
+          ${question.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED' ? '<span class="chip warning-chip">PRINTED DUPLICATE OPTIONS</span>' : ''}
           ${question.is_supplemental ? '<span class="chip warning-chip">SUPPLEMENTAL NORMAL</span>' : ''}
           ${item.resolution_action && item.resolution_action !== 'NONE' ? `<span class="chip">Action: ${escapeHtml(item.resolution_action)}</span>` : ''}
         </div>
@@ -1111,7 +1311,14 @@ async function runImportDryRun(event) {
   }
 }
 
-function requestImportConfirmation({ title, message, buttonLabel }) {
+function requestAdminConfirmation({
+  eyebrow = 'Admin confirmation',
+  title,
+  message,
+  safetyTitle = 'Protected operation',
+  safetyMessage = 'The database validates this action before saving changes.',
+  buttonLabel = 'Continue',
+}) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value) => {
@@ -1122,29 +1329,40 @@ function requestImportConfirmation({ title, message, buttonLabel }) {
 
     elements.dialogContent.innerHTML = `
       <div class="review-content">
-        <span class="eyebrow">Controlled import confirmation</span>
+        <span class="eyebrow">${escapeHtml(eyebrow)}</span>
         <h2>${escapeHtml(title)}</h2>
         <p>${escapeHtml(message)}</p>
         <div class="import-safety-note">
-          <strong>Architecture lock</strong>
-          <span>This action creates draft_questions only. It never publishes directly to the master questions table.</span>
+          <strong>${escapeHtml(safetyTitle)}</strong>
+          <span>${escapeHtml(safetyMessage)}</span>
         </div>
         <div class="draft-item-actions">
-          <button id="confirmImportAction" class="button button-primary" type="button">${escapeHtml(buttonLabel)}</button>
-          <button id="cancelImportAction" class="button button-ghost" type="button">Cancel</button>
+          <button id="confirmAdminAction" class="button button-primary" type="button">${escapeHtml(buttonLabel)}</button>
+          <button id="cancelAdminAction" class="button button-ghost" type="button">Cancel</button>
         </div>
       </div>
     `;
-    elements.dialogContent.querySelector('#confirmImportAction')?.addEventListener('click', () => {
+    elements.dialogContent.querySelector('#confirmAdminAction')?.addEventListener('click', () => {
       finish(true);
       elements.dialog.close();
     });
-    elements.dialogContent.querySelector('#cancelImportAction')?.addEventListener('click', () => {
+    elements.dialogContent.querySelector('#cancelAdminAction')?.addEventListener('click', () => {
       finish(false);
       elements.dialog.close();
     });
     elements.dialog.addEventListener('close', () => finish(false), { once: true });
     elements.dialog.showModal();
+  });
+}
+
+function requestImportConfirmation({ title, message, buttonLabel }) {
+  return requestAdminConfirmation({
+    eyebrow: 'Controlled import confirmation',
+    title,
+    message,
+    safetyTitle: 'Architecture lock',
+    safetyMessage: 'This action creates draft_questions only. It never publishes directly to the master questions table.',
+    buttonLabel,
   });
 }
 
@@ -1455,6 +1673,17 @@ function bindEvents() {
   elements.statusFilter?.addEventListener('change', () => loadDrafts({ reset: true }));
   elements.reviewNextDraft?.addEventListener('click', () => openNextAvailableDraft());
   elements.loadMoreDrafts?.addEventListener('click', () => loadDrafts({ reset: false }));
+  elements.refreshPublishQueue?.addEventListener('click', () => loadPublishQueue({ reset: true }));
+  elements.loadMorePublishQueue?.addEventListener('click', () => loadPublishQueue({ reset: false }));
+  elements.selectAllPublishReady?.addEventListener('click', () => {
+    publishQueue.forEach((draft) => selectedPublishDraftIds.add(draft.draft_id));
+    renderPublishQueue();
+  });
+  elements.clearPublishSelection?.addEventListener('click', () => {
+    selectedPublishDraftIds.clear();
+    renderPublishQueue();
+  });
+  elements.publishSelectedDrafts?.addEventListener('click', () => publishSelectedQueue([...selectedPublishDraftIds]));
   document.getElementById('draftBoardId')?.addEventListener('change', refreshDraftReferenceSelects);
   document.getElementById('draftExamId')?.addEventListener('change', refreshDraftReferenceSelects);
   document.getElementById('draftSubjectId')?.addEventListener('change', refreshDraftReferenceSelects);

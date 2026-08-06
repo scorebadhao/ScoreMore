@@ -19,6 +19,7 @@ const ENUMS = Object.freeze({
   correct_answer: ['A', 'B', 'C', 'D', null],
   confidence: ['HIGH', 'MEDIUM', 'LOW', null],
   source_quality: ['CLEAR', 'LOW_RESOLUTION', 'CROPPED', 'DIAGRAM_REVIEW', 'UNREADABLE', null],
+  source_option_anomaly: ['NONE', 'DUPLICATE_OPTIONS_PRINTED', null],
   completeness_status: ['COMPLETE', 'PARTIAL', 'PARTIAL_WITH_SUPPLEMENTS', 'REJECTED'],
 });
 
@@ -35,7 +36,8 @@ const DEFAULT_KEYS = new Set([
   'question_type', 'board_id', 'exam_id', 'exam_year', 'exam_date', 'shift_no',
   'paper_code', 'section_code', 'language', 'difficulty', 'content_origin',
   'verification_status', 'answer_source', 'transcription_confidence',
-  'answer_confidence', 'topic_confidence', 'source_quality', 'tags',
+  'answer_confidence', 'topic_confidence', 'source_quality', 'source_option_anomaly',
+  'source_option_anomaly_note', 'tags',
 ]);
 const QUESTION_KEYS = new Set([
   'source_record_id', 'proposed_question_id', 'question_type', 'board_id',
@@ -47,7 +49,8 @@ const QUESTION_KEYS = new Set([
   'explanation', 'image_refs', 'content_id', 'group_id', 'group_type',
   'group_text', 'tags', 'suggested_topic_code', 'suggested_topic_name',
   'topic_confidence', 'transcription_confidence', 'answer_confidence',
-  'answer_review_note', 'source_quality', 'is_supplemental', 'supplement_reason',
+  'answer_review_note', 'source_quality', 'source_option_anomaly',
+  'source_option_anomaly_note', 'is_supplemental', 'supplement_reason',
 ]);
 const IMAGE_REF_KEYS = new Set(['ref', 'alt', 'source_page']);
 const PAPER_KEYS = new Set([
@@ -219,6 +222,12 @@ function validateDefaults(defaults, errors) {
   if (defaults.source_quality !== undefined && !ENUMS.source_quality.includes(defaults.source_quality)) {
     errors.push(issue('INVALID_SOURCE_QUALITY', 'source_quality has an unsupported value.', '$.defaults.source_quality'));
   }
+  if (defaults.source_option_anomaly !== undefined && !ENUMS.source_option_anomaly.includes(defaults.source_option_anomaly)) {
+    errors.push(issue('INVALID_SOURCE_OPTION_ANOMALY', 'source_option_anomaly has an unsupported value.', '$.defaults.source_option_anomaly'));
+  }
+  if (defaults.source_option_anomaly_note !== undefined && !isNullableString(defaults.source_option_anomaly_note)) {
+    errors.push(issue('INVALID_TEXT', 'source_option_anomaly_note must be text or null.', '$.defaults.source_option_anomaly_note'));
+  }
   validateTags(defaults.tags, '$.defaults.tags', errors);
 }
 
@@ -364,8 +373,9 @@ function validateRawQuestion(question, index, manifest, errors, warnings) {
     if (question[key] !== undefined && !ENUMS.confidence.includes(question[key])) errors.push(issue('INVALID_CONFIDENCE', `${key} must be HIGH, MEDIUM or LOW.`, `${base}.${key}`));
   });
   if (question.source_quality !== undefined && !ENUMS.source_quality.includes(question.source_quality)) errors.push(issue('INVALID_SOURCE_QUALITY', 'source_quality has an unsupported value.', `${base}.source_quality`));
+  if (question.source_option_anomaly !== undefined && !ENUMS.source_option_anomaly.includes(question.source_option_anomaly)) errors.push(issue('INVALID_SOURCE_OPTION_ANOMALY', 'source_option_anomaly has an unsupported value.', `${base}.source_option_anomaly`));
   if (question.is_supplemental !== undefined && typeof question.is_supplemental !== 'boolean') errors.push(issue('INVALID_BOOLEAN', 'is_supplemental must be true or false.', `${base}.is_supplemental`));
-  ['suggested_topic_code', 'suggested_topic_name', 'answer_review_note', 'supplement_reason'].forEach((key) => {
+  ['suggested_topic_code', 'suggested_topic_name', 'answer_review_note', 'source_option_anomaly_note', 'supplement_reason'].forEach((key) => {
     if (question[key] !== undefined && question[key] !== null && typeof question[key] !== 'string') errors.push(issue('INVALID_TEXT', `${key} must be text or null.`, `${base}.${key}`));
   });
 
@@ -405,6 +415,13 @@ function validateRawQuestion(question, index, manifest, errors, warnings) {
     if (!merged.explanation) errors.push(issue('AI_EXPLANATION_REQUIRED', 'AI_PROPOSED requires an explanation.', `${base}.explanation`));
     if (merged.verification_status === 'VERIFIED') errors.push(issue('AI_ANSWER_CANNOT_BE_PREVERIFIED', 'AI_PROPOSED must remain NEEDS_CHECK until human review.', `${base}.verification_status`));
     warnings.push(issue('AI_PROPOSED_ANSWER_REQUIRES_REVIEW', 'Admin confirmation is required before publication.', `${base}.answer_source`));
+  }
+  if (merged.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED') {
+    if (merged.question_type !== 'PYQ') errors.push(issue('OPTION_ANOMALY_REQUIRES_PYQ', 'Printed duplicate-option confirmation is allowed only for genuine PYQs.', `${base}.source_option_anomaly`));
+    if (!isNonEmptyString(merged.source_option_anomaly_note)) errors.push(issue('OPTION_ANOMALY_NOTE_REQUIRED', 'Add a source traceability note for printed duplicate options.', `${base}.source_option_anomaly_note`));
+    const normalizedOptions = ['A', 'B', 'C', 'D'].map((key) => String(merged.options?.[key] || '').normalize('NFC').trim().replace(/\s+/g, ' '));
+    if (new Set(normalizedOptions).size === 4) errors.push(issue('OPTION_ANOMALY_NOT_PRESENT', 'All four options are distinct; remove the duplicate-option anomaly flag.', `${base}.source_option_anomaly`));
+    else warnings.push(issue('SOURCE_DUPLICATE_OPTIONS_PRINTED', 'The source prints repeated option values. Preserve them exactly and verify the answer during human review.', `${base}.options`));
   }
   if (merged.is_supplemental === true) {
     if (merged.question_type !== 'NORMAL' || merged.content_origin !== 'AI_GENERATED') errors.push(issue('INVALID_SUPPLEMENTAL_ORIGIN', 'Supplemental questions must be NORMAL and AI_GENERATED.', base));
