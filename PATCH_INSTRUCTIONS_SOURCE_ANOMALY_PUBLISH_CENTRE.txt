@@ -1,0 +1,62 @@
+SCOREMORE — SHIFT 1 V2 Q55 FIX + SEPARATE PUBLISH CENTRE
+
+CONFIRMED ISSUE
+Package: GSSSB-CCE-2024-0401-S1-REAL-PYQ-V2
+Record: Q55 / GSSSB-CCE-2024-QUANT-0401S1-0055
+The genuine source prints option 640 twice (B and D). The old validator correctly detected repeated values but had no controlled way to preserve a real printed anomaly.
+
+PHASE A — DATABASE FIRST
+Upload:
+supabase/migrations/20260806000000_source_option_anomaly_publish_centre.sql
+
+Commit:
+Fix Shift 1 V2 option anomaly and add Publish Centre
+
+Run:
+GitHub -> Actions -> Deploy ScoreMore Database -> Run workflow
+Confirmation: DEPLOY_SCOREMORE
+Wait until all steps are green.
+
+PHASE B — FRONTEND AND DOCS
+Replace/upload:
+admin.html
+assets/js/admin.js
+assets/js/api.js
+assets/js/importEngine.js
+assets/css/main.css
+docs/scoremore-question-import.schema.v1.json
+docs/HTML_IMPORT_SPEC_v1.md
+docs/SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE.md
+docs/SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE_VERIFICATION.sql
+docs/ARCHITECTURE_LOCK.md
+docs/DEVELOPMENT_ROADMAP.md
+docs/README.md
+supabase/migrations/README.md
+README.md
+PATCH_INSTRUCTIONS_SOURCE_ANOMALY_PUBLISH_CENTRE.txt
+
+Commit:
+Separate verified question publication in ScoreMore admin
+
+TEST URL
+https://scorebadhao.github.io/ScoreMore/admin.html?v=publish-centre
+
+SHIFT 1 V2 RECOVERY
+1. Open the existing report GSSSB-CCE-2024-0401-S1-REAL-PYQ-V2.
+2. Q55 should now show VALID_WITH_WARNINGS instead of INVALID.
+3. The warning should say the genuine source prints duplicate option values.
+4. Tap 2. Import remaining drafts.
+5. Expected: 1 new draft; 100 total Shift 1 V2 drafts; 0 automatically published questions.
+6. Run the same action again. Expected: 0 additional drafts.
+
+REVIEW/PUBLISH FLOW
+1. Open Review Centre and verify a question.
+2. Verify & next must save review only.
+3. The verified question must appear in Publish Centre.
+4. Review Centre must not show a Publish button.
+5. Publish Centre must support Preview, individual Publish, Select loaded, and Publish selected.
+6. Unverified/AI_PROPOSED drafts must never appear in Publish Centre.
+7. A failed selected item must remain unpublished and visible in the queue.
+
+OPTIONAL READ-ONLY SQL
+Run docs/SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE_VERIFICATION.sql in Supabase SQL Editor.

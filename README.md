@@ -169,3 +169,7 @@ Large PYQ packages use compact mobile reports, timeout recovery and small idempo
 ### Visual fingerprint V2 and fast review
 
 The current import flow distinguishes diagram/image questions using a visual digest, repairs old false duplicate states in place, imports remaining drafts in resumable chunks and provides a compact one-question-at-a-time human review screen.
+
+## Printed option anomaly and separate Publish Centre
+
+ScoreMore now preserves a genuine PYQ when the source itself prints duplicate option values, but only through explicit source confirmation and human review. The Admin Review Centre no longer publishes directly; verified drafts move to a separate compact Publish Centre for individual or safe chunked publication.

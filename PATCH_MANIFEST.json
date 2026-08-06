@@ -1,0 +1,71 @@
+{
+  "patch": "ScoreMore Shift 1 V2 printed-option anomaly + separate Publish Centre",
+  "created_at": "2026-08-06T03:35:00+05:30",
+  "database_migration": "20260806000000_source_option_anomaly_publish_centre.sql",
+  "files": {
+    "PATCH_INSTRUCTIONS_SOURCE_ANOMALY_PUBLISH_CENTRE.txt": {
+      "size_bytes": 2245,
+      "sha256": "fdc59725fb1faa80f3f47cc6f065e97ca8dc2aac981049c968fc2c8c27406c44"
+    },
+    "README.md": {
+      "size_bytes": 7278,
+      "sha256": "c115ddc89e57ce1d25e1fef730dd4f1033e58352b0084b9ce71f12841432156a"
+    },
+    "admin.html": {
+      "size_bytes": 18718,
+      "sha256": "912899276c0f5809b7aa8baf9c2be2f7984a277940c30e2b6ef721cfb7978653"
+    },
+    "assets/css/main.css": {
+      "size_bytes": 58852,
+      "sha256": "4f941a000e670277d8721561fc213cf734d1d21ab4a89cd149f006ce4c3c88f8"
+    },
+    "assets/js/admin.js": {
+      "size_bytes": 84639,
+      "sha256": "51e748089af6c93adadcf521748fd01470d4c8a1d0ea1a63ae00ad54278cec71"
+    },
+    "assets/js/api.js": {
+      "size_bytes": 26256,
+      "sha256": "29361d7f17172315ffd66644c9e76a635aab1ca3877e86609e8d445faf31243f"
+    },
+    "assets/js/importEngine.js": {
+      "size_bytes": 37614,
+      "sha256": "e5f84bfd6d4a6739e938297cf823c949543f278ea178b8dda5de5c4003fce19b"
+    },
+    "docs/ARCHITECTURE_LOCK.md": {
+      "size_bytes": 10496,
+      "sha256": "6bcf3575d5c80dfd5a03eaaa3990818a72b786ea211426003d4aeb2f01c493f3"
+    },
+    "docs/DEVELOPMENT_ROADMAP.md": {
+      "size_bytes": 8526,
+      "sha256": "4da7dce9eb36ed7176b31f6b49ef74b43aaebaf6c4eac3fb3a0e6de1abcfa185"
+    },
+    "docs/HTML_IMPORT_SPEC_v1.md": {
+      "size_bytes": 15884,
+      "sha256": "603d3b2036657fe512a9035aaaff693445851d5465133ebb43223e0483dcc4a7"
+    },
+    "docs/README.md": {
+      "size_bytes": 1764,
+      "sha256": "28180851da3af0308035cc6f310cd68e6acda8553ac86be2b11d8cdcfaa9f9c8"
+    },
+    "docs/SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE.md": {
+      "size_bytes": 2566,
+      "sha256": "65855ade413d1cd88ecbe7d8aaefb0a8e27bcb0ebd3463557d027100d7c3274f"
+    },
+    "docs/SOURCE_OPTION_ANOMALY_PUBLISH_CENTRE_VERIFICATION.sql": {
+      "size_bytes": 1907,
+      "sha256": "fc4d4506e041a15130260cb1b9bdbd64acfa414fd7d7a5520e42fb61f6f45c71"
+    },
+    "docs/scoremore-question-import.schema.v1.json": {
+      "size_bytes": 15304,
+      "sha256": "03e9e76e5af225dfbcf1bce7d73416b1fd586d04428e29bcab23bcebfc38856a"
+    },
+    "supabase/migrations/20260806000000_source_option_anomaly_publish_centre.sql": {
+      "size_bytes": 24766,
+      "sha256": "7b328391f8deda1e12ad4f209d5d6c8de1ca4ca548badb2785f33ebf7f99f692"
+    },
+    "supabase/migrations/README.md": {
+      "size_bytes": 2345,
+      "sha256": "00df927c6466d505d502d298c742678634a29f02b9fca1edfec24fe57b23788a"
+    }
+  }
+}

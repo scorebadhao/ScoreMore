@@ -13,7 +13,7 @@
     <header class="topbar topbar-dark">
       <a class="brand" href="./admin.html">
         <span class="brand-mark">S+</span>
-        <span><strong>ScoreMore Admin</strong><small>Draft → review → test → publish</small></span>
+        <span><strong>ScoreMore Admin</strong><small>Import → review → publish → test</small></span>
       </a>
       <div class="topbar-actions">
         <a class="button button-ghost-light" href="./student.html">Student site</a>
@@ -42,10 +42,17 @@
           <div>
             <span class="eyebrow">Content and test operations</span>
             <h1>Admin Operations Centre</h1>
-            <p>Review questions first, then assemble published questions into dynamic tests.</p>
+            <p>Import safely, review accurately, publish verified questions, then build dynamic tests.</p>
           </div>
-          <button id="refreshDrafts" class="button button-secondary" type="button">Refresh drafts</button>
+          <button id="refreshDrafts" class="button button-secondary" type="button">Refresh review</button>
         </div>
+
+        <nav class="admin-section-nav" aria-label="Admin sections">
+          <a href="#htmlImportSection">Import</a>
+          <a href="#reviewSection">Review</a>
+          <a href="#publishSection">Publish</a>
+          <a href="#testManagerSection">Tests</a>
+        </nav>
 
         <div class="admin-grid">
           <section class="panel-card">
@@ -186,17 +193,17 @@
           </div>
         </section>
 
-        <section class="section panel-card">
+        <section id="reviewSection" class="section panel-card">
           <div class="section-heading draft-review-heading">
             <div>
               <span class="eyebrow">Human review required</span>
-              <h2>Question drafts</h2>
-              <p id="draftListMeta" class="muted">Review one question at a time. Source preview, proposed answer and topic remain visible together.</p>
+              <h2>Review Centre</h2>
+              <p id="draftListMeta" class="muted">Verify one question at a time. Saved verified drafts move automatically to the separate Publish Centre.</p>
             </div>
             <div class="draft-review-tools">
               <select id="draftStatusFilter" aria-label="Draft status filter">
                 <option value="PENDING">Pending</option>
-                <option value="IN_REVIEW">Verified</option>
+                <option value="IN_REVIEW">Verified — publish queue</option>
                 <option value="REJECTED">Rejected</option>
                 <option value="PUBLISHED">Published</option>
                 <option value="">All</option>
@@ -206,6 +213,31 @@
           </div>
           <div id="draftList" class="draft-list compact-draft-list" aria-live="polite"></div>
           <button id="loadMoreDrafts" class="button button-ghost draft-load-more hidden" type="button">Load more drafts</button>
+        </section>
+
+        <section id="publishSection" class="section panel-card publish-centre">
+          <div class="section-heading publish-centre-heading">
+            <div>
+              <span class="eyebrow">Verified questions only</span>
+              <h2>Publish Centre</h2>
+              <p id="publishQueueMeta" class="muted">Only drafts that passed human answer, explanation and topic review appear here.</p>
+            </div>
+            <button id="refreshPublishQueue" class="button button-secondary" type="button">Refresh queue</button>
+          </div>
+
+          <div class="publish-toolbar">
+            <div class="publish-selection-tools">
+              <button id="selectAllPublishReady" class="button button-ghost" type="button">Select loaded</button>
+              <button id="clearPublishSelection" class="button button-ghost" type="button">Clear</button>
+              <span id="publishSelectionCount" class="muted">0 selected</span>
+            </div>
+            <button id="publishSelectedDrafts" class="button button-primary" type="button" disabled>Publish selected</button>
+          </div>
+
+          <div id="publishQueueList" class="publish-queue-list" aria-live="polite">
+            <div class="empty-state">Loading verified drafts…</div>
+          </div>
+          <button id="loadMorePublishQueue" class="button button-ghost publish-load-more hidden" type="button">Load more verified drafts</button>
         </section>
 
         <section id="testManagerSection" class="section panel-card">
