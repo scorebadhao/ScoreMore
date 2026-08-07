@@ -30,3 +30,8 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 
 - `SIMPLE_TEST_BUILDER_CATALOGUE.md` — locked mobile test-builder and catalogue-control behaviour.
 - `SIMPLE_TEST_BUILDER_CATALOGUE_VERIFICATION.sql` — read-only post-deployment checks.
+
+## Phase 4A
+
+- `PHASE4A_DYNAMIC_MULTI_FILTER_TEST_BUILDER.md` — dynamic package/subject/topic multi-filter builder.
+- `PHASE4A_VERIFICATION.sql` — read-only deployment and integrity checks.

@@ -202,3 +202,23 @@ Human review and publication are separate admin operations. Review verification 
 Fixed-question tests use a three-step mobile-first builder: test details, catalogue/paper identity and published-question selection. PYQ tests require year, shift and paper code so the selected list belongs to one exact paper. Question order must preserve `original_question_no` for original papers. Advanced marking settings remain secondary.
 
 Configured tests are controlled through a separate searchable catalogue. Editing reloads the existing fixed question links; status changes use an admin-only audited RPC. Master questions remain stored once and are reused only through `test_question_links`.
+
+## Phase 4A — Dynamic Multi-Filter Test Builder
+
+Status: **ADDITIVE AND LOCKED AFTER ACCEPTANCE**
+
+- Package-aware test building uses `import_batches.package_id`; it does not repurpose the paid `packages` table.
+- Published master questions remain stored once in `questions`.
+- Package/source appearances remain represented through `question_occurrences`, `import_batch_items` and import-batch traceability.
+- Phase 4A test creation always materializes a fixed ordered list in `test_question_links`.
+- Dynamic filters are a builder workflow; they are not re-run when a student starts an already saved test.
+- Values inside one multi-select filter group use OR; different groups use AND.
+- Superseded import packages are hidden by default and cannot be used for Original/Completed full-paper resolution.
+- `PYQ_ORIGINAL` includes genuine source PYQ memberships only.
+- `PYQ_COMPLETED` includes every published question attached to the selected import package and must not be labelled as an exact original paper when NORMAL/supplemental questions exist.
+- `PYQ_SECTIONAL` supports multiple import packages and multiple subjects/topics.
+- Duplicate handling is `UNIQUE_MASTER` because `test_question_links` and `attempt_questions` permit one master question once per test/attempt.
+- Only published questions are eligible.
+- The existing `save_fixed_question_test()` remains the structural test writer and preserves attempt-lock protection.
+- Phase 4A browser reads/writes go through `assets/js/api.js` and admin-checked PostgreSQL RPCs.
+- The dedicated admin entry point is `test-builder.html`.

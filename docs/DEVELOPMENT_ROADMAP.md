@@ -209,3 +209,20 @@ Completed: AI_PROPOSED status repair, timeout-state recovery, compact mobile rep
 - Paper metadata stored on tests
 - Searchable catalogue with status counts
 - Edit, Publish, Archive and Restore Draft actions
+
+## Phase 4A — Dynamic Multi-Filter Test Builder
+
+- [x] Package-aware published-question catalogue
+- [x] Active/superseded import package handling
+- [x] Dynamic multi-select facets and counts
+- [x] OR within filter groups and AND across groups
+- [x] Persistent manual selection across pagination/filter changes
+- [x] Server-side Select all filtered
+- [x] Original full PYQ resolution
+- [x] Completed PYQ practice with labelled supplements
+- [x] Multi-package, multi-subject sectional resolution
+- [x] Unique-master duplicate collapse and preview warning
+- [x] Authoritative preview before save/publish
+- [x] Fixed-list save through existing test writer
+- [x] Audit trail and verification SQL
+- [ ] Production acceptance with fully published Shift 1 V2 and Shift 3 V1
