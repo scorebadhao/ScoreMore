@@ -35,6 +35,7 @@ let allTests = [];
 let redirecting = false;
 let selectedType = '';
 let searchTerm = '';
+let unmountTestEngine = null;
 
 const STANDARD_TYPES = [
   ['', 'All tests'],
@@ -300,6 +301,7 @@ async function startAttempt(testId) {
 
 function setVisibleSection(routePath) {
   const inAttempt = routePath === 'attempt';
+  document.body.classList.toggle('attempt-mode', inAttempt);
   elements.attemptSection.classList.toggle('hidden', !inAttempt);
   elements.catalogueSection.classList.toggle('hidden', inAttempt);
   elements.dashboardHome.classList.toggle('hidden', inAttempt || routePath === 'tests' || routePath === 'practice');
@@ -312,14 +314,23 @@ async function handleRoute(route) {
   });
   if (!currentUser) return;
 
+  if (route.path !== 'attempt' && unmountTestEngine) {
+    unmountTestEngine();
+    unmountTestEngine = null;
+    elements.testEngineRoot.innerHTML = '';
+  }
+
   setVisibleSection(route.path);
 
   if (route.path === 'attempt') {
     const attemptId = route.params.get('id');
     if (!attemptId) return navigate('tests');
     try {
-      await mountTestEngine(elements.testEngineRoot, attemptId, {
+      unmountTestEngine?.();
+      unmountTestEngine = await mountTestEngine(elements.testEngineRoot, attemptId, {
         onExit: async () => {
+          unmountTestEngine?.();
+          unmountTestEngine = null;
           elements.testEngineRoot.innerHTML = '';
           activeAttempt = await api.getInProgressAttempt();
           renderContinueAttempt();

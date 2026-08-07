@@ -202,6 +202,23 @@ export const api = Object.freeze({
     ), 'Unable to load questions.') || [];
   },
 
+  async getAttemptNavigation(attemptId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_attempt_navigation', { p_attempt_id: attemptId }),
+    ), 'Unable to load test navigation.');
+  },
+
+  async visitAttemptQuestion(attemptId, questionId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('visit_attempt_question', {
+        p_attempt_id: attemptId,
+        p_question_id: questionId,
+      }),
+    ), 'Unable to save the current question position.');
+  },
+
   async saveAnswer({ attemptId, questionId, selectedAnswer, markedReview = false, timeTakenSeconds = 0 }) {
     const client = requireSupabase();
     const user = await getUser();
