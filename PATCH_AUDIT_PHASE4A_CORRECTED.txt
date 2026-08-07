@@ -1,0 +1,54 @@
+SCOREMORE PHASE 4A — CORRECTED PATCH AUDIT REPORT
+
+Audit basis
+- Latest uploaded repository: ScoreMore-main (1).zip
+- Previously supplied Phase 4A complete package
+- Existing ScoreMore migration history and current frontend architecture
+
+Definite blocker found
+- File:
+  supabase/migrations/20260807010000_phase4a_dynamic_multifilter_test_builder.sql
+- Function:
+  public.phase4a_resolve_test_questions(...)
+- Problem:
+  RETURNS TABLE used the unquoted output name `position integer`.
+- Why this is incorrect:
+  ScoreMore's own working initial migration already quotes the same PostgreSQL output name as
+  `"position" integer` after a prior syntax error around POSITION.
+- Correction:
+  The Phase 4A migration now uses `"position"` consistently in the RETURNS TABLE declaration,
+  emitted aliases, and internal ordering references.
+
+Repository-preservation audit
+- No files from the user's latest repository were deleted.
+- Existing Import, Review, Publish Centre, Simple Test Builder and Catalogue Control files remain.
+- Existing files changed only where Phase 4A integration requires it:
+  admin.html, vite.config.js, assets/js/api.js, README/docs files.
+- New isolated Phase 4A frontend files:
+  test-builder.html
+  assets/js/testBuilder4A.js
+  assets/css/testBuilder4A.css
+
+Static checks passed
+- assets/js/api.js: node --check
+- assets/js/testBuilder4A.js: node --check
+- assets/js/admin.js: node --check
+- test-builder.html: unique IDs
+- Every getElementById used by testBuilder4A.js exists in test-builder.html
+- vite.config.js includes test-builder.html as a production entry
+- Phase 4A migration has balanced dollar-quoted function bodies
+- Required Phase 4A functions each appear exactly once
+- No unquoted RETURNS TABLE `position integer` remains
+- Corrected migration ends in COMMIT
+
+Database compatibility checked against existing ScoreMore migrations
+- import_batches package/version/completeness fields exist
+- questions import_batch_id/import_item_id/is_supplemental fields exist
+- question_occurrences fields used by Phase 4A exist
+- test_type values used by Phase 4A exist
+- helper functions is_admin, try_parse_integer, try_parse_date and save_fixed_question_test exist
+
+Production authority
+Static validation cannot replace an actual PostgreSQL/Supabase migration execution.
+The next Deploy ScoreMore Database workflow is the authoritative database test.
+Do not deploy the Phase 4A frontend until that corrected migration is green.

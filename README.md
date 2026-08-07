@@ -177,3 +177,7 @@ ScoreMore now preserves a genuine PYQ when the source itself prints duplicate op
 ## Simple Test Builder and Catalogue Control
 
 The admin test workflow is now a compact three-step builder with exact PYQ paper filters, local question search, visible-question selection, ID suggestions, paper-aware test metadata and a separate searchable catalogue with Edit, Publish, Archive and Restore actions. See `docs/SIMPLE_TEST_BUILDER_CATALOGUE.md`.
+
+## Phase 4A Dynamic Test Builder
+
+Administrators can open `test-builder.html` to build fixed tests from published questions using multiple import Package IDs, subjects, topics and other live Supabase filters. Supported modes are Custom Selected, Original Full PYQ, Completed PYQ Practice and multi-package Sectional Test. See `docs/PHASE4A_DYNAMIC_MULTI_FILTER_TEST_BUILDER.md` and `PATCH_INSTRUCTIONS_PHASE4A.txt`.

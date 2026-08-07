@@ -9,6 +9,7 @@ export default defineConfig({
         public: resolve(import.meta.dirname, 'index.html'),
         student: resolve(import.meta.dirname, 'student.html'),
         admin: resolve(import.meta.dirname, 'admin.html'),
+        testBuilder: resolve(import.meta.dirname, 'test-builder.html'),
       },
     },
   },
