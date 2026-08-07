@@ -392,6 +392,99 @@ export const api = Object.freeze({
     ), 'Unable to change the test status.');
   },
 
+  async getPhase4ATestBuilderFacets(filters = {}) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_phase4a_test_builder_facets', {
+        p_filters: filters && typeof filters === 'object' ? filters : {},
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 60000),
+    ), 'Unable to load the dynamic test-builder filters.');
+  },
+
+  async searchPhase4ATestBuilderQuestions({
+    filters = {},
+    search = '',
+    order = 'PACKAGE_ORIGINAL',
+    offset = 0,
+    limit = 40,
+  } = {}) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('search_phase4a_test_builder_questions', {
+        p_filters: filters && typeof filters === 'object' ? filters : {},
+        p_search: clean(search) || null,
+        p_order: clean(order)?.toUpperCase() || 'PACKAGE_ORIGINAL',
+        p_offset: Math.max(Math.round(Number(offset) || 0), 0),
+        p_limit: Math.min(Math.max(Math.round(Number(limit) || 40), 1), 200),
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 60000),
+    ), 'Unable to load the filtered question stack.');
+  },
+
+  async selectAllPhase4ATestBuilderQuestionIds({
+    filters = {},
+    search = '',
+    order = 'PACKAGE_ORIGINAL',
+  } = {}) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('select_all_phase4a_test_builder_question_ids', {
+        p_filters: filters && typeof filters === 'object' ? filters : {},
+        p_search: clean(search) || null,
+        p_order: clean(order)?.toUpperCase() || 'PACKAGE_ORIGINAL',
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 90000),
+    ), 'Unable to select every filtered question.');
+  },
+
+  async previewPhase4ADynamicTest(input = {}) {
+    const client = requireSupabase();
+    const questionIds = [...new Set(
+      (Array.isArray(input.questionIds) ? input.questionIds : [])
+        .map((value) => clean(value)?.toUpperCase())
+        .filter(Boolean),
+    )];
+
+    return unwrap(await withTimeout(
+      client.rpc('preview_phase4a_dynamic_test', {
+        p_builder_mode: clean(input.builderMode)?.toUpperCase() || 'CUSTOM',
+        p_filters: input.filters && typeof input.filters === 'object' ? input.filters : {},
+        p_question_ids: questionIds,
+        p_order: clean(input.order)?.toUpperCase() || 'PACKAGE_ORIGINAL',
+        p_custom_test_type: clean(input.customTestType)?.toUpperCase() || null,
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 90000),
+    ), 'Unable to preview the resolved test.');
+  },
+
+  async savePhase4ADynamicTest(input = {}) {
+    const client = requireSupabase();
+    const questionIds = [...new Set(
+      (Array.isArray(input.questionIds) ? input.questionIds : [])
+        .map((value) => clean(value)?.toUpperCase())
+        .filter(Boolean),
+    )];
+
+    return unwrap(await withTimeout(
+      client.rpc('save_phase4a_dynamic_test', {
+        p_test_id: clean(input.testId)?.toUpperCase(),
+        p_test_name: clean(input.testName),
+        p_builder_mode: clean(input.builderMode)?.toUpperCase() || 'CUSTOM',
+        p_filters: input.filters && typeof input.filters === 'object' ? input.filters : {},
+        p_question_ids: questionIds,
+        p_order: clean(input.order)?.toUpperCase() || 'PACKAGE_ORIGINAL',
+        p_custom_test_type: clean(input.customTestType)?.toUpperCase() || null,
+        p_duration_minutes: Math.max(0, Math.round(Number(input.durationMinutes) || 0)),
+        p_marks_per_question: Number(input.marksPerQuestion) || 1,
+        p_negative_marks: Math.max(0, Number(input.negativeMarks) || 0),
+        p_sort_order: Math.round(Number(input.sortOrder) || 0),
+        p_publish: Boolean(input.publish),
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 120000),
+    ), 'Unable to save the dynamic multi-filter test.');
+  },
+
   async listDrafts({ status = 'PENDING', page = 0, pageSize = 24 } = {}) {
     const client = requireSupabase();
     const from = page * pageSize;
