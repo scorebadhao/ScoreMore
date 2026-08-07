@@ -841,7 +841,7 @@ create or replace function public.phase4a_resolve_test_questions(
 )
 returns table (
   question_id text,
-  position integer,
+  "position" integer,
   package_id text,
   membership_type text,
   source_order integer,
@@ -939,7 +939,7 @@ begin
           case when v_order = 'DETERMINISTIC_RANDOM' then md5(c.question_id) end,
           c.selected_position,
           c.question_id
-      )::integer as position,
+      )::integer as "position",
       c.package_id,
       c.membership_type,
       c.source_order,
@@ -977,7 +977,7 @@ begin
     )
     select
       r.question_id,
-      row_number() over (order by r.source_order, r.question_id)::integer as position,
+      row_number() over (order by r.source_order, r.question_id)::integer as "position",
       r.package_id,
       r.membership_type,
       r.source_order,
@@ -1012,7 +1012,7 @@ begin
     )
     select
       r.question_id,
-      row_number() over (order by r.source_order, r.question_id)::integer as position,
+      row_number() over (order by r.source_order, r.question_id)::integer as "position",
       r.package_id,
       r.membership_type,
       r.source_order,
@@ -1067,7 +1067,7 @@ begin
         case when v_order = 'QUESTION_ID' then r.question_id end,
         case when v_order = 'DETERMINISTIC_RANDOM' then md5(r.question_id) end,
         r.question_id
-    )::integer as position,
+    )::integer as "position",
     r.package_id,
     r.membership_type,
     r.source_order,
@@ -1298,7 +1298,7 @@ begin
       case when count(distinct shift_no) filter (where shift_no is not null) = 1 then min(shift_no) end as shift_no,
       case when count(distinct paper_code) filter (where paper_code is not null) = 1 then min(paper_code) end as paper_code,
       case when count(distinct section_code) filter (where section_code is not null) = 1 then min(section_code) end as section_code,
-      coalesce(jsonb_agg(question_id order by position), '[]'::jsonb) as question_ids
+      coalesce(jsonb_agg(question_id order by "position"), '[]'::jsonb) as question_ids
     from resolved
   )
   select jsonb_build_object(
@@ -1385,7 +1385,7 @@ begin
     p_custom_test_type
   );
 
-  select array_agg(question_id order by position)
+  select array_agg(question_id order by "position")
   into v_ids
   from public.phase4a_resolve_test_questions(
     v_mode,
