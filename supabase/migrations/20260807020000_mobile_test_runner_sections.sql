@@ -27,7 +27,7 @@ end;
 $$;
 
 comment on column public.attempt_questions.visited_at is
-  'First protected server visit used by the complete attempt navigator.';
+  'Most recent protected server visit used by resume and section navigation.';
 
 comment on column public.questions.student_image_refs is
   'Admin-reviewed diagram-only image references allowed in the student test runner. Raw source captures remain in image_refs and are never returned during an attempt.';
@@ -304,7 +304,7 @@ begin
   end if;
 
   update public.attempt_questions
-  set visited_at = coalesce(visited_at, now())
+  set visited_at = now()
   where attempt_id = p_attempt_id
     and question_id = p_question_id;
 
@@ -499,7 +499,7 @@ begin
   returning answer_id into v_answer_id;
 
   update public.attempt_questions
-  set visited_at = coalesce(visited_at, now())
+  set visited_at = now()
   where attempt_id = p_attempt_id
     and question_id = p_question_id;
 
