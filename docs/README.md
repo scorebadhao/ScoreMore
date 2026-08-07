@@ -35,3 +35,7 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 
 - `PHASE4A_DYNAMIC_MULTI_FILTER_TEST_BUILDER.md` — dynamic package/subject/topic multi-filter builder.
 - `PHASE4A_VERIFICATION.sql` — read-only deployment and integrity checks.
+
+## Mobile test runner
+
+- `MOBILE_TEST_RUNNER_SECTIONS.md` — protected complete navigation, dynamic section tabs, authoritative timer, mobile layout corrections and acceptance checklist.
