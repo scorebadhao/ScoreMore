@@ -39,3 +39,7 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260806000000_source_option_anomaly_publish_centre.sql` preserves explicitly confirmed printed duplicate options in genuine PYQs, repairs Shift 1 V2 Q55 in place, and adds the admin-only verified Publish Centre RPCs.
 
 - `20260806010000_simple_test_builder_catalogue.sql` adds paper-aware fixed-test saving and an audited admin-only test status RPC for the simplified Test Builder and Catalogue Control.
+
+- `20260807010000_phase4a_dynamic_multifilter_test_builder.sql` adds the Phase 4A dynamic multi-filter test builder and protected preview/save workflows.
+
+- `20260807020000_mobile_test_runner_sections.sql` adds the protected complete attempt navigator, persisted visit state, authoritative server timer/auto-submit, dynamic section support and student-safe image boundary for the mobile test runner.
