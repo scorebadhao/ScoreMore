@@ -38,6 +38,73 @@ function clean(value) {
   return typeof value === 'string' ? value.trim() : value;
 }
 
+const STUDENT_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const STUDENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+async function sha256File(file) {
+  const digest = await window.crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function inspectImageFile(file) {
+  if (!(file instanceof File) || !file.size) throw new Error('Choose a diagram-only image crop.');
+  if (!STUDENT_IMAGE_TYPES.has(file.type)) throw new Error('Use a PNG, JPEG or WebP image crop.');
+  if (file.size > STUDENT_IMAGE_MAX_BYTES) throw new Error('Student image crops must be 5 MB or smaller.');
+
+  let bitmap;
+  try {
+    if (typeof window.createImageBitmap === 'function') {
+      bitmap = await window.createImageBitmap(file);
+      const width = Number(bitmap.width);
+      const height = Number(bitmap.height);
+      if (!width || !height || width > 8000 || height > 8000) throw new Error('Image dimensions must be between 1 and 8000 pixels.');
+      return { width, height };
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      const dimensions = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+        image.onerror = () => reject(new Error('The selected file is not a readable image.'));
+        image.src = objectUrl;
+      });
+      if (!dimensions.width || !dimensions.height || dimensions.width > 8000 || dimensions.height > 8000) {
+        throw new Error('Image dimensions must be between 1 and 8000 pixels.');
+      }
+      return dimensions;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  } finally {
+    bitmap?.close?.();
+  }
+}
+
+async function resolveStorageImageRefs(client, imageRefs, { blockedOnFailure = false } = {}) {
+  const refs = Array.isArray(imageRefs) ? imageRefs : [];
+  return Promise.all(refs.map(async (item) => {
+    if (!item || typeof item !== 'object' || item.blocked) return item;
+    const bucket = clean(item.bucket || item.storage_bucket);
+    const path = clean(item.path || item.storage_path);
+    if (!bucket || !path) return item;
+
+    const response = await withTimeout(client.storage.from(bucket).createSignedUrl(path, 3600));
+    if (response?.error || !response?.data?.signedUrl) {
+      return blockedOnFailure ? { blocked: true } : { ...item, preview_error: response?.error?.message || 'Preview unavailable.' };
+    }
+    return { ...item, url: response.data.signedUrl };
+  }));
+}
+
+async function removeStudentImageObject(client, storagePath) {
+  if (!storagePath) return null;
+  const response = await withTimeout(
+    client.storage.from(APP_CONFIG.studentImageBucket).remove([storagePath]),
+  );
+  return response?.error ? response.error.message || 'Storage cleanup failed.' : null;
+}
+
 function normalizeIndianMobile(value) {
   const digits = String(clean(value) || '').replace(/\D/g, '');
   const nationalNumber = digits.length === 12 && digits.startsWith('91')
@@ -193,13 +260,18 @@ export const api = Object.freeze({
 
   async loadQuestionBatch(attemptId, offset = 0, limit = APP_CONFIG.questionBatchSize) {
     const client = requireSupabase();
-    return unwrap(await withTimeout(
+    const rows = unwrap(await withTimeout(
       client.rpc('get_attempt_questions', {
         p_attempt_id: attemptId,
         p_offset: offset,
         p_limit: limit,
       }),
     ), 'Unable to load questions.') || [];
+
+    return Promise.all(rows.map(async (row) => ({
+      ...row,
+      image_refs: await resolveStorageImageRefs(client, row.image_refs, { blockedOnFailure: true }),
+    })));
   },
 
   async getAttemptNavigation(attemptId) {
@@ -407,6 +479,147 @@ export const api = Object.freeze({
         p_status: clean(status).toUpperCase(),
       }),
     ), 'Unable to change the test status.');
+  },
+
+  async listStudentImageRepairQueue({
+    status = 'NEEDS_REPAIR',
+    search = '',
+    paperCode = '',
+    shiftNo = '',
+    sectionCode = '',
+    originalQuestionNo = '',
+    page = 0,
+    pageSize = 20,
+  } = {}) {
+    const client = requireSupabase();
+    const limit = Math.min(Math.max(Math.round(Number(pageSize) || 20), 1), 100);
+    const offset = Math.max(Math.round(Number(page) || 0), 0) * limit;
+    return unwrap(await withTimeout(
+      client.rpc('list_student_image_repair_queue', {
+        p_status: clean(status)?.toUpperCase() || 'NEEDS_REPAIR',
+        p_search: clean(search) || null,
+        p_paper_code: clean(paperCode)?.toUpperCase() || null,
+        p_shift_no: shiftNo === '' || shiftNo === null ? null : Math.max(1, Math.round(Number(shiftNo))),
+        p_section_code: clean(sectionCode)?.toUpperCase() || null,
+        p_original_question_no: originalQuestionNo === '' || originalQuestionNo === null
+          ? null
+          : Math.max(1, Math.round(Number(originalQuestionNo))),
+        p_limit: limit,
+        p_offset: offset,
+      }),
+    ), 'Unable to load the student-safe image repair queue.');
+  },
+
+  async getStudentImageRepairDetail(questionId) {
+    const client = requireSupabase();
+    const detail = unwrap(await withTimeout(
+      client.rpc('get_student_image_repair_detail', {
+        p_question_id: clean(questionId)?.toUpperCase(),
+      }),
+    ), 'Unable to load this image-repair record.');
+
+    const sourceImages = await resolveStorageImageRefs(client, detail?.question?.image_refs || []);
+    const repairs = await Promise.all((detail?.repairs || []).map(async (repair) => {
+      if (!['PENDING', 'APPROVED'].includes(repair.status)) return { ...repair, preview_url: '', preview_error: '' };
+      const [preview] = await resolveStorageImageRefs(client, [{
+        bucket: repair.storage_bucket,
+        path: repair.storage_path,
+      }]);
+      return { ...repair, preview_url: preview?.url || '', preview_error: preview?.preview_error || '' };
+    }));
+
+    return {
+      ...detail,
+      question: { ...detail.question, source_image_refs: sourceImages },
+      repairs,
+    };
+  },
+
+  async uploadStudentImageRepair({ questionId, file, altText, adminNote = '' }) {
+    const client = requireSupabase();
+    const user = await getUser();
+    if (!user) throw new Error('Your session has expired.');
+
+    const normalizedQuestionId = clean(questionId)?.toUpperCase();
+    if (!normalizedQuestionId) throw new Error('Question ID is required.');
+    const normalizedAlt = clean(altText);
+    if (!normalizedAlt) throw new Error('Describe the diagram for students.');
+
+    const dimensions = await inspectImageFile(file);
+    const checksum = await sha256File(file);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${user.id}/${normalizedQuestionId}/${Date.now()}-${checksum.slice(0, 12)}-${safeName}`;
+
+    unwrap(await withTimeout(
+      client.storage.from(APP_CONFIG.studentImageBucket).upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type,
+      }),
+    ), 'Unable to upload the student-safe crop.');
+
+    try {
+      const result = unwrap(await withTimeout(
+        client.rpc('register_student_image_upload', {
+          p_question_id: normalizedQuestionId,
+          p_storage_path: storagePath,
+          p_original_file_name: file.name,
+          p_mime_type: file.type,
+          p_file_size_bytes: file.size,
+          p_checksum_sha256: checksum,
+          p_pixel_width: dimensions.width,
+          p_pixel_height: dimensions.height,
+          p_alt_text: normalizedAlt,
+          p_admin_note: clean(adminNote) || null,
+        }),
+      ), 'The crop uploaded, but its pending repair record could not be saved.');
+
+      const cleanupWarning = await removeStudentImageObject(client, result?.superseded_storage_path);
+      return { ...result, cleanup_warning: cleanupWarning };
+    } catch (error) {
+      await removeStudentImageObject(client, storagePath);
+      throw error;
+    }
+  },
+
+  async approveStudentImageRepair({ repairId, altText, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('approve_student_image_repair', {
+        p_repair_id: repairId,
+        p_alt_text: clean(altText),
+        p_admin_note: clean(adminNote) || null,
+        p_confirmation: 'APPROVE_STUDENT_IMAGE',
+      }),
+    ), 'Unable to approve the student-safe image.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.replaced_storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
+  },
+
+  async discardStudentImageUpload({ repairId, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('discard_student_image_upload', {
+        p_repair_id: repairId,
+        p_admin_note: clean(adminNote) || null,
+        p_confirmation: 'DISCARD_STUDENT_IMAGE',
+      }),
+    ), 'Unable to discard the pending crop.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
+  },
+
+  async removeApprovedStudentImage({ questionId, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('remove_approved_student_image', {
+        p_question_id: clean(questionId)?.toUpperCase(),
+        p_admin_note: clean(adminNote) || null,
+        p_confirmation: 'REMOVE_STUDENT_IMAGE',
+      }),
+    ), 'Unable to remove the approved student image.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
   },
 
   async getPhase4ATestBuilderFacets(filters = {}) {

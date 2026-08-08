@@ -91,7 +91,7 @@ function imageItems(imageRefs) {
     if (item?.blocked) return { blocked: true };
     const rawUrl = typeof item === 'string' ? item : item?.url || item?.ref;
     const url = safeImageUrl(rawUrl);
-    return url ? { url } : null;
+    return url ? { url, alt: typeof item === 'object' ? item?.alt || '' : '' } : null;
   }).filter(Boolean);
 }
 
@@ -380,7 +380,7 @@ export async function mountTestEngine(root, attemptId, { onExit } = {}) {
       <div class="question-images" aria-label="Question diagrams">
         ${items.map((item, index) => `
           <figure class="question-image-frame">
-            <img class="question-image" src="${escapeHtml(item.url)}" alt="Question diagram ${index + 1}" loading="lazy" decoding="async" />
+            <img class="question-image" src="${escapeHtml(item.url)}" alt="${escapeHtml(item.alt || `Question diagram ${index + 1}`)}" loading="lazy" decoding="async" />
           </figure>
         `).join('')}
       </div>

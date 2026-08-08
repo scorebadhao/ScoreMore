@@ -7,6 +7,7 @@ export const APP_CONFIG = Object.freeze({
   questionBatchSize: 10,
   cacheVersion: 'scoremore-v0.1.0',
   sourceBucket: 'source-documents',
+  studentImageBucket: 'student-question-images',
   features: Object.freeze({
     publicCatalogue: true,
     studentAttempts: true,
