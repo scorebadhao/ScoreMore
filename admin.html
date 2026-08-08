@@ -51,6 +51,7 @@
           <a href="#htmlImportSection">Import</a>
           <a href="#reviewSection">Review</a>
           <a href="#publishSection">Publish</a>
+          <a href="#imageRepairSection">Image repair</a>
           <a href="#testManagerSection">Build tests</a>
           <a href="./test-builder.html">Dynamic builder</a>
           <a href="#catalogueControlSection">Catalogue</a>
@@ -242,6 +243,52 @@
           <button id="loadMorePublishQueue" class="button button-ghost publish-load-more hidden" type="button">Load more verified drafts</button>
         </section>
 
+        <section id="imageRepairSection" class="section panel-card image-repair-centre">
+          <div class="section-heading image-repair-heading">
+            <div>
+              <span class="eyebrow">Published visual questions · audited student crops</span>
+              <h2>Student-safe Image Repair Centre</h2>
+              <p class="muted">Keep the original source capture for admin audit, then upload and approve only the diagram, figure or table students need.</p>
+            </div>
+            <button id="refreshImageRepairs" class="button button-secondary" type="button">Refresh queue</button>
+          </div>
+
+          <div class="import-safety-note image-repair-safety">
+            <strong>Approval boundary</strong>
+            <span>A pending crop is never visible to students. Approval replaces <code>student_image_refs</code> through an admin-only RPC; raw <code>image_refs</code> remain private and unchanged.</span>
+          </div>
+
+          <div id="imageRepairStats" class="image-repair-stats" aria-live="polite"></div>
+
+          <form id="imageRepairFilters" class="image-repair-filters" novalidate>
+            <label class="image-repair-search">Question ID or text
+              <input id="imageRepairSearch" name="search" type="search" placeholder="GSSSB-CCE… or question words" autocomplete="off" />
+            </label>
+            <label>Status
+              <select id="imageRepairStatus" name="status">
+                <option value="NEEDS_REPAIR" selected>Needs repair</option>
+                <option value="PENDING">Pending approval</option>
+                <option value="APPROVED">Approved</option>
+                <option value="ALL">All visual questions</option>
+              </select>
+            </label>
+            <label>Paper code<input id="imageRepairPaperCode" name="paperCode" placeholder="0401S1" /></label>
+            <label>Shift<input id="imageRepairShiftNo" name="shiftNo" type="number" min="1" step="1" placeholder="1" /></label>
+            <label>Section<input id="imageRepairSectionCode" name="sectionCode" placeholder="REASONING" /></label>
+            <label>Original Q. no.<input id="imageRepairQuestionNo" name="originalQuestionNo" type="number" min="1" step="1" placeholder="3" /></label>
+            <div class="image-repair-filter-actions">
+              <button class="button button-primary" type="submit">Apply filters</button>
+              <button id="clearImageRepairFilters" class="button button-ghost" type="button">Clear</button>
+            </div>
+          </form>
+
+          <p id="imageRepairQueueMeta" class="muted image-repair-queue-meta">Loading visual questions…</p>
+          <div id="imageRepairList" class="image-repair-list" aria-live="polite">
+            <div class="empty-state">Loading image-repair queue…</div>
+          </div>
+          <button id="loadMoreImageRepairs" class="button button-ghost image-repair-load-more hidden" type="button">Load more questions</button>
+        </section>
+
         <section id="testManagerSection" class="section panel-card test-builder-panel">
           <div class="section-heading test-builder-heading">
             <div>
@@ -391,6 +438,11 @@
   <dialog id="draftDialog" class="review-dialog">
     <form method="dialog" class="dialog-close-row"><button class="icon-button" value="cancel" aria-label="Close">×</button></form>
     <div id="draftDialogContent"></div>
+  </dialog>
+
+  <dialog id="imageRepairDialog" class="review-dialog image-repair-dialog">
+    <form method="dialog" class="dialog-close-row"><button class="icon-button" value="cancel" aria-label="Close image repair">×</button></form>
+    <div id="imageRepairDialogContent"></div>
   </dialog>
 
   <div id="toastRoot" class="toast-root" aria-live="polite" aria-atomic="true"></div>
