@@ -271,6 +271,14 @@ source-documents
 
 Current private upload types include PDF, PNG, JPEG, WebP and versioned ScoreMore HTML import packages. HTML files remain admin-only and are never rendered or executed.
 
+Private student-safe image bucket:
+
+```text
+student-question-images
+```
+
+Only admins may upload, update or delete diagram-only crops. An authenticated student may sign an approved object only when its question belongs to one of that student's attempts. Repair metadata and lifecycle state are stored in `question_image_repairs`; the active approved reference is mirrored to `questions.student_image_refs` through audited admin-only RPCs.
+
 
 ## Phase 3B dry-run operations
 
