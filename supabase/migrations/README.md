@@ -43,3 +43,5 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260807010000_phase4a_dynamic_multifilter_test_builder.sql` adds the Phase 4A dynamic multi-filter test builder and protected preview/save workflows.
 
 - `20260807020000_mobile_test_runner_sections.sql` adds the protected complete attempt navigator, persisted visit state, authoritative server timer/auto-submit, dynamic section support and student-safe image boundary for the mobile test runner.
+
+- `20260808010000_student_safe_image_repair_centre.sql` adds the private approved-crop bucket, audited image-repair lifecycle, admin-only repair queue/RPCs and attempt-owned signed-image access without exposing raw source captures.
