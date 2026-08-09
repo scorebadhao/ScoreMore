@@ -45,3 +45,5 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260807020000_mobile_test_runner_sections.sql` adds the protected complete attempt navigator, persisted visit state, authoritative server timer/auto-submit, dynamic section support and student-safe image boundary for the mobile test runner.
 
 - `20260808010000_student_safe_image_repair_centre.sql` adds the private approved-crop bucket, audited image-repair lifecycle, admin-only repair queue/RPCs and attempt-owned signed-image access without exposing raw source captures.
+
+- `20260808020000_compulsory_student_image_readiness.sql` makes an audited visual-safety decision compulsory, filters unresolved questions from builders, guards test publication and new attempts, and supports the audited `NO_STUDENT_IMAGE_REQUIRED` decision.
