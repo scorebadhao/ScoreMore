@@ -246,16 +246,16 @@
         <section id="imageRepairSection" class="section panel-card image-repair-centre">
           <div class="section-heading image-repair-heading">
             <div>
-              <span class="eyebrow">Published visual questions · audited student crops</span>
+              <span class="eyebrow">Compulsory visual safety review · audited decisions</span>
               <h2>Student-safe Image Repair Centre</h2>
-              <p class="muted">Keep the original source capture for admin audit, then upload and approve only the diagram, figure or table students need.</p>
+              <p class="muted">Every published question with a source image must receive an approved safe crop or an audited “No student image required” decision before it can enter a test.</p>
             </div>
             <button id="refreshImageRepairs" class="button button-secondary" type="button">Refresh queue</button>
           </div>
 
           <div class="import-safety-note image-repair-safety">
-            <strong>Approval boundary</strong>
-            <span>A pending crop is never visible to students. Approval replaces <code>student_image_refs</code> through an admin-only RPC; raw <code>image_refs</code> remain private and unchanged.</span>
+            <strong>Compulsory readiness boundary</strong>
+            <span>Unresolved visual questions are excluded from Test Builders and block test publication or new attempts. Raw <code>image_refs</code> remain private and unchanged.</span>
           </div>
 
           <div id="imageRepairStats" class="image-repair-stats" aria-live="polite"></div>
@@ -269,6 +269,7 @@
                 <option value="NEEDS_REPAIR" selected>Needs repair</option>
                 <option value="PENDING">Pending approval</option>
                 <option value="APPROVED">Approved</option>
+                <option value="NO_IMAGE_REQUIRED">No student image required</option>
                 <option value="ALL">All visual questions</option>
               </select>
             </label>
@@ -294,7 +295,7 @@
             <div>
               <span class="eyebrow">Simple fixed-question builder</span>
               <h2>Test Builder</h2>
-              <p class="muted">Choose the test type, filter the published question bank, select questions, then save or publish. Master questions are linked, never copied.</p>
+              <p class="muted">Choose the test type, filter the student-ready published question bank, select questions, then save or publish. Master questions are linked, never copied.</p>
             </div>
             <div class="test-builder-heading-actions">
               <span id="testBuilderMode" class="status-pill status-draft">New test</span>
