@@ -39,4 +39,4 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 ## Mobile test runner
 
 - `MOBILE_TEST_RUNNER_SECTIONS.md` — protected complete navigation, dynamic section tabs, authoritative timer, mobile layout corrections and acceptance checklist.
-- `STUDENT_SAFE_IMAGE_REPAIR_CENTRE.md` — audited admin queue for diagram-only crops, private signed delivery, replacement/removal workflow and acceptance checklist.
+- `STUDENT_SAFE_IMAGE_REPAIR_CENTRE.md` — compulsory visual-question readiness, approved safe crops, audited no-image decisions, builder/publication/attempt enforcement and acceptance checklist.

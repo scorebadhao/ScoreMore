@@ -99,6 +99,16 @@ Phase 3A adds:
 - `loose_fingerprint`
 - `import_item_id`
 
+Student-image readiness fields:
+
+- `student_image_refs`
+- `student_image_review_status`
+- `student_image_reviewed_by`
+- `student_image_reviewed_at`
+- `student_image_review_note`
+
+Visual questions remain published master records but are not student-ready until an approved safe crop or a current audited `NO_STUDENT_IMAGE_REQUIRED` decision matches the source-image fingerprint.
+
 `content_fingerprint` is globally unique in the master table. Changing a Question ID or source paper cannot create a second master row with identical strict content.
 
 Options remain JSONB:
@@ -240,6 +250,12 @@ Admin content/test workflow:
 - `publish_draft_question(draft_id)`
 - `reject_draft_question(draft_id, notes)`
 - `save_fixed_question_test(...)`
+- `list_student_image_repair_queue(...)`
+- `get_student_image_repair_detail(question_id)`
+- `approve_student_image_repair(...)`
+- `mark_student_image_not_required(...)`
+- `reopen_student_image_review(...)`
+- `remove_approved_student_image(...)`
 
 Phase 3 import validation:
 
@@ -277,7 +293,9 @@ Private student-safe image bucket:
 student-question-images
 ```
 
-Only admins may upload, update or delete diagram-only crops. An authenticated student may sign an approved object only when its question belongs to one of that student's attempts. Repair metadata and lifecycle state are stored in `question_image_repairs`; the active approved reference is mirrored to `questions.student_image_refs` through audited admin-only RPCs.
+Only admins may upload, update or delete diagram-only crops. An authenticated student may sign an approved object only when its question belongs to one of that student's attempts. Repair metadata and lifecycle state are stored in `question_image_repairs`; audited crop/no-image decisions are stored in `question_image_review_decisions`; the active approved reference is mirrored to `questions.student_image_refs` through admin-only RPCs.
+
+The database readiness predicate is enforced by Test Builder filters, test-link guards, a deferred test-publication guard, the student catalogue policy and new-attempt materialization. Unresolved image questions are never silently skipped to shorten a test.
 
 
 ## Phase 3B dry-run operations
