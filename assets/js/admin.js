@@ -103,7 +103,7 @@ let imageRepairPage = 0;
 let imageRepairTotal = 0;
 let imageRepairHasMore = false;
 let imageRepairItems = [];
-let imageRepairSummary = { total_candidates: 0, needs_repair: 0, pending: 0, approved: 0 };
+let imageRepairSummary = { total_candidates: 0, needs_repair: 0, pending: 0, approved: 0, no_image_required: 0 };
 let activeRepairObjectUrl = '';
 
 function escapeHtml(value) {
@@ -479,6 +479,7 @@ function renderImageRepairStats() {
     ['Needs repair', imageRepairSummary.needs_repair || 0, 'needs-repair'],
     ['Pending approval', imageRepairSummary.pending || 0, 'pending'],
     ['Approved', imageRepairSummary.approved || 0, 'approved'],
+    ['No image required', imageRepairSummary.no_image_required || 0, 'no-image-required'],
   ];
   elements.imageRepairStats.innerHTML = cards.map(([label, value, status]) => `
     <button class="image-repair-stat" data-repair-stat="${status}" type="button">
@@ -487,7 +488,13 @@ function renderImageRepairStats() {
   `).join('');
   elements.imageRepairStats.querySelectorAll('[data-repair-stat]').forEach((button) => {
     button.addEventListener('click', () => {
-      const mapping = { all: 'ALL', 'needs-repair': 'NEEDS_REPAIR', pending: 'PENDING', approved: 'APPROVED' };
+      const mapping = {
+        all: 'ALL',
+        'needs-repair': 'NEEDS_REPAIR',
+        pending: 'PENDING',
+        approved: 'APPROVED',
+        'no-image-required': 'NO_IMAGE_REQUIRED',
+      };
       elements.imageRepairStatus.value = mapping[button.dataset.repairStat] || 'NEEDS_REPAIR';
       loadImageRepairQueue({ reset: true });
     });
@@ -535,8 +542,14 @@ function renderImageRepairQueue() {
             <span>${Number(item.student_image_count || 0)} student image${Number(item.student_image_count || 0) === 1 ? '' : 's'}</span>
           </div>
         </div>
-        <button class="button ${item.repair_status === 'APPROVED' ? 'button-secondary' : 'button-primary'}" data-open-image-repair="${escapeHtml(item.question_id)}" type="button">
-          ${item.repair_status === 'APPROVED' ? 'Inspect / replace' : item.repair_status === 'PENDING' ? 'Review crop' : 'Repair image'}
+        <button class="button ${['APPROVED', 'NO_IMAGE_REQUIRED'].includes(item.repair_status) ? 'button-secondary' : 'button-primary'}" data-open-image-repair="${escapeHtml(item.question_id)}" type="button">
+          ${item.repair_status === 'APPROVED'
+            ? 'Inspect / replace'
+            : item.repair_status === 'NO_IMAGE_REQUIRED'
+              ? 'Inspect decision'
+              : item.repair_status === 'PENDING'
+                ? 'Review crop'
+                : 'Complete review'}
         </button>
       </article>
     `;
@@ -608,6 +621,18 @@ function repairHistoryMarkup(repairs) {
   `).join('');
 }
 
+function decisionHistoryMarkup(decisions) {
+  if (!decisions.length) return '';
+  return decisions.map((decision) => `
+    <div class="image-repair-history-row image-decision-history-row">
+      <span class="image-repair-status status-${escapeHtml(String(decision.status).toLowerCase())}">${escapeHtml(decision.status)}</span>
+      <span>${escapeHtml(String(decision.decision || '').replaceAll('_', ' '))}</span>
+      <span>${escapeHtml(decision.admin_note || 'No note')}</span>
+      <span>${decision.decided_at ? escapeHtml(new Date(decision.decided_at).toLocaleString()) : '—'}</span>
+    </div>
+  `).join('');
+}
+
 async function completeImageRepairAction({ questionId, loadingText, successText, action }) {
   const loading = toast.loading(loadingText);
   try {
@@ -641,13 +666,24 @@ async function confirmImageRepairAction({ questionId, title, message, buttonLabe
 function renderImageRepairDetail(detail) {
   const question = detail.question || {};
   const repairs = Array.isArray(detail.repairs) ? detail.repairs : [];
+  const decisions = Array.isArray(detail.decisions) ? detail.decisions : [];
   const pending = repairs.find((repair) => repair.status === 'PENDING');
   const approved = repairs.find((repair) => repair.status === 'APPROVED');
+  const reviewStatus = question.student_image_review_status || 'NEEDS_REVIEW';
+  const noImageRequired = reviewStatus === 'NO_STUDENT_IMAGE_REQUIRED';
   const studentPreview = pending?.preview_url || approved?.preview_url || '';
-  const previewLabel = pending ? 'Pending candidate preview' : approved ? 'Current approved student image' : 'No student-safe crop';
+  const previewLabel = pending
+    ? 'Pending candidate preview'
+    : noImageRequired
+      ? 'Text and options only — no image required'
+      : approved
+        ? 'Current approved student image'
+        : 'Question blocked until review is completed';
   const options = question.options || {};
   const defaultAlt = pending?.alt_text || approved?.alt_text || `Diagram for ${question.question_id}`;
-  const defaultNote = pending?.admin_note || '';
+  const defaultNote = pending?.admin_note || question.student_image_review_note || '';
+  const visibleStatus = pending ? 'PENDING' : noImageRequired ? 'NO IMAGE REQUIRED' : approved ? 'APPROVED' : 'NEEDS REPAIR';
+  const visibleStatusClass = pending ? 'pending' : noImageRequired ? 'no-image-required' : approved ? 'approved' : 'needs-repair';
 
   elements.imageRepairDialogContent.innerHTML = `
     <div class="review-content image-repair-detail">
@@ -657,7 +693,7 @@ function renderImageRepairDetail(detail) {
           <h2>${escapeHtml(question.question_id)}</h2>
           <p class="muted">${escapeHtml(question.subject_name || question.subject_id || '')} · ${escapeHtml(question.section_code || 'No section')}</p>
         </div>
-        <span class="image-repair-status ${pending ? 'status-pending' : approved ? 'status-approved' : 'status-needs-repair'}">${pending ? 'PENDING APPROVAL' : approved ? 'APPROVED' : 'NEEDS REPAIR'}</span>
+        <span class="image-repair-status status-${visibleStatusClass}">${visibleStatus}</span>
       </div>
 
       <div class="image-repair-source-warning">
@@ -676,7 +712,9 @@ function renderImageRepairDetail(detail) {
         <div class="student-preview-question">${escapeHtml(question.question_text || '')}</div>
         ${studentPreview
           ? `<figure class="image-repair-preview-frame student-crop"><img src="${escapeHtml(safePreviewUrl(studentPreview))}" alt="${escapeHtml(defaultAlt)}" /></figure>`
-          : '<div class="question-image-review"><strong>Diagram temporarily hidden</strong><span>This is what students currently see.</span></div>'}
+          : noImageRequired
+            ? '<div class="student-no-image-decision"><strong>No student image required</strong><span>Students see the verified question text and options without an image or warning.</span></div>'
+            : '<div class="question-image-review"><strong>Question not student-ready</strong><span>New tests and attempts are blocked until this review is completed.</span></div>'}
         <div class="student-preview-options">
           ${['A','B','C','D'].map((key) => `<div><strong>${key}</strong><span>${escapeHtml(options[key] || '')}</span></div>`).join('')}
         </div>
@@ -699,12 +737,14 @@ function renderImageRepairDetail(detail) {
           ${pending ? `<button id="approveStudentImage" class="button button-primary" type="button" data-repair-id="${pending.repair_id}">Approve student image</button>` : ''}
           ${pending ? `<button id="discardStudentImage" class="button button-danger" type="button" data-repair-id="${pending.repair_id}">Discard pending</button>` : ''}
           ${approved ? '<button id="removeApprovedStudentImage" class="button button-danger" type="button">Remove approved image</button>' : ''}
+          ${!pending && !noImageRequired ? '<button id="markStudentImageNotRequired" class="button button-ghost" type="button">No student image required</button>' : ''}
+          ${noImageRequired ? '<button id="reopenStudentImageReview" class="button button-danger" type="button">Reopen image review</button>' : ''}
         </div>
       </form>
 
       <details class="image-repair-history">
-        <summary>Audit history (${repairs.length})</summary>
-        <div>${repairHistoryMarkup(repairs)}</div>
+        <summary>Audit history (${repairs.length + decisions.length})</summary>
+        <div>${decisionHistoryMarkup(decisions)}${repairHistoryMarkup(repairs)}</div>
       </details>
     </div>
   `;
@@ -779,6 +819,7 @@ function renderImageRepairDetail(detail) {
 
   elements.imageRepairDialogContent.querySelector('#removeApprovedStudentImage')?.addEventListener('click', () => {
     const adminNote = elements.imageRepairDialogContent.querySelector('#studentImageAdminNote')?.value;
+    if (String(adminNote || '').trim().length < 5) return toast.warning('Add a short reason before removing the approved image.');
     return confirmImageRepairAction({
       questionId: question.question_id,
       title: 'Remove the approved student image?',
@@ -787,6 +828,36 @@ function renderImageRepairDetail(detail) {
       loadingText: 'Removing the approved student image…',
       successText: 'Approved student image removed. The safe fallback is active again.',
       action: () => api.removeApprovedStudentImage({ questionId: question.question_id, adminNote }),
+    });
+  });
+
+  elements.imageRepairDialogContent.querySelector('#markStudentImageNotRequired')?.addEventListener('click', () => {
+    const adminNote = elements.imageRepairDialogContent.querySelector('#studentImageAdminNote')?.value;
+    if (String(adminNote || '').trim().length < 10) {
+      return toast.warning('Explain why the source capture is audit evidence and students do not need its image.');
+    }
+    return confirmImageRepairAction({
+      questionId: question.question_id,
+      title: 'Confirm that students need no image?',
+      message: 'Use this only when the raw source capture is audit evidence and the complete question can be answered from the verified text and options. This audited decision makes the question student-ready without displaying an image.',
+      buttonLabel: 'Confirm no image required',
+      loadingText: 'Recording the audited no-image decision…',
+      successText: 'Decision recorded. The question is now student-ready without an image.',
+      action: () => api.markStudentImageNotRequired({ questionId: question.question_id, adminNote }),
+    });
+  });
+
+  elements.imageRepairDialogContent.querySelector('#reopenStudentImageReview')?.addEventListener('click', () => {
+    const adminNote = elements.imageRepairDialogContent.querySelector('#studentImageAdminNote')?.value;
+    if (String(adminNote || '').trim().length < 5) return toast.warning('Add a reason for reopening this review.');
+    return confirmImageRepairAction({
+      questionId: question.question_id,
+      title: 'Reopen compulsory image review?',
+      message: 'The question will immediately become not student-ready. It will be removed from Test Builder results and new tests or attempts will be blocked until a safe crop is approved or a new no-image decision is recorded.',
+      buttonLabel: 'Reopen image review',
+      loadingText: 'Reopening compulsory image review…',
+      successText: 'Image review reopened. The question is blocked from new student use.',
+      action: () => api.reopenStudentImageReview({ questionId: question.question_id, adminNote }),
     });
   });
 }

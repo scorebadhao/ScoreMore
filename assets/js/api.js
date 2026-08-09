@@ -363,6 +363,11 @@ export const api = Object.freeze({
         subject_id, topic_id, language, difficulty, question_text, sort_order
       `)
       .eq('question_status', 'PUBLISHED')
+      .in('student_image_review_status', [
+        'NOT_APPLICABLE',
+        'SAFE_CROP_APPROVED',
+        'NO_STUDENT_IMAGE_REQUIRED',
+      ])
       .limit(Math.min(Math.max(Number(pageSize) || 100, 1), 500));
 
     if (boardId) query = query.eq('board_id', clean(boardId).toUpperCase());
@@ -620,6 +625,30 @@ export const api = Object.freeze({
     ), 'Unable to remove the approved student image.');
     const cleanupWarning = await removeStudentImageObject(client, result?.storage_path);
     return { ...result, cleanup_warning: cleanupWarning };
+  },
+
+  async markStudentImageNotRequired({ questionId, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('mark_student_image_not_required', {
+        p_question_id: clean(questionId)?.toUpperCase(),
+        p_admin_note: clean(adminNote),
+        p_confirmation: 'NO_STUDENT_IMAGE_REQUIRED',
+      }),
+    ), 'Unable to confirm that no student image is required.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
+  },
+
+  async reopenStudentImageReview({ questionId, adminNote = '' }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('reopen_student_image_review', {
+        p_question_id: clean(questionId)?.toUpperCase(),
+        p_admin_note: clean(adminNote),
+        p_confirmation: 'REOPEN_STUDENT_IMAGE_REVIEW',
+      }),
+    ), 'Unable to reopen student-image review.');
   },
 
   async getPhase4ATestBuilderFacets(filters = {}) {
