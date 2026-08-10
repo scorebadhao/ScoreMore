@@ -1,0 +1,14 @@
+{
+  "patch": "4",
+  "name": "RankTiger PROD Connection Verification",
+  "base": "Verified Patch 3",
+  "databaseMigrationRequired": false,
+  "databaseWritesEnabled": false,
+  "productionDeploymentEnabled": false,
+  "rankTigerRepositoryPushEnabled": false,
+  "cloudflareRequired": false,
+  "newWorkflow": ".github/workflows/verify-ranktiger-prod.yml",
+  "manualWorkflowOnly": true,
+  "workflowConfirmation": "VERIFY_RANKTIGER_PROD",
+  "notes": "Verifies RankTiger PROD credentials and read connectivity only. No migration or seed is applied."
+}

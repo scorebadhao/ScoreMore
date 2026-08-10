@@ -1,0 +1,26 @@
+SCOREMORE PATCH 4 — RANKTIGER PROD CONNECTION VERIFICATION
+
+STATUS: SAFE / NON-MIGRATING
+
+Adds one manual GitHub Action:
+  Verify RankTiger PROD Connection — READ ONLY
+
+Exact confirmation:
+  VERIFY_RANKTIGER_PROD
+
+This workflow verifies:
+- RankTiger project ID and URL agree
+- RankTiger is not the locked ScoreMore DEV project
+- existing Supabase access token can see RankTiger
+- RankTiger publishable key reaches the Data API
+- RankTiger database password can link the Supabase CLI
+- remote migration status can be read
+
+This workflow DOES NOT:
+- apply migrations
+- seed data
+- reset the database
+- update RankTiger GitHub
+- deploy Cloudflare
+
+After upload, do not run database initialization. First run this verification workflow only after ChatGPT confirms the uploaded workflow is visible.
