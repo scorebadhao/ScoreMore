@@ -1,0 +1,93 @@
+name: Prepare RankTiger Release Candidate — SAFE NO DEPLOY
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Candidate version, for example 1.0.0-rc.1'
+        required: true
+        type: string
+      confirmation:
+        description: 'Type PREPARE_RANKTIGER_RC exactly. This prepares an artifact only; it does NOT deploy.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-ranktiger-release-candidate
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Safety gate
+        shell: bash
+        run: |
+          if [ "${{ inputs.confirmation }}" != "PREPARE_RANKTIGER_RC" ]; then
+            echo "Blocked: confirmation must be PREPARE_RANKTIGER_RC"
+            exit 1
+          fi
+
+      - name: Checkout approved ScoreMore source
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Require dependency lock before any production candidate
+        shell: bash
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "Blocked safely: package-lock.json does not exist yet."
+            echo "Patch 3 intentionally refuses to create a production candidate without locked dependencies."
+            exit 1
+          fi
+
+      - name: Require future RankTiger PROD public environment secrets
+        shell: bash
+        env:
+          RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
+          RANKTIGER_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.RANKTIGER_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$RANKTIGER_SUPABASE_URL" ] || [ -z "$RANKTIGER_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "Blocked safely: RankTiger PROD browser-safe Supabase secrets are not configured yet."
+            echo "No production system has been touched."
+            exit 1
+          fi
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify ScoreMore → RankTiger release foundation
+        run: npm run verify:patch3
+
+      - name: Build RankTiger production target
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.RANKTIGER_SUPABASE_PUBLISHABLE_KEY }}
+        run: npm run build:ranktiger
+
+      - name: Package candidate release
+        env:
+          RANKTIGER_RELEASE_VERSION: ${{ inputs.release_version }}
+        run: npm run package:ranktiger
+
+      - name: Upload RankTiger release-candidate artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ranktiger-${{ inputs.release_version }}-${{ github.sha }}
+          path: release/ranktiger
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Confirm no production deployment occurred
+        run: |
+          echo "RankTiger release candidate prepared as a GitHub artifact only."
+          echo "RankTiger repository push: DISABLED in Patch 3."
+          echo "RankTiger PROD database migration: DISABLED in Patch 3."
+          echo "Cloudflare production deployment: NOT CONFIGURED in Patch 3."
