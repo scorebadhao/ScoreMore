@@ -4,8 +4,10 @@ import crypto from 'node:crypto';
 
 const root = process.cwd();
 const workflowPath = path.join(root, '.github', 'workflows', 'initialize-ranktiger-prod-db.yml');
-const checksumPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH3.json');
-const seedPath = path.join(root, 'supabase', 'seed.sql');
+const patch3LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH3.json');
+const patch51LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH5_1.json');
+const catalogueMigrationName = '20260811020000_public_catalogue_baseline.sql';
+const catalogueMigrationPath = path.join(root, 'supabase', 'migrations', catalogueMigrationName);
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -16,14 +18,15 @@ function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-for (const required of [workflowPath, checksumPath, seedPath]) {
-  if (!fs.existsSync(required)) fail(`Missing required Patch 5 file: ${path.relative(root, required)}`);
+for (const required of [workflowPath, patch3LockPath, patch51LockPath, catalogueMigrationPath]) {
+  if (!fs.existsSync(required)) fail(`Missing required Patch 5.1 file: ${path.relative(root, required)}`);
 }
 if (process.exitCode) process.exit();
 
 const workflow = fs.readFileSync(workflowPath, 'utf8');
-const seed = fs.readFileSync(seedPath, 'utf8');
-const locked = JSON.parse(fs.readFileSync(checksumPath, 'utf8'));
+const catalogue = fs.readFileSync(catalogueMigrationPath, 'utf8');
+const patch3Locked = JSON.parse(fs.readFileSync(patch3LockPath, 'utf8'));
+const patch51Locked = JSON.parse(fs.readFileSync(patch51LockPath, 'utf8'));
 
 const requiredWorkflowFragments = [
   'INITIALIZE_RANKTIGER_PROD',
@@ -32,16 +35,18 @@ const requiredWorkflowFragments = [
   'RANKTIGER_SUPABASE_URL',
   'RANKTIGER_SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_ACCESS_TOKEN',
-  'supabase db push --dry-run --include-seed',
-  'supabase db push --include-seed',
+  'supabase db push --dry-run',
+  'supabase db push --yes',
   'supabase migration list --linked',
+  'LOCKED_MIGRATION_CHECKSUMS_PATCH5_1.json',
   'verify-ranktiger-prod-database-init.mjs',
 ];
 for (const fragment of requiredWorkflowFragments) {
-  if (!workflow.includes(fragment)) fail(`Patch 5 workflow is missing required safety/apply fragment: ${fragment}`);
+  if (!workflow.includes(fragment)) fail(`Patch 5.1 workflow is missing required safety/apply fragment: ${fragment}`);
 }
 
 const forbiddenWorkflowPatterns = [
+  /--include-seed/i,
   /supabase\s+db\s+reset/i,
   /supabase\s+migration\s+(repair|down)/i,
   /git\s+push/i,
@@ -51,10 +56,9 @@ const forbiddenWorkflowPatterns = [
   /sb_secret_/i,
 ];
 for (const pattern of forbiddenWorkflowPatterns) {
-  if (pattern.test(workflow)) fail(`Patch 5 workflow contains forbidden operation/pattern: ${pattern}`);
+  if (pattern.test(workflow)) fail(`Patch 5.1 workflow contains forbidden operation/pattern: ${pattern}`);
 }
 
-// The only shared ScoreMore secret allowed in the PROD workflow is the account-level access token.
 const forbiddenDevSecrets = [
   'secrets.SUPABASE_DB_PASSWORD',
   'secrets.SUPABASE_PROJECT_ID',
@@ -62,32 +66,42 @@ const forbiddenDevSecrets = [
   'secrets.VITE_SUPABASE_PUBLISHABLE_KEY',
 ];
 for (const secret of forbiddenDevSecrets) {
-  if (workflow.includes(secret)) fail(`Patch 5 workflow must not reference ScoreMore DEV secret: ${secret}`);
+  if (workflow.includes(secret)) fail(`Patch 5.1 workflow must not reference ScoreMore DEV secret: ${secret}`);
 }
 
-// Existing migration history is immutable.
-const migrations = locked?.migrations ?? {};
-const names = Object.keys(migrations);
-if (names.length !== 18) fail(`Expected 18 locked migrations, found ${names.length}.`);
-for (const [name, expected] of Object.entries(migrations)) {
+// Patch 3's original 18 migrations are immutable.
+const original = patch3Locked?.migrations ?? {};
+if (Object.keys(original).length !== 18) fail(`Expected 18 Patch 3 historical migrations, found ${Object.keys(original).length}.`);
+for (const [name, expected] of Object.entries(original)) {
   const filePath = path.join(root, 'supabase', 'migrations', name);
   if (!fs.existsSync(filePath)) {
-    fail(`Locked migration is missing: ${name}`);
+    fail(`Historical migration is missing: ${name}`);
     continue;
   }
-  const actual = sha256(filePath);
-  if (actual !== expected) fail(`Locked migration checksum mismatch: ${name}`);
+  if (sha256(filePath) !== expected) fail(`Historical migration checksum mismatch: ${name}`);
 }
 
-// Seed is deliberately narrow: catalogue + public app content only.
-const approvedSeedTables = new Set(['boards', 'exams', 'subjects', 'topics', 'app_settings']);
-const insertTargets = [...seed.matchAll(/insert\s+into\s+(?:public\.)?([a-zA-Z0-9_]+)/gi)].map((m) => m[1].toLowerCase());
-if (!insertTargets.length) fail('seed.sql contains no INSERT targets.');
+// Patch 5.1 locks the complete approved migration set including catalogue baseline.
+const approved = patch51Locked?.migrations ?? {};
+if (Object.keys(approved).length !== 19) fail(`Expected 19 Patch 5.1 approved migrations, found ${Object.keys(approved).length}.`);
+for (const [name, expected] of Object.entries(approved)) {
+  const filePath = path.join(root, 'supabase', 'migrations', name);
+  if (!fs.existsSync(filePath)) {
+    fail(`Patch 5.1 approved migration is missing: ${name}`);
+    continue;
+  }
+  if (sha256(filePath) !== expected) fail(`Patch 5.1 migration checksum mismatch: ${name}`);
+}
+
+// Production reference data is now a versioned migration, never supabase seed.
+const approvedCatalogueTables = new Set(['boards', 'exams', 'subjects', 'topics', 'app_settings']);
+const insertTargets = [...catalogue.matchAll(/insert\s+into\s+(?:public\.)?([a-zA-Z0-9_]+)/gi)].map((m) => m[1].toLowerCase());
+if (!insertTargets.length) fail('Public catalogue migration contains no INSERT targets.');
 for (const target of new Set(insertTargets)) {
-  if (!approvedSeedTables.has(target)) fail(`Production seed writes to non-approved table: ${target}`);
+  if (!approvedCatalogueTables.has(target)) fail(`Public catalogue migration writes to non-approved table: ${target}`);
 }
 
-const forbiddenSeedTerms = [
+const forbiddenCatalogueTerms = [
   /['"]app_name['"]/i,
   /['"]app_mark['"]/i,
   /['"]app_environment['"]/i,
@@ -96,11 +110,12 @@ const forbiddenSeedTerms = [
   /service_role/i,
   /sb_secret_/i,
 ];
-for (const pattern of forbiddenSeedTerms) {
-  if (pattern.test(seed)) fail(`Production seed contains forbidden identity/test/user pattern: ${pattern}`);
+for (const pattern of forbiddenCatalogueTerms) {
+  if (pattern.test(catalogue)) fail(`Public catalogue migration contains forbidden identity/test/user pattern: ${pattern}`);
 }
 
 if (process.exitCode) process.exit();
-console.log('PASS: Patch 5 RankTiger PROD database initialization workflow is guarded and production seed is narrow/safe.');
-console.log(`PASS: ${names.length} locked historical migration checksums match.`);
-console.log(`PASS: production seed targets only: ${[...new Set(insertTargets)].sort().join(', ')}`);
+console.log('PASS: Patch 5.1 RankTiger PROD database initialization is migration-only; production seed execution is forbidden.');
+console.log('PASS: 18 historical migrations remain unchanged.');
+console.log('PASS: 19 approved migrations are locked for RankTiger PROD initialization.');
+console.log(`PASS: versioned catalogue baseline targets only: ${[...new Set(insertTargets)].sort().join(', ')}`);
