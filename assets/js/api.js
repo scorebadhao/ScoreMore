@@ -1,12 +1,12 @@
-import { APP_CONFIG } from './config.js';
+import { APP_CONFIG, brandRuntimeText } from './config.js';
 import { requireSupabase } from './supabaseClient.js';
 
 function normalizeError(error, fallback = 'Something went wrong.') {
   if (!error) return new Error(fallback);
   const message = error.message || error.error_description || error.details || fallback;
-  const normalized = new Error(message);
+  const normalized = new Error(brandRuntimeText(message, fallback));
   normalized.code = error.code || 'UNKNOWN_ERROR';
-  normalized.details = error.details || '';
+  normalized.details = brandRuntimeText(error.details || '');
   return normalized;
 }
 

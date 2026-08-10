@@ -1,10 +1,10 @@
-import { APP_CONFIG, isConfigured } from './config.js';
+import { APP_CONFIG, isConfigured, resolvePublicSettings } from './config.js';
 import { api } from './api.js';
 import { navigate, startRouter, subscribeRoute } from './router.js';
 import { mountTestEngine } from './testEngine.js';
 import { toast } from './toast.js';
 
-const PENDING_TEST_KEY = 'scoremore:pending-test-id';
+const PENDING_TEST_KEY = `${APP_CONFIG.cacheVersion}:pending-test-id`;
 const TEST_PAGE_SIZE = 12;
 const SAVED_PAGE_SIZE = 20;
 const RESULT_PAGE_SIZE = 12;
@@ -142,9 +142,9 @@ function redirectToLanding(reason = 'signin') {
 async function loadBrand() {
   try {
     const config = await api.getPublicConfiguration();
-    const settings = config.settings || {};
-    input('brandName').textContent = APP_CONFIG.name;
-    input('brandTagline').textContent = settings.app_tagline || APP_CONFIG.tagline;
+    const settings = resolvePublicSettings(config.settings || {});
+    input('brandName').textContent = settings.appName;
+    input('brandTagline').textContent = settings.tagline;
   } catch (error) {
     toast.warning(error.message);
   }

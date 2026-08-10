@@ -1,9 +1,9 @@
-import { APP_CONFIG, isConfigured } from './config.js';
+import { APP_CONFIG, isConfigured, resolvePublicSettings } from './config.js';
 import { api } from './api.js';
 import { bindAuthTabs, bindStudentAuth } from './auth.js';
 import { toast } from './toast.js';
 
-const PENDING_TEST_KEY = 'scoremore:pending-test-id';
+const PENDING_TEST_KEY = `${APP_CONFIG.cacheVersion}:pending-test-id`;
 
 const elements = {
   setupNotice: document.getElementById('setupNotice'),
@@ -187,12 +187,12 @@ function renderScopes(config) {
 
 async function loadPublicConfiguration() {
   publicConfig = await api.getPublicConfiguration();
-  const settings = publicConfig.settings || {};
-  document.getElementById('brandName').textContent = APP_CONFIG.name;
-  document.getElementById('brandTagline').textContent = settings.app_tagline || APP_CONFIG.tagline;
-  document.getElementById('scopeBadge').textContent = settings.scope_badge || 'Dynamic exam platform';
-  document.getElementById('heroTitle').textContent = settings.hero_title || 'Prepare Smarter';
-  document.getElementById('heroSubtitle').textContent = settings.hero_subtitle || 'Previous-year questions, sectional practice and meaningful analytics.';
+  const settings = resolvePublicSettings(publicConfig.settings || {});
+  document.getElementById('brandName').textContent = settings.appName;
+  document.getElementById('brandTagline').textContent = settings.tagline;
+  document.getElementById('scopeBadge').textContent = settings.scopeBadge;
+  document.getElementById('heroTitle').textContent = settings.heroTitle;
+  document.getElementById('heroSubtitle').textContent = settings.heroSubtitle;
   const stats = publicConfig.stats || {};
   document.getElementById('statQuestions').textContent = stats.published_questions ?? 0;
   document.getElementById('statPapers').textContent = stats.pyq_papers ?? 0;
