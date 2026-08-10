@@ -298,6 +298,27 @@ Only admins may upload, update or delete diagram-only crops. An authenticated st
 The database readiness predicate is enforced by Test Builder filters, test-link guards, a deferred test-publication guard, the student catalogue policy and new-attempt materialization. Unresolved image questions are never silently skipped to shorten a test.
 
 
+## Student Hub v1 protected operations
+
+The Student Hub reads learning data through security-definer RPCs scoped to `auth.uid()`:
+
+- `get_student_home()` — dashboard summary, active attempt, recent results, weak subject, recommendation and package summary
+- `get_student_test_facets()` — dynamic catalogue filter values
+- `list_student_tests()` — server search, filtering, sorting, pagination, access and attempt state
+- `get_attempt_bookmarks()` — bookmark state for one owned attempt
+- `set_student_bookmark()` — validated save/remove action for a question from an owned attempt
+- `list_student_saved()` — Bookmarks or Mistake Book with answer protection and approved images only
+- `set_student_mistake_resolved()` — controlled resolved/unresolved state
+- `list_student_results()` — submitted-attempt history
+- `get_student_result_detail()` — server-calculated subject/topic/difficulty/timing analytics
+- `get_attempt_review()` — submitted-attempt-only question review with approved images
+- `get_student_profile()` — protected identity, learning preferences and account statistics
+- `update_student_profile()` — full name, language, target board and target exam only
+
+Direct authenticated browser writes to `bookmarks`, `mistake_book` and `profiles` are revoked. Email, mobile, role and authorization data cannot be updated through Student Hub.
+
+Saved answers and explanations are returned only when the student has a submitted occurrence of the question and no `IN_PROGRESS` attempt for that student currently contains it.
+
 ## Phase 3B dry-run operations
 
 ### `stage_import_dry_run()`

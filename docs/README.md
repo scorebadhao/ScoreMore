@@ -8,6 +8,7 @@
 - `UI_PARITY_SCOREBADHAO.md` — approved UX reference boundaries
 - `MIGRATION_MAPPING_SCOREBADHAO.md` — manual compatibility mapping only
 - `SETUP.md` — Supabase and deployment setup
+- `STUDENT_HUB_V1.md` — protected Home, Tests, Saved, Results and Profile implementation and acceptance checklist
 
 - `PHASE3B_ACCEPTANCE_TESTS.md` — safe parser, exact re-import and reconciliation verification.
 
@@ -40,3 +41,7 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 
 - `MOBILE_TEST_RUNNER_SECTIONS.md` — protected complete navigation, dynamic section tabs, authoritative timer, mobile layout corrections and acceptance checklist.
 - `STUDENT_SAFE_IMAGE_REPAIR_CENTRE.md` — compulsory visual-question readiness, approved safe crops, audited no-image decisions, builder/publication/attempt enforcement and acceptance checklist.
+
+## Student Hub v1
+
+- `STUDENT_HUB_V1.md` — five-section student navigation, server-side catalogue, active-attempt answer protection, result analytics, safe profile editing and deployment order.

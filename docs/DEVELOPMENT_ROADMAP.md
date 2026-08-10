@@ -32,7 +32,7 @@ Acceptance:
 - Student dashboard and catalogue remain fully authenticated and refresh safe.
 - Existing test start/resume/save/submit behaviour remains connected to Supabase.
 - Admin question and test workflows remain unaffected.
-- Results history and Mistake Revision stay deferred to Phase 5.
+- Results history and Mistake Revision were completed in Student Hub v1.
 
 ### Phase 3 — Accurate validated HTML import engine
 
@@ -112,14 +112,24 @@ Acceptance before Phase 3D:
 - Reuse each published master question for the original paper, sectional tests and topic practice.
 - Do not duplicate master question rows.
 
-### Phase 5 — Results and Mistake Revision
+### Phase 5 — ScoreMore Student Hub v1 — COMPLETED
 
-- Results history
-- Detailed attempt review
-- Improved result summary
-- Mistake Revision list
-- Automatic resolved/unresolved status
-- Secure student-only RPC functions
+- [x] Home metrics, active-attempt resume, recent results and recommendations
+- [x] Server-filtered Tests catalogue with Start, Resume and Reattempt states
+- [x] Saved workspace containing Bookmarks and Mistake Book
+- [x] Active-attempt answer and explanation protection
+- [x] Result history, analytics and detailed submitted-attempt review
+- [x] Automatic Mistake Book insertion and controlled resolved/unresolved state
+- [x] Safe profile editing with protected mobile, email and role
+- [x] Approved student-safe image delivery only
+- [x] Secure student-only RPC functions and cross-user denial
+
+Acceptance:
+
+- All five bottom-navigation routes work with mobile-back navigation.
+- Direct bookmark, mistake and profile browser-write bypasses are revoked.
+- Result review is submitted-attempt only.
+- Existing mobile runner, offline answer queue, timer and server scoring pass regression.
 
 ---
 
@@ -152,10 +162,10 @@ Acceptance before Phase 3D:
 
 ### Learning and analytics
 
-- Bookmarks
-- Mistake practice generation
-- Subject/topic/difficulty analysis
-- Time analysis
+- Bookmarks — completed in Student Hub v1
+- Mistake review and configured revision-test launch — completed in Student Hub v1
+- Subject/topic/difficulty analysis — completed in Student Hub v1
+- Time analysis — completed in Student Hub v1
 - Rank, percentile and readiness score
 
 ### Commercial readiness
