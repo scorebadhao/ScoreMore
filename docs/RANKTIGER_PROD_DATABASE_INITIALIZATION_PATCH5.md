@@ -1,70 +1,42 @@
-# RankTiger PROD Database Initialization — Patch 5
+# RankTiger PROD Database Initialization — Patch 5.1
 
-Status: guarded production-write foundation.
+Patch 5.1 is the production-safe correction to Patch 5.
 
-## Purpose
+## Production rule
+RankTiger PROD is initialized and updated with **versioned migrations only**.
+The production workflow must never run `supabase db push --include-seed`.
 
-Patch 5 introduces the first workflow that is allowed to write to the separate `RANKTIGER_PROD` Supabase project.
+The shared `supabase/seed.sql` remains for ScoreMore DEV/local reset workflows. Approved baseline reference content for production is captured as an idempotent migration:
 
-The workflow is intentionally limited to:
+`supabase/migrations/20260811020000_public_catalogue_baseline.sql`
 
-1. re-verifying the RankTiger target and credentials,
-2. validating immutable migration checksums,
-3. validating the narrow shared production-safe seed,
-4. previewing pending migrations,
-5. applying migrations in Supabase migration order,
-6. applying the shared catalogue/settings seed,
-7. verifying remote migration history,
-8. verifying seeded public catalogue/settings data through the RankTiger Data API.
+The catalogue migration is restricted to:
+- boards
+- exams
+- subjects
+- topics
+- app_settings
 
-It does **not** deploy frontend code, push to the RankTiger GitHub repository, or trigger Cloudflare.
+It contains no users, questions, tests, attempts, payments, access grants, admin data, or product-identity keys (`app_name`, `app_mark`, `app_environment`).
 
-## Manual workflow
-
+## Guarded production workflow
 `.github/workflows/initialize-ranktiger-prod-db.yml`
 
-Workflow name:
-
-`Initialize / Update RankTiger PROD Database — GUARDED`
-
 Required confirmation:
-
 `INITIALIZE_RANKTIGER_PROD`
 
-## Production credentials
+Sequence:
+1. Confirmation gate
+2. Verify workflow and migration locks
+3. Require RankTiger PROD credentials
+4. Block ScoreMore DEV target
+5. Cross-check RankTiger URL/project ID
+6. Verify account token and publishable key
+7. Link RankTiger PROD
+8. Read current migration status
+9. `supabase db push --dry-run`
+10. `supabase db push --yes`
+11. Verify all 19 approved migrations remotely
+12. Verify baseline public catalogue through the RankTiger Data API
 
-The workflow consumes these GitHub repository secrets from the ScoreMore repository:
-
-- `SUPABASE_ACCESS_TOKEN` — account-level CLI token already used by ScoreMore.
-- `RANKTIGER_SUPABASE_PROJECT_ID`
-- `RANKTIGER_SUPABASE_DB_PASSWORD`
-- `RANKTIGER_SUPABASE_URL`
-- `RANKTIGER_SUPABASE_PUBLISHABLE_KEY`
-
-It must not use ScoreMore DEV database/project/browser secrets.
-
-## Migration immutability
-
-All 18 migrations locked in `docs/LOCKED_MIGRATION_CHECKSUMS_PATCH3.json` remain immutable. Patch 5 verifies each SHA-256 before allowing the production database push.
-
-Future database changes must be new migration files; historical migrations must not be edited.
-
-## Production-safe seed
-
-The shared `supabase/seed.sql` is permitted to write only to:
-
-- `boards`
-- `exams`
-- `subjects`
-- `topics`
-- `app_settings`
-
-It must not seed students/users, questions, drafts, tests, attempts, payments, or admin data. Product identity remains build-controlled and `app_name`, `app_mark`, and `app_environment` are forbidden in the shared seed.
-
-## Post-deploy checks
-
-After a successful push, the workflow checks all locked migration versions are present remotely and verifies the expected seeded `GSSSB` board, `CCE` exam, and `hero_title` setting through the public RankTiger Data API using the RankTiger publishable key.
-
-## Important
-
-This workflow writes to production. Run it only after the read-only `Verify RankTiger PROD Connection — READ ONLY` workflow passes and only when the intended ScoreMore source revision is approved for database deployment.
+The workflow does not deploy the frontend, update the RankTiger repository, or trigger Cloudflare.
