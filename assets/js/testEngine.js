@@ -105,7 +105,7 @@ function formatTimer(totalSeconds) {
     : `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 }
 
-export async function mountTestEngine(root, attemptId, { onExit } = {}) {
+export async function mountTestEngine(root, attemptId, { onExit, onViewResult } = {}) {
   if (!root) throw new Error('Test engine root was not found.');
 
   const state = {
@@ -116,6 +116,7 @@ export async function mountTestEngine(root, attemptId, { onExit } = {}) {
     sections: [],
     lastIndexBySection: new Map(),
     visited: new Set(),
+    bookmarks: new Set(),
     currentIndex: 0,
     questionStartedAt: Date.now(),
     deadlineEpoch: null,
@@ -453,6 +454,7 @@ export async function mountTestEngine(root, attemptId, { onExit } = {}) {
     const section = currentSection();
     const sectionCounts = statusCounts(section?.items || []);
     const disabled = state.expired || state.submitting ? 'disabled' : '';
+    const bookmarked = state.bookmarks.has(question.question_id);
 
     root.innerHTML = `
       <article class="test-workspace">
@@ -490,6 +492,9 @@ export async function mountTestEngine(root, attemptId, { onExit } = {}) {
             </div>
             <div class="question-tools">
               <button id="clearResponse" class="text-button" ${answer.selectedAnswer && !state.expired ? '' : 'disabled'} type="button">Clear response</button>
+              <button id="bookmarkQuestion" class="button ${bookmarked ? 'button-primary bookmark-active' : 'button-ghost'}" type="button" aria-pressed="${bookmarked}">
+                <svg class="icon"><use href="#i-bookmark"></use></svg><span>${bookmarked ? 'Saved' : 'Save question'}</span>
+              </button>
               <button id="markReview" class="button ${answer.markedReview ? 'button-warning' : 'button-ghost'}" ${disabled} type="button">
                 <svg class="icon"><use href="#i-flag"></use></svg><span>${answer.markedReview ? 'Marked for review' : 'Mark for review'}</span>
               </button>
@@ -541,6 +546,7 @@ export async function mountTestEngine(root, attemptId, { onExit } = {}) {
     root.querySelector('#nextQuestion')?.addEventListener('click', () => move(1));
     root.querySelector('#engineExit')?.addEventListener('click', exitEngine);
     root.querySelector('#clearResponse')?.addEventListener('click', () => persistAnswer(question, null, answerState(question).markedReview));
+    root.querySelector('#bookmarkQuestion')?.addEventListener('click', () => toggleBookmark(question));
     root.querySelector('#markReview')?.addEventListener('click', () => {
       const current = answerState(question);
       persistAnswer(question, current.selectedAnswer, !current.markedReview);
@@ -549,6 +555,26 @@ export async function mountTestEngine(root, attemptId, { onExit } = {}) {
 
     root.querySelector('.test-section-tab.active')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     updateTimerDisplay();
+  }
+
+  async function toggleBookmark(question) {
+    const nextSaved = !state.bookmarks.has(question.question_id);
+    const button = root.querySelector('#bookmarkQuestion');
+    if (button) button.disabled = true;
+    try {
+      await api.setStudentBookmark({
+        questionId: question.question_id,
+        attemptId,
+        saved: nextSaved,
+      });
+      if (nextSaved) state.bookmarks.add(question.question_id);
+      else state.bookmarks.delete(question.question_id);
+      toast.success(nextSaved ? 'Question saved for revision.' : 'Bookmark removed.');
+      renderQuestion();
+    } catch (error) {
+      if (button) button.disabled = false;
+      toast.error(error.message);
+    }
   }
 
   async function persistAnswer(question, selectedAnswer, markedReview) {
@@ -750,13 +776,17 @@ export async function mountTestEngine(root, attemptId, { onExit } = {}) {
           <span>Detailed review: Phase 5</span>
         </div>
         <div class="button-row">
-          <button id="resultExit" class="button button-primary" type="button">Back to tests</button>
-          <button id="resultHome" class="button button-ghost" type="button">Dashboard</button>
+          <button id="resultReview" class="button button-primary" type="button">View detailed result</button>
+          <button id="resultExit" class="button button-ghost" type="button">Back to tests</button>
         </div>
       </article>
     `;
     root.querySelector('#resultExit')?.addEventListener('click', exitEngine);
-    root.querySelector('#resultHome')?.addEventListener('click', exitEngine);
+    root.querySelector('#resultReview')?.addEventListener('click', () => {
+      destroy();
+      if (onViewResult) onViewResult(attemptId);
+      else onExit?.();
+    });
   }
 
   async function refreshNavigation() {
@@ -821,6 +851,9 @@ export async function mountTestEngine(root, attemptId, { onExit } = {}) {
     renderLoading('Opening your test…');
     await flushQueue({ attemptId });
     state.attempt = await api.getAttempt(attemptId);
+    if (api.getAttemptBookmarks) {
+      state.bookmarks = new Set(await api.getAttemptBookmarks(attemptId));
+    }
 
     if (state.attempt.status !== 'IN_PROGRESS') {
       await showFinalAttempt();

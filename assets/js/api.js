@@ -182,6 +182,148 @@ export const api = Object.freeze({
     return data;
   },
 
+  async getStudentHome() {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_student_home'),
+    ), 'Unable to load your student dashboard.') || {};
+  },
+
+  async getStudentTestFacets() {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_student_test_facets'),
+    ), 'Unable to load test filters.') || {};
+  },
+
+  async listStudentTests({
+    testType = '',
+    search = '',
+    subjectId = '',
+    topicId = '',
+    examYear = '',
+    examDate = '',
+    shiftNo = '',
+    access = 'ALL',
+    progress = 'ALL',
+    sort = 'RECOMMENDED',
+    page = 0,
+    pageSize = 12,
+  } = {}) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('list_student_tests', {
+        p_test_type: clean(testType) || null,
+        p_search: clean(search) || null,
+        p_subject_id: clean(subjectId) || null,
+        p_topic_id: clean(topicId) || null,
+        p_exam_year: examYear === '' || examYear === null ? null : Number(examYear),
+        p_exam_date: clean(examDate) || null,
+        p_shift_no: shiftNo === '' || shiftNo === null ? null : Number(shiftNo),
+        p_access: clean(access) || 'ALL',
+        p_progress: clean(progress) || 'ALL',
+        p_sort: clean(sort) || 'RECOMMENDED',
+        p_page: Math.max(0, Number(page) || 0),
+        p_page_size: Math.min(Math.max(Number(pageSize) || 12, 1), 50),
+      }),
+    ), 'Unable to load tests.') || { items: [], total: 0, page: 0, has_more: false };
+  },
+
+  async getAttemptBookmarks(attemptId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_attempt_bookmarks', { p_attempt_id: attemptId }),
+    ), 'Unable to load saved-question state.') || [];
+  },
+
+  async setStudentBookmark({ questionId, attemptId = null, saved = true }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('set_student_bookmark', {
+        p_question_id: questionId,
+        p_attempt_id: attemptId,
+        p_saved: Boolean(saved),
+      }),
+    ), saved ? 'Unable to save this question.' : 'Unable to remove this bookmark.');
+  },
+
+  async listStudentSaved({
+    kind = 'BOOKMARKS',
+    search = '',
+    subjectId = '',
+    topicId = '',
+    status = 'ALL',
+    offset = 0,
+    limit = 20,
+  } = {}) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('list_student_saved', {
+        p_kind: clean(kind) || 'BOOKMARKS',
+        p_search: clean(search) || null,
+        p_subject_id: clean(subjectId) || null,
+        p_topic_id: clean(topicId) || null,
+        p_status: clean(status) || 'ALL',
+        p_offset: Math.max(0, Number(offset) || 0),
+        p_limit: Math.min(Math.max(Number(limit) || 20, 1), 50),
+      }),
+    ), 'Unable to load saved questions.') || { items: [], total: 0, has_more: false };
+
+    result.items = await Promise.all((result.items || []).map(async (item) => ({
+      ...item,
+      image_refs: await resolveStorageImageRefs(client, item.image_refs, { blockedOnFailure: true }),
+    })));
+    return result;
+  },
+
+  async setMistakeResolved(questionId, resolved = true) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('set_student_mistake_resolved', {
+        p_question_id: questionId,
+        p_resolved: Boolean(resolved),
+      }),
+    ), 'Unable to update this mistake.');
+  },
+
+  async listStudentResults({ search = '', sort = 'NEWEST', page = 0, pageSize = 12 } = {}) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('list_student_results', {
+        p_search: clean(search) || null,
+        p_sort: clean(sort) || 'NEWEST',
+        p_page: Math.max(0, Number(page) || 0),
+        p_page_size: Math.min(Math.max(Number(pageSize) || 12, 1), 50),
+      }),
+    ), 'Unable to load result history.') || { items: [], total: 0, page: 0, has_more: false };
+  },
+
+  async getStudentResultDetail(attemptId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_student_result_detail', { p_attempt_id: attemptId }),
+    ), 'Unable to load result analytics.') || {};
+  },
+
+  async getStudentProfile() {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_student_profile'),
+    ), 'Unable to load your profile.') || {};
+  },
+
+  async updateStudentProfile({ fullName, language, targetBoardId = '', targetExamId = '' }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('update_student_profile', {
+        p_full_name: clean(fullName),
+        p_language: clean(language),
+        p_target_board_id: clean(targetBoardId) || null,
+        p_target_exam_id: clean(targetExamId) || null,
+      }),
+    ), 'Unable to update your profile.');
+  },
+
   async getPublicConfiguration() {
     const client = requireSupabase();
     const [settingsResponse, boardsResponse, examsResponse, statsResponse] = await Promise.all([
@@ -316,13 +458,17 @@ export const api = Object.freeze({
 
   async getAttemptReview(attemptId, offset = 0, limit = 25) {
     const client = requireSupabase();
-    return unwrap(await withTimeout(
+    const rows = unwrap(await withTimeout(
       client.rpc('get_attempt_review', {
         p_attempt_id: attemptId,
         p_offset: offset,
         p_limit: limit,
       }),
     ), 'Unable to load review data.') || [];
+    return Promise.all(rows.map(async (row) => ({
+      ...row,
+      image_refs: await resolveStorageImageRefs(client, row.image_refs, { blockedOnFailure: true }),
+    })));
   },
 
   async getAdminReferenceData() {
