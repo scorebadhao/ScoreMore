@@ -1,0 +1,124 @@
+name: Verify RankTiger PROD Connection — READ ONLY
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type VERIFY_RANKTIGER_PROD exactly. This verifies credentials/connectivity only; it does NOT run migrations or seed data.'
+        required: true
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-ranktiger-prod-connection
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.RANKTIGER_SUPABASE_DB_PASSWORD }}
+      RANKTIGER_SUPABASE_PROJECT_ID: ${{ secrets.RANKTIGER_SUPABASE_PROJECT_ID }}
+      RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
+      RANKTIGER_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.RANKTIGER_SUPABASE_PUBLISHABLE_KEY }}
+
+    steps:
+      - name: Safety gate
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != "VERIFY_RANKTIGER_PROD" ]; then
+            echo "Blocked: confirmation must be VERIFY_RANKTIGER_PROD"
+            exit 1
+          fi
+
+      - name: Checkout ScoreMore release source
+        uses: actions/checkout@v6
+
+      - name: Verify Patch 4 workflow safety locally
+        run: node scripts/verify-ranktiger-prod-connection.mjs
+
+      - name: Require all RankTiger PROD credentials
+        shell: bash
+        run: |
+          missing=0
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RANKTIGER_SUPABASE_PROJECT_ID RANKTIGER_SUPABASE_URL RANKTIGER_SUPABASE_PUBLISHABLE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required GitHub secret/environment value: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Guard against ScoreMore DEV target
+        shell: bash
+        run: |
+          SCOREMORE_DEV_PROJECT_ID="stejewkuikvqpqotjnnt"
+          if [ "$RANKTIGER_SUPABASE_PROJECT_ID" = "$SCOREMORE_DEV_PROJECT_ID" ]; then
+            echo "Blocked: RankTiger PROD project ID matches ScoreMore DEV."
+            exit 1
+          fi
+
+      - name: Cross-check RankTiger URL and project ID
+        shell: bash
+        run: |
+          EXPECTED_URL="https://${RANKTIGER_SUPABASE_PROJECT_ID}.supabase.co"
+          ACTUAL_URL="${RANKTIGER_SUPABASE_URL%/}"
+          if [ "$ACTUAL_URL" != "$EXPECTED_URL" ]; then
+            echo "Blocked: RankTiger project URL does not match the RankTiger project ID."
+            exit 1
+          fi
+          echo "RankTiger project URL and project ID match."
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.111.0
+          github-token: ${{ github.token }}
+
+      - name: Verify access token can see RankTiger project
+        shell: bash
+        run: |
+          supabase projects list > /tmp/ranktiger-projects.txt
+          if ! grep -Fq "$RANKTIGER_SUPABASE_PROJECT_ID" /tmp/ranktiger-projects.txt; then
+            echo "Blocked: the configured Supabase access token cannot see the RankTiger project."
+            exit 1
+          fi
+          echo "Supabase access token can see the RankTiger project."
+
+      - name: Verify RankTiger Data API endpoint and publishable key
+        shell: bash
+        run: |
+          HTTP_CODE="$(curl --silent --show-error --output /tmp/ranktiger-data-api.json --write-out '%{http_code}' \
+            "${RANKTIGER_SUPABASE_URL%/}/rest/v1/" \
+            -H "apikey: ${RANKTIGER_SUPABASE_PUBLISHABLE_KEY}")"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Blocked: RankTiger Data API check returned HTTP $HTTP_CODE."
+            exit 1
+          fi
+          echo "RankTiger Data API endpoint accepted the publishable key successfully."
+
+      - name: Link RankTiger PROD using the production database password
+        shell: bash
+        run: supabase link --project-ref "$RANKTIGER_SUPABASE_PROJECT_ID"
+
+      - name: Read RankTiger PROD migration status only
+        shell: bash
+        run: supabase migration list --linked
+
+      - name: Verification complete — no production changes applied
+        shell: bash
+        run: |
+          echo "RankTiger PROD credential and connection verification PASSED."
+          echo "Database migrations applied by this workflow: NO"
+          echo "Seed data applied by this workflow: NO"
+          echo "RankTiger repository updated by this workflow: NO"
+          echo "Cloudflare deployment triggered by this workflow: NO"
