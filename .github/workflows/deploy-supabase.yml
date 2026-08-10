@@ -1,10 +1,10 @@
-name: Deploy ScoreMore Database
+name: Deploy ScoreMore DEV Database
 
 on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type DEPLOY_SCOREMORE to apply migrations and seed data
+        description: Type DEPLOY_SCOREMORE_DEV to apply DEV migrations and seed data
         required: true
         default: ""
 
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: scoremore-database-deploy
+  group: scoremore-dev-database-deploy
   cancel-in-progress: false
 
 jobs:
@@ -25,11 +25,11 @@ jobs:
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
 
     steps:
-      - name: Confirm ScoreMore deployment
+      - name: Confirm ScoreMore DEV deployment
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
         run: |
-          if [ "$CONFIRMATION" != "DEPLOY_SCOREMORE" ]; then
+          if [ "$CONFIRMATION" != "DEPLOY_SCOREMORE_DEV" ]; then
             echo "Confirmation text is incorrect."
             exit 1
           fi
@@ -43,14 +43,14 @@ jobs:
           version: 2.111.0
           github-token: ${{ github.token }}
 
-      - name: Verify ScoreMore project target
+      - name: Verify ScoreMore DEV project target
         run: |
           if [ "$SUPABASE_PROJECT_ID" != "stejewkuikvqpqotjnnt" ]; then
-            echo "Refusing to deploy: project reference does not match ScoreMore."
+            echo "Refusing to deploy: project reference does not match ScoreMore DEV."
             exit 1
           fi
 
-      - name: Link ScoreMore Supabase project
+      - name: Link ScoreMore DEV Supabase project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Preview pending database changes

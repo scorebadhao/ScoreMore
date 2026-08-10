@@ -1,4 +1,4 @@
-name: Deploy ScoreMore to GitHub Pages
+name: Deploy ScoreMore DEV to GitHub Pages
 
 on:
   push:
@@ -34,7 +34,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-        run: npm run build
+        run: npm run build:scoremore
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
