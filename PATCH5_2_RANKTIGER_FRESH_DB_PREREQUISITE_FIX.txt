@@ -1,0 +1,21 @@
+PATCH 5.2 — RANKTIGER FRESH DATABASE PREREQUISITE FIX
+
+Cause fixed:
+- Locked historical migration 20260805000100_phase3e_compatibility.sql inserts canonical topics.
+- On ScoreMore DEV the catalogue parents had already been seeded historically.
+- On a fresh RankTiger PROD database, subjects such as REASONING did not yet exist.
+- The migration therefore failed on topics_subject_id_fkey.
+
+Fix:
+- DO NOT edit the locked historical migration.
+- Add idempotent versioned migration 20260805000050_catalogue_parent_prerequisites.sql.
+- It creates/upserts only GSSSB -> CCE -> four parent subjects.
+- It sorts immediately before the locked Phase 3E topic migration.
+- Production workflow uses --include-all so this newly introduced earlier version is included even in environments whose migration history has later versions.
+- No Supabase seed is run on PROD.
+- No migration repair/reset is used.
+
+After the failed RankTiger run:
+- Successfully completed earlier migrations remain applied and tracked.
+- The failing 20260805000100 migration is transactional and was not recorded as successfully applied.
+- Rerunning the guarded workflow after Patch 5.2 should apply the prerequisite, retry the failed migration, then continue with remaining migrations.
