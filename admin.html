@@ -4,16 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#111827" />
-  <meta name="description" content="ScoreMore administration for reviewed questions and dynamic tests." />
-  <title>ScoreMore Admin</title>
+  <meta name="description" content="__APP_NAME__ administration for reviewed questions and dynamic tests." />
+  <title>__APP_NAME__ Admin</title>
   <link rel="stylesheet" href="./assets/css/main.css" />
 </head>
 <body class="admin-body">
   <div class="app-shell">
     <header class="topbar topbar-dark">
       <a class="brand" href="./admin.html">
-        <span class="brand-mark">S+</span>
-        <span><strong>ScoreMore Admin</strong><small>Import → review → publish → test</small></span>
+        <span class="brand-mark">__APP_MARK__</span>
+        <span><strong>__APP_NAME__ Admin</strong><small>Import → review → publish → test</small></span>
       </a>
       <div class="topbar-actions">
         <a class="button button-ghost-light" href="./student.html">Student site</a>
@@ -23,7 +23,7 @@
 
     <main class="admin-main">
       <section id="adminSetupNotice" class="notice notice-warning hidden">
-        Add the Supabase URL and publishable key to your environment before running ScoreMore.
+        Add the Supabase URL and publishable key to your environment before running __APP_NAME__.
       </section>
 
       <section id="adminLoginPanel" class="auth-card section narrow-card">
@@ -133,7 +133,7 @@
           </div>
 
           <form id="htmlImportForm" class="stack-form" novalidate>
-            <label>ScoreMore HTML package
+            <label>__APP_NAME__ HTML package
               <input id="htmlImportFile" name="htmlImportFile" type="file" accept=".html,.htm,.xhtml,text/html,application/xhtml+xml" required />
             </label>
             <div class="import-safety-note">

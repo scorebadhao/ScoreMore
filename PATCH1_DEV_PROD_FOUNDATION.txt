@@ -1,0 +1,37 @@
+SCOREMORE PATCH 1 — DEV/PROD ENVIRONMENT FOUNDATION
+
+PURPOSE
+- Keep the current ScoreMore site as the safe development build.
+- Add an explicit future RankTiger production build mode.
+- Do not create or deploy RankTiger yet.
+
+FILES ADDED
+- build-targets.js
+- docs/DEV_PROD_ENVIRONMENT_FOUNDATION.md
+- PATCH1_DEV_PROD_FOUNDATION.txt
+
+FILES UPDATED
+- vite.config.js
+- package.json
+- index.html
+- student.html
+- admin.html
+- test-builder.html
+- assets/js/config.js
+- assets/js/supabaseClient.js
+- assets/js/public.js
+- assets/js/student.js
+- assets/js/admin.js
+- assets/js/testEngine.js
+- assets/js/testBuilder4A.js
+- assets/js/importEngine.js
+- .github/workflows/deploy-pages.yml
+- .github/workflows/deploy-supabase.yml
+
+IMPORTANT
+- Existing `npm run build` still builds ScoreMore DEV.
+- Existing GitHub Pages workflow explicitly builds ScoreMore DEV.
+- Database deployment now requires confirmation text: DEPLOY_SCOREMORE_DEV
+- RankTiger build command exists but does not deploy anywhere: npm run build:ranktiger
+- No production credentials are included.
+- Dependency-free verification command: npm run verify:targets

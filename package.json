@@ -3,14 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "ScoreMore — Supabase-based GSSSB CCE examination platform starter.",
+  "description": "ScoreMore \u2014 Supabase-based GSSSB CCE examination platform starter.",
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "vite --mode scoremore",
+    "build": "npm run build:scoremore",
+    "build:scoremore": "vite build --mode scoremore",
+    "build:ranktiger": "vite build --mode ranktiger",
+    "preview": "vite preview",
+    "verify:targets": "node scripts/verify-build-targets.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.110.8"

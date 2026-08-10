@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f766e" />
-  <meta name="description" content="ScoreMore student hub, dynamic tests, saved questions and performance analytics." />
-  <title>ScoreMore Student Hub</title>
+  <meta name="description" content="__APP_NAME__ student hub, dynamic tests, saved questions and performance analytics." />
+  <title>__APP_NAME__ Student Hub</title>
   <link rel="stylesheet" href="./assets/css/main.css" />
 </head>
 <body class="student-body">
@@ -34,9 +34,9 @@
 
   <div id="app" class="app-shell student-shell">
     <header class="app-header">
-      <a class="brand" href="./student.html#home" aria-label="ScoreMore student home">
-        <span class="brand-mark" aria-hidden="true">S+</span>
-        <span class="brand-copy"><strong id="brandName">ScoreMore</strong><small id="brandTagline">Prepare smarter</small></span>
+      <a class="brand" href="./student.html#home" aria-label="__APP_NAME__ student home">
+        <span class="brand-mark" aria-hidden="true">__APP_MARK__</span>
+        <span class="brand-copy"><strong id="brandName">__APP_NAME__</strong><small id="brandTagline">__APP_TAGLINE__</small></span>
       </a>
       <div class="header-actions">
         <span id="syncState" class="sync-badge" aria-live="polite"><span class="sync-dot"></span>Online</span>
@@ -45,8 +45,8 @@
     </header>
 
     <main id="mainContent" class="app-main">
-      <section id="setupNotice" class="notice notice-warning hidden" role="status">Add the Supabase URL and publishable key to your environment before running ScoreMore.</section>
-      <section id="studentLoading" class="loading-state app-opening-state">Checking your ScoreMore session…</section>
+      <section id="setupNotice" class="notice notice-warning hidden" role="status">Add the Supabase URL and publishable key to your environment before running __APP_NAME__.</section>
+      <section id="studentLoading" class="loading-state app-opening-state">Checking your __APP_NAME__ session…</section>
 
       <section id="studentView" class="hidden">
         <section id="dashboardHome" class="dashboard-shell hub-page">
@@ -99,7 +99,7 @@
             </div>
             <div class="button-row"><button id="refreshStudentTests" class="button button-ghost" type="button"><svg class="icon"><use href="#i-refresh"></use></svg><span>Refresh</span></button><button id="clearCatalogueFilters" class="text-button hidden" type="button">Clear filters</button></div>
           </div>
-          <div class="catalogue-result-bar"><div><strong id="catalogueResultText">Loading tests…</strong><span id="catalogueScopeText">Published ScoreMore catalogue</span></div></div>
+          <div class="catalogue-result-bar"><div><strong id="catalogueResultText">Loading tests…</strong><span id="catalogueScopeText">Published __APP_NAME__ catalogue</span></div></div>
           <div id="studentTestList" class="catalogue-grid" aria-live="polite"></div>
           <div id="testPagination" class="hub-pagination"></div>
         </section>

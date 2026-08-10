@@ -1,0 +1,114 @@
+{
+  "patch": "ScoreMore Patch 1 \u2014 DEV/PROD Environment Foundation",
+  "database_migration": null,
+  "default_development_build": "npm run build",
+  "explicit_development_build": "npm run build:scoremore",
+  "future_production_build": "npm run build:ranktiger",
+  "changed_files": {
+    ".github/workflows/deploy-pages.yml": {
+      "size_bytes": 1172,
+      "sha256": "6f8be04f60488a6fe244cd9e3b2073ea586220f9e95956f6437fc263f425d075",
+      "status": "updated"
+    },
+    ".github/workflows/deploy-supabase.yml": {
+      "size_bytes": 1737,
+      "sha256": "f8410de9cdc767233ac20e2e2b536d6800cbc1a24b0029e25710a055359b48df",
+      "status": "updated"
+    },
+    "PATCH1_DEV_PROD_FOUNDATION.txt": {
+      "size_bytes": 1119,
+      "sha256": "4072f3ec4aeb922d80d10f709854b10df6bd79a3d48ec760e502a0525af82367",
+      "status": "added"
+    },
+    "PATCH1_VALIDATION_REPORT.md": {
+      "size_bytes": 1638,
+      "sha256": "c9b36d6e1f3b7a2e046c91fd5e3fb219923cba30320ecd6a2406fda5425296c6",
+      "status": "added"
+    },
+    "admin.html": {
+      "size_bytes": 25864,
+      "sha256": "56c10e6ec5cb1d5e5b2e40da3140c076c6d8ba25ca1d3f327eee0183a1105356",
+      "status": "updated"
+    },
+    "assets/js/admin.js": {
+      "size_bytes": 124141,
+      "sha256": "5be7580164cdd9379fb534a50a43f548a1e5c49da85357eab1dcb8cb12027a00",
+      "status": "updated"
+    },
+    "assets/js/config.js": {
+      "size_bytes": 990,
+      "sha256": "f0a66b1731d222e1e73d93b447aacc2e860019066e4974d53973a94a5057788c",
+      "status": "updated"
+    },
+    "assets/js/importEngine.js": {
+      "size_bytes": 37613,
+      "sha256": "8ac5c773a000a374a6010d15d43b3f2b119c3a2f125a31e2889a5bf28979b0b7",
+      "status": "updated"
+    },
+    "assets/js/public.js": {
+      "size_bytes": 11242,
+      "sha256": "e059d167c14c9aa0c06bfb6cae57618b0584a69b85d4d1999768588f7ce243e7",
+      "status": "updated"
+    },
+    "assets/js/student.js": {
+      "size_bytes": 47997,
+      "sha256": "6d39c40918c4149aa7e65fa7cfaaa21af391ee96707ae11b251ad7774c5bbe8c",
+      "status": "updated"
+    },
+    "assets/js/supabaseClient.js": {
+      "size_bytes": 545,
+      "sha256": "be984e6198e5f1b75e8c69e494d43424ee0641c121462f42b9791fd1868aa5aa",
+      "status": "updated"
+    },
+    "assets/js/testBuilder4A.js": {
+      "size_bytes": 33865,
+      "sha256": "7fbbb04d8f64baa5457f33925bb4b5ac150627702237e15dd2ee67019ce1debb",
+      "status": "updated"
+    },
+    "assets/js/testEngine.js": {
+      "size_bytes": 35410,
+      "sha256": "6c5ac2ba837e56446c55f21747f4cd8c2743ff80b2d01bcc195ef3fb52c6323b",
+      "status": "updated"
+    },
+    "build-targets.js": {
+      "size_bytes": 607,
+      "sha256": "0131bc145720a4a0fed24861dfaad188f26f5eff1a8e2b5b2dbc1c3fc1bd9cf9",
+      "status": "added"
+    },
+    "docs/DEV_PROD_ENVIRONMENT_FOUNDATION.md": {
+      "size_bytes": 2151,
+      "sha256": "57a4331af2eff3bb7ea5764e591c7a08f76099811a878856711036e006aa677f",
+      "status": "added"
+    },
+    "index.html": {
+      "size_bytes": 10520,
+      "sha256": "c67f64477075a876c993e90e2bc98a8efcd8900b5deee1f0f4c7d13e0c4d4fae",
+      "status": "updated"
+    },
+    "package.json": {
+      "size_bytes": 632,
+      "sha256": "1895c6e25806688fa514c39c6e5cb011cec10832f02b5799136bb07df5b58577",
+      "status": "updated"
+    },
+    "scripts/verify-build-targets.mjs": {
+      "size_bytes": 2592,
+      "sha256": "eb30a1174f2b28d89cab6aa7afe6184954c7f049f084db5338ada8064dfa47ce",
+      "status": "added"
+    },
+    "student.html": {
+      "size_bytes": 15367,
+      "sha256": "e51cf5fc94e8d680c5253c0c76e00fd54f2d6d2044d17f88201b87e66c95601c",
+      "status": "updated"
+    },
+    "test-builder.html": {
+      "size_bytes": 15262,
+      "sha256": "b5f3d53aabc162431e6839f75adbfe9e5f883c35b9ae047d4e4d6f1c196bc290",
+      "status": "updated"
+    },
+    "vite.config.js": {
+      "size_bytes": 995,
+      "sha256": "38c9ad8ca757fedcab2a4a5087bb3b408b40f7d2df0ddc7b6b54cf0dfd1089b1",
+      "status": "updated"
+    }
+  }
+}
