@@ -185,3 +185,7 @@ Administrators can open `test-builder.html` to build fixed tests from published 
 ## RankTiger release safety (Patch 4)
 
 RankTiger production credentials are verified through the manual, non-migrating GitHub Action **Verify RankTiger PROD Connection — READ ONLY** before any production database initialization is allowed. ScoreMore remains the only development source.
+
+## RankTiger production release architecture — Patch 5
+
+Patch 5 adds a separately guarded, manual RankTiger PROD database initialization/update workflow. It verifies the production target, immutable migration checksums, and narrow production-safe seed before applying migrations. It does not deploy the RankTiger frontend. See `docs/RANKTIGER_PROD_DATABASE_INITIALIZATION_PATCH5.md`.

@@ -20,7 +20,9 @@
     "verify:release-foundation": "node scripts/verify-release-foundation.mjs",
     "verify:patch3": "npm run verify:patch2 && npm run verify:release-foundation",
     "verify:ranktiger-prod-connection": "node scripts/verify-ranktiger-prod-connection.mjs",
-    "verify:patch4": "npm run verify:patch3 && npm run verify:ranktiger-prod-connection"
+    "verify:patch4": "npm run verify:patch3 && npm run verify:ranktiger-prod-connection",
+    "verify:ranktiger-prod-db-init": "node scripts/verify-ranktiger-prod-database-init.mjs",
+    "verify:patch5": "npm run verify:patch4 && npm run verify:ranktiger-prod-db-init"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.110.8"

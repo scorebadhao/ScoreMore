@@ -1,0 +1,9 @@
+PATCH 4.1 — RankTiger PROD Publishable-Key Verification Fix
+
+Reason:
+The Patch 4 workflow tested the PostgREST OpenAPI root (/rest/v1/) with a low-privilege publishable key. That root is not an appropriate publishable-key health check and can return an authorization error even when the key is valid.
+
+Fix:
+The workflow now checks the read-only Auth settings endpoint (/auth/v1/settings) with the publishable key. This validates project URL + publishable key without requiring any database tables or applying any changes.
+
+No migrations, seeds, production writes, repository pushes, or Cloudflare deployments are added.

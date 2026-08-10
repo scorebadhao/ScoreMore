@@ -1,0 +1,21 @@
+PATCH 5 — RANKTIGER PROD DATABASE INITIALIZATION
+
+Adds the first guarded write-capable RankTiger PROD database workflow.
+
+NEW WORKFLOW
+.github/workflows/initialize-ranktiger-prod-db.yml
+Name: Initialize / Update RankTiger PROD Database — GUARDED
+Confirmation: INITIALIZE_RANKTIGER_PROD
+
+SAFETY
+- RankTiger-only secrets.
+- Hard guard against ScoreMore DEV project ID.
+- Project URL/project ID cross-check.
+- 18 historical migration SHA-256 checks.
+- Production-safe seed allowlist.
+- Dry-run before write.
+- Post-write migration and public seed verification.
+- No RankTiger frontend deployment.
+- No RankTiger repo push.
+- No Cloudflare deployment.
+- No db reset/migration repair/down.

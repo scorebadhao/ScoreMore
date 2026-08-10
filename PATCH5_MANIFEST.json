@@ -1,0 +1,18 @@
+{
+  "patch": "5",
+  "name": "RankTiger PROD Database Initialization",
+  "base": "Verified Patch 4.1",
+  "writeCapability": "RankTiger PROD database migrations + production-safe shared seed only",
+  "newFiles": [
+    ".github/workflows/initialize-ranktiger-prod-db.yml",
+    "scripts/verify-ranktiger-prod-database-init.mjs",
+    "docs/RANKTIGER_PROD_DATABASE_INITIALIZATION_PATCH5.md",
+    "PATCH5_RANKTIGER_PROD_DATABASE_INITIALIZATION.txt",
+    "PATCH5_MANIFEST.json"
+  ],
+  "modifiedFiles": ["package.json"],
+  "historicalMigrationsModified": false,
+  "frontendDeploymentIncluded": false,
+  "rankTigerRepositoryPushIncluded": false,
+  "cloudflareDeploymentIncluded": false
+}
