@@ -13,6 +13,14 @@ Apply migrations in timestamp order through the controlled GitHub Actions databa
 20260805000000_add_ai_proposed_answer_source.sql
 20260805000100_phase3e_compatibility.sql
 20260805010000_import_recovery_fast_drafts.sql
+20260805020000_visual_fingerprint_and_review_flow.sql
+20260806000000_source_option_anomaly_publish_centre.sql
+20260806010000_simple_test_builder_catalogue.sql
+20260807010000_phase4a_dynamic_multifilter_test_builder.sql
+20260807020000_mobile_test_runner_sections.sql
+20260808010000_student_safe_image_repair_centre.sql
+20260808020000_compulsory_student_image_readiness.sql
+20260810010000_student_hub_v1.sql
 ```
 
 Do not edit an already-applied migration. Add a new timestamped migration for every production schema change.
@@ -47,3 +55,5 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260808010000_student_safe_image_repair_centre.sql` adds the private approved-crop bucket, audited image-repair lifecycle, admin-only repair queue/RPCs and attempt-owned signed-image access without exposing raw source captures.
 
 - `20260808020000_compulsory_student_image_readiness.sql` makes an audited visual-safety decision compulsory, filters unresolved questions from builders, guards test publication and new attempts, and supports the audited `NO_STUDENT_IMAGE_REQUIRED` decision.
+
+- `20260810010000_student_hub_v1.sql` adds protected Home, Tests, Saved, Results and Profile RPCs; server-side catalogue filters; active-attempt answer protection; submitted-result analytics/review; safe profile editing; and revokes direct browser writes to bookmarks, mistake records and profile fields.
