@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: 'Type INITIALIZE_RANKTIGER_PROD exactly. This WILL apply approved migrations and the production-safe seed to RankTiger PROD.'
+        description: 'Type INITIALIZE_RANKTIGER_PROD exactly. This WILL apply approved versioned migrations to RankTiger PROD. It will NOT run supabase seed.'
         required: true
         default: ''
         type: string
@@ -42,7 +42,7 @@ jobs:
       - name: Checkout approved ScoreMore release source
         uses: actions/checkout@v6
 
-      - name: Verify Patch 5 workflow, locked migrations, and production seed locally
+      - name: Verify Patch 5.1 workflow and locked migrations locally
         run: node scripts/verify-ranktiger-prod-database-init.mjs
 
       - name: Require all RankTiger PROD credentials
@@ -113,24 +113,24 @@ jobs:
         shell: bash
         run: supabase migration list --linked
 
-      - name: Preview pending RankTiger PROD changes — NO WRITE
+      - name: Preview pending RankTiger PROD migrations — NO WRITE
         shell: bash
-        run: supabase db push --dry-run --include-seed
+        run: supabase db push --dry-run
 
-      - name: Apply approved migrations and production-safe seed to RankTiger PROD
+      - name: Apply approved versioned migrations to RankTiger PROD
         shell: bash
-        run: supabase db push --include-seed --yes
+        run: supabase db push --yes
 
       - name: Capture RankTiger PROD migration status after write
         shell: bash
         run: supabase migration list --linked | tee /tmp/ranktiger-migrations-after.txt
 
-      - name: Verify all 18 locked migrations are applied remotely
+      - name: Verify all 19 Patch 5.1 locked migrations are applied remotely
         shell: bash
         run: |
           node - <<'NODE'
           const fs = require('fs');
-          const locked = JSON.parse(fs.readFileSync('docs/LOCKED_MIGRATION_CHECKSUMS_PATCH3.json', 'utf8'));
+          const locked = JSON.parse(fs.readFileSync('docs/LOCKED_MIGRATION_CHECKSUMS_PATCH5_1.json', 'utf8'));
           const output = fs.readFileSync('/tmp/ranktiger-migrations-after.txt', 'utf8');
           const missing = [];
           for (const name of Object.keys(locked.migrations)) {
@@ -144,16 +144,16 @@ jobs:
           console.log(`Verified ${Object.keys(locked.migrations).length} locked migrations in RankTiger PROD migration history.`);
           NODE
 
-      - name: Verify production-safe seed through RankTiger public Data API
+      - name: Verify versioned public catalogue baseline through RankTiger Data API
         shell: bash
         run: |
           API="${RANKTIGER_SUPABASE_URL%/}/rest/v1"
 
-          check_seed() {
+          check_catalogue() {
             local label="$1"
             local path="$2"
             local expected="$3"
-            local out="/tmp/ranktiger-seed-${label}.json"
+            local out="/tmp/ranktiger-catalogue-${label}.json"
             local code
             code="$(curl --silent --show-error --output "$out" --write-out '%{http_code}' \
               "${API}/${path}" \
@@ -164,24 +164,25 @@ jobs:
               exit 1
             fi
             if ! grep -Fq "$expected" "$out"; then
-              echo "Post-deploy verification failed for $label: expected seeded value was not returned."
+              echo "Post-deploy verification failed for $label: expected value was not returned."
               cat "$out" || true
               exit 1
             fi
-            echo "Verified seeded $label."
+            echo "Verified $label."
           }
 
-          check_seed "board" "boards?select=board_id&board_id=eq.GSSSB&limit=1" '"board_id":"GSSSB"'
-          check_seed "exam" "exams?select=exam_id&exam_id=eq.CCE&limit=1" '"exam_id":"CCE"'
-          check_seed "hero" "app_settings?select=setting_key&setting_key=eq.hero_title&limit=1" '"setting_key":"hero_title"'
+          check_catalogue "board" "boards?select=board_id&board_id=eq.GSSSB&limit=1" '"board_id":"GSSSB"'
+          check_catalogue "exam" "exams?select=exam_id&exam_id=eq.CCE&limit=1" '"exam_id":"CCE"'
+          check_catalogue "hero" "app_settings?select=setting_key&setting_key=eq.hero_title&limit=1" '"setting_key":"hero_title"'
 
       - name: RankTiger PROD database initialization/update complete
         shell: bash
         run: |
-          echo "RankTiger PROD database migration/seed deployment PASSED."
+          echo "RankTiger PROD versioned migration deployment PASSED."
           echo "Target: RankTiger PROD only"
-          echo "Locked migrations verified: 18"
-          echo "Production-safe catalogue/settings seed verified: YES"
+          echo "Locked migrations verified: 19"
+          echo "Production catalogue baseline source: VERSIONED MIGRATION"
+          echo "Supabase seed executed on PROD: NO"
           echo "RankTiger frontend deployed by this workflow: NO"
           echo "RankTiger GitHub repository updated by this workflow: NO"
           echo "Cloudflare deployment triggered by this workflow: NO"
