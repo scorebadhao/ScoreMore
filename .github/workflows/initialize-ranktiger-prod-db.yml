@@ -1,0 +1,187 @@
+name: Initialize / Update RankTiger PROD Database — GUARDED
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type INITIALIZE_RANKTIGER_PROD exactly. This WILL apply approved migrations and the production-safe seed to RankTiger PROD.'
+        required: true
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ranktiger-prod-database-deploy
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.RANKTIGER_SUPABASE_DB_PASSWORD }}
+      RANKTIGER_SUPABASE_PROJECT_ID: ${{ secrets.RANKTIGER_SUPABASE_PROJECT_ID }}
+      RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
+      RANKTIGER_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.RANKTIGER_SUPABASE_PUBLISHABLE_KEY }}
+
+    steps:
+      - name: PRODUCTION safety gate
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != "INITIALIZE_RANKTIGER_PROD" ]; then
+            echo "Blocked: confirmation must be INITIALIZE_RANKTIGER_PROD"
+            exit 1
+          fi
+          echo "Explicit RankTiger PROD write confirmation accepted."
+
+      - name: Checkout approved ScoreMore release source
+        uses: actions/checkout@v6
+
+      - name: Verify Patch 5 workflow, locked migrations, and production seed locally
+        run: node scripts/verify-ranktiger-prod-database-init.mjs
+
+      - name: Require all RankTiger PROD credentials
+        shell: bash
+        run: |
+          missing=0
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RANKTIGER_SUPABASE_PROJECT_ID RANKTIGER_SUPABASE_URL RANKTIGER_SUPABASE_PUBLISHABLE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required GitHub secret/environment value: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Guard against ScoreMore DEV target
+        shell: bash
+        run: |
+          SCOREMORE_DEV_PROJECT_ID="stejewkuikvqpqotjnnt"
+          if [ "$RANKTIGER_SUPABASE_PROJECT_ID" = "$SCOREMORE_DEV_PROJECT_ID" ]; then
+            echo "Blocked: RankTiger PROD project ID matches ScoreMore DEV."
+            exit 1
+          fi
+
+      - name: Cross-check RankTiger URL and project ID
+        shell: bash
+        run: |
+          EXPECTED_URL="https://${RANKTIGER_SUPABASE_PROJECT_ID}.supabase.co"
+          ACTUAL_URL="${RANKTIGER_SUPABASE_URL%/}"
+          if [ "$ACTUAL_URL" != "$EXPECTED_URL" ]; then
+            echo "Blocked: RankTiger project URL does not match the RankTiger project ID."
+            exit 1
+          fi
+          echo "RankTiger project URL and project ID match."
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.111.0
+          github-token: ${{ github.token }}
+
+      - name: Verify access token can see RankTiger PROD
+        shell: bash
+        run: |
+          supabase projects list > /tmp/ranktiger-projects.txt
+          if ! grep -Fq "$RANKTIGER_SUPABASE_PROJECT_ID" /tmp/ranktiger-projects.txt; then
+            echo "Blocked: configured Supabase access token cannot see RankTiger PROD."
+            exit 1
+          fi
+
+      - name: Verify RankTiger publishable key before database write
+        shell: bash
+        run: |
+          HTTP_CODE="$(curl --silent --show-error --output /tmp/ranktiger-auth-settings.json --write-out '%{http_code}' \
+            "${RANKTIGER_SUPABASE_URL%/}/auth/v1/settings" \
+            -H "apikey: ${RANKTIGER_SUPABASE_PUBLISHABLE_KEY}")"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Blocked: RankTiger Auth API check returned HTTP $HTTP_CODE."
+            exit 1
+          fi
+
+      - name: Link only RankTiger PROD
+        shell: bash
+        run: supabase link --project-ref "$RANKTIGER_SUPABASE_PROJECT_ID"
+
+      - name: Show current RankTiger migration status before write
+        shell: bash
+        run: supabase migration list --linked
+
+      - name: Preview pending RankTiger PROD changes — NO WRITE
+        shell: bash
+        run: supabase db push --dry-run --include-seed
+
+      - name: Apply approved migrations and production-safe seed to RankTiger PROD
+        shell: bash
+        run: supabase db push --include-seed --yes
+
+      - name: Capture RankTiger PROD migration status after write
+        shell: bash
+        run: supabase migration list --linked | tee /tmp/ranktiger-migrations-after.txt
+
+      - name: Verify all 18 locked migrations are applied remotely
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const locked = JSON.parse(fs.readFileSync('docs/LOCKED_MIGRATION_CHECKSUMS_PATCH3.json', 'utf8'));
+          const output = fs.readFileSync('/tmp/ranktiger-migrations-after.txt', 'utf8');
+          const missing = [];
+          for (const name of Object.keys(locked.migrations)) {
+            const version = name.split('_', 1)[0];
+            if (!output.includes(version)) missing.push(version);
+          }
+          if (missing.length) {
+            console.error(`Missing remote migration versions after deploy: ${missing.join(', ')}`);
+            process.exit(1);
+          }
+          console.log(`Verified ${Object.keys(locked.migrations).length} locked migrations in RankTiger PROD migration history.`);
+          NODE
+
+      - name: Verify production-safe seed through RankTiger public Data API
+        shell: bash
+        run: |
+          API="${RANKTIGER_SUPABASE_URL%/}/rest/v1"
+
+          check_seed() {
+            local label="$1"
+            local path="$2"
+            local expected="$3"
+            local out="/tmp/ranktiger-seed-${label}.json"
+            local code
+            code="$(curl --silent --show-error --output "$out" --write-out '%{http_code}' \
+              "${API}/${path}" \
+              -H "apikey: ${RANKTIGER_SUPABASE_PUBLISHABLE_KEY}")"
+            if [ "$code" != "200" ]; then
+              echo "Post-deploy verification failed for $label: HTTP $code"
+              cat "$out" || true
+              exit 1
+            fi
+            if ! grep -Fq "$expected" "$out"; then
+              echo "Post-deploy verification failed for $label: expected seeded value was not returned."
+              cat "$out" || true
+              exit 1
+            fi
+            echo "Verified seeded $label."
+          }
+
+          check_seed "board" "boards?select=board_id&board_id=eq.GSSSB&limit=1" '"board_id":"GSSSB"'
+          check_seed "exam" "exams?select=exam_id&exam_id=eq.CCE&limit=1" '"exam_id":"CCE"'
+          check_seed "hero" "app_settings?select=setting_key&setting_key=eq.hero_title&limit=1" '"setting_key":"hero_title"'
+
+      - name: RankTiger PROD database initialization/update complete
+        shell: bash
+        run: |
+          echo "RankTiger PROD database migration/seed deployment PASSED."
+          echo "Target: RankTiger PROD only"
+          echo "Locked migrations verified: 18"
+          echo "Production-safe catalogue/settings seed verified: YES"
+          echo "RankTiger frontend deployed by this workflow: NO"
+          echo "RankTiger GitHub repository updated by this workflow: NO"
+          echo "Cloudflare deployment triggered by this workflow: NO"
