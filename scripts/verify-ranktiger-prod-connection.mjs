@@ -19,7 +19,7 @@ pass(workflow.includes('SUPABASE_ACCESS_TOKEN'), 'Existing Supabase access token
 pass(workflow.includes('stejewkuikvqpqotjnnt'), 'ScoreMore DEV project-ID guard is missing.');
 pass(workflow.includes('https://${RANKTIGER_SUPABASE_PROJECT_ID}.supabase.co'), 'URL/project-ID cross-check is missing.');
 pass(workflow.includes('supabase projects list'), 'Management/API visibility check is missing.');
-pass(workflow.includes('/rest/v1/'), 'Data API publishable-key check is missing.');
+pass(workflow.includes('/auth/v1/settings'), 'Auth API publishable-key check is missing.');
 pass(workflow.includes('supabase link --project-ref'), 'Database credential/link check is missing.');
 pass(workflow.includes('supabase migration list --linked'), 'Read-only migration status check is missing.');
 
