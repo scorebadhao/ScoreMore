@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "product": "RankTiger",
+  "sourceRepository": "ScoreMore",
+  "productionRepository": "RankTiger",
+  "buildTarget": "ranktiger",
+  "environment": "production",
+  "basePath": "/",
+  "workflowConfirmation": "PREPARE_RANKTIGER_RC",
+  "artifactDirectory": "release/ranktiger",
+  "releaseMetadataFile": "RELEASE.json",
+  "releaseStatus": "candidate",
+  "productionDeployEnabled": false,
+  "productionDatabaseMigrationEnabled": false,
+  "notes": "Patch 3 foundation only. This policy may prepare a RankTiger release candidate artifact but must not deploy RankTiger PROD or push to the RankTiger repository."
+}

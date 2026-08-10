@@ -1,0 +1,13 @@
+{
+  "patch": "3",
+  "name": "Production Release Foundation",
+  "base": "Verified Patch 2",
+  "databaseMigrationRequired": false,
+  "productionDeploymentEnabled": false,
+  "rankTigerRepositoryPushEnabled": false,
+  "cloudflareRequired": false,
+  "newWorkflow": ".github/workflows/prepare-ranktiger-release.yml",
+  "manualWorkflowOnly": true,
+  "workflowConfirmation": "PREPARE_RANKTIGER_RC",
+  "notes": "Creates safe RankTiger release-candidate packaging foundation only."
+}

@@ -15,7 +15,10 @@
     "preview": "vite preview",
     "verify:targets": "node scripts/verify-build-targets.mjs",
     "verify:branding": "node scripts/verify-brand-safety.mjs",
-    "verify:patch2": "npm run verify:targets && npm run verify:branding"
+    "verify:patch2": "npm run verify:targets && npm run verify:branding",
+    "package:ranktiger": "node scripts/package-ranktiger-release.mjs",
+    "verify:release-foundation": "node scripts/verify-release-foundation.mjs",
+    "verify:patch3": "npm run verify:patch2 && npm run verify:release-foundation"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.110.8"

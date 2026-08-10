@@ -1,0 +1,20 @@
+SCOREMORE PATCH 3 — PRODUCTION RELEASE FOUNDATION
+
+Status: SAFE FOUNDATION ONLY
+
+Adds:
+- RankTiger release policy
+- manual release-candidate workflow
+- release version/metadata packaging
+- exact dist tree SHA-256 recording
+- historical migration checksum lock
+- release safety verifier
+
+Important:
+- no RankTiger repository push
+- no production database migration
+- no Cloudflare deployment
+- no new Supabase project required
+- do NOT run the new RankTiger workflow yet
+
+Normal ScoreMore DEV Pages deployment remains unchanged.
