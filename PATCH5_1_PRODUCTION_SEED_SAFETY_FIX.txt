@@ -1,0 +1,17 @@
+PATCH 5.1 — RANKTIGER PROD DATABASE INITIALIZATION SAFETY FIX
+
+Reason:
+Supabase current production guidance says not to use `supabase db push --include-seed` on production databases.
+
+Patch 5.1 therefore:
+- removes every `--include-seed` flag from the RankTiger PROD workflow;
+- deploys RankTiger PROD with versioned migrations only;
+- moves the approved public catalogue/app-content baseline into migration:
+  supabase/migrations/20260811020000_public_catalogue_baseline.sql
+- keeps supabase/seed.sql for DEV/local reset purposes only;
+- preserves all 18 previously locked migration files unchanged;
+- locks the complete 19-migration production baseline in:
+  docs/LOCKED_MIGRATION_CHECKSUMS_PATCH5_1.json
+
+DO NOT RUN THE OLD PATCH 5 WORKFLOW.
+Replace initialize-ranktiger-prod-db.yml with the Patch 5.1 version before any RankTiger PROD database initialization.

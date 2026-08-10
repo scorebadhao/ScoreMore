@@ -1,5 +1,5 @@
 {
-  "patch": "5",
+  "patch": "5.1",
   "name": "RankTiger PROD Database Initialization",
   "base": "Verified Patch 4.1",
   "writeCapability": "RankTiger PROD database migrations + production-safe shared seed only",
@@ -10,9 +10,14 @@
     "PATCH5_RANKTIGER_PROD_DATABASE_INITIALIZATION.txt",
     "PATCH5_MANIFEST.json"
   ],
-  "modifiedFiles": ["package.json"],
+  "modifiedFiles": [
+    "package.json"
+  ],
   "historicalMigrationsModified": false,
   "frontendDeploymentIncluded": false,
   "rankTigerRepositoryPushIncluded": false,
-  "cloudflareDeploymentIncluded": false
+  "cloudflareDeploymentIncluded": false,
+  "title": "RankTiger PROD Database Initialization — Production Seed Safety Fix",
+  "production_seed_execution": false,
+  "production_catalogue_baseline": "supabase/migrations/20260811020000_public_catalogue_baseline.sql"
 }

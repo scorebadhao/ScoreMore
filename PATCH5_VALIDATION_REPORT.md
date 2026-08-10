@@ -1,35 +1,14 @@
-# Patch 5 Validation Report
+# Patch 5.1 Validation Report
 
-Patch: RankTiger PROD Database Initialization
-Base: verified Patch 4.1
+Status: PASS (local static/safety validation)
 
-## Passed checks
-
-- Patch 1 DEV/PROD target verifier: PASS
-- Patch 2 brand/seed verifier: PASS
-- Patch 3 release-foundation verifier: PASS
-- Patch 4 read-only PROD connection verifier: PASS
-- Patch 5 guarded database-init verifier: PASS
-- Workflow YAML parse: PASS
-- JavaScript syntax checks: PASS
-- Historical migration count: 18
-- Historical migration SHA-256 checks: PASS
-- Historical migration files unchanged from verified Patch 4.1: PASS
-- Production seed table allowlist: PASS
-- Production seed forbidden user/test/payment/admin targets: PASS
-- Literal secret/credential scan: PASS
-- Destructive database reset/migration repair/down commands in Patch 5 workflow: NONE
-- RankTiger GitHub push in Patch 5 workflow: NONE
-- Cloudflare deployment action/command in Patch 5 workflow: NONE
-
-## Intended write capability
-
-Only when manually run with the exact confirmation `INITIALIZE_RANKTIGER_PROD`, the Patch 5 workflow may apply pending versioned migrations and the shared production-safe catalogue/settings seed to the separately verified RankTiger PROD Supabase project.
-
-## Post-write verification
-
-The workflow verifies remote migration history and reads the seeded GSSSB board, CCE exam, and `hero_title` setting through the RankTiger public Data API using the publishable key.
-
-## Not included
-
-Patch 5 does not deploy or update the RankTiger frontend, RankTiger GitHub repository, Cloudflare Pages, or `ranktiger.in`.
+- RankTiger PROD production workflow uses versioned migrations only.
+- `--include-seed` is forbidden in the RankTiger PROD workflow.
+- 18 Patch 3 historical migrations remain byte-for-byte unchanged.
+- New idempotent public catalogue baseline migration added as migration 19.
+- Complete 19-migration RankTiger PROD baseline is checksum-locked.
+- Catalogue migration writes only to boards, exams, subjects, topics, app_settings.
+- Product identity keys app_name/app_mark/app_environment are forbidden.
+- No users/questions/tests/attempts/payments/admin data are inserted.
+- No database reset, migration repair/down, git push, Cloudflare deployment, service-role key, or secret API key is present.
+- RankTiger frontend deployment remains disabled in this workflow.
