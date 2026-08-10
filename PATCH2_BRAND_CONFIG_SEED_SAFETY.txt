@@ -1,0 +1,13 @@
+ScoreMore Patch 2 — Brand Configuration + Shared Seed Safety
+
+Purpose:
+- keep ScoreMore DEV behavior unchanged;
+- make future RankTiger PROD identity build-controlled;
+- prevent shared seed data from restoring ScoreMore branding in production;
+- normalize legacy human-readable backend ScoreMore messages to the active build name;
+- keep internal import protocol identifiers backward compatible;
+- separate build-specific browser pending-test state.
+
+No new Supabase migration is required.
+Do NOT create RankTiger PROD Supabase yet.
+Do NOT run the ScoreMore DEV database workflow for Patch 2.

@@ -1,0 +1,30 @@
+{
+  "patch": "Patch 2 \u2014 Brand Configuration + Shared Seed Safety",
+  "base": "Verified Patch 1 DEV/PROD Environment Foundation",
+  "database_migration_required": false,
+  "ranktiger_created": false,
+  "cloudflare_changed": false,
+  "files_added": [
+    "docs/BRAND_CONFIG_AND_SEED_SAFETY.md",
+    "scripts/verify-brand-safety.mjs",
+    "PATCH2_BRAND_CONFIG_SEED_SAFETY.txt",
+    "PATCH2_VALIDATION_REPORT.md",
+    "PATCH2_MANIFEST.json"
+  ],
+  "files_modified": [
+    ".env.example",
+    "build-targets.js",
+    "package.json",
+    "assets/js/config.js",
+    "assets/js/public.js",
+    "assets/js/student.js",
+    "assets/js/api.js",
+    "supabase/seed.sql"
+  ],
+  "historical_migrations_modified": false,
+  "safety_notes": [
+    "Do not run the ScoreMore DEV database deployment for Patch 2; there is no migration.",
+    "Do not create or connect RankTiger production infrastructure yet.",
+    "scoremore.question-import and scoremore-import-data remain compatibility protocol identifiers."
+  ]
+}
