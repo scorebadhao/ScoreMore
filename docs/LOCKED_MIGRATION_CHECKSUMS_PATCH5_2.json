@@ -1,0 +1,27 @@
+{
+  "lock_version": "PATCH5_2",
+  "purpose": "Approved RankTiger PROD migration set after fresh-environment catalogue prerequisite repair.",
+  "migration_count": 20,
+  "migrations": {
+    "20260804000000_initial_scoremore_schema.sql": "a451081e80c74941d9975aa3a3602df95ee6b7ec41c8ad71ddd6c44ffdd06b3f",
+    "20260804010000_store_signup_mobile.sql": "c41fa398b7c67bf69c2572e84aeeb1f78f2b76dc2374cb5202a5d5dc527f5815",
+    "20260804020000_admin_fixed_test_manager.sql": "897687c22bb66904cad052e52a8fc678cf91649e88afe831970142377f22b997",
+    "20260804030000_phase3a_import_foundation.sql": "5bb94d5dfe0b9f236960cb5e54df088b1311bd87f9a28dcf0b61532adf243bea",
+    "20260804040000_phase3b_import_dry_run.sql": "b44b80830d05540df036431a3d1dcd4536cdff4480d683da761bc6617be4c5d1",
+    "20260804050000_allow_html_import_mime_types.sql": "0a27d1860a192b60905531c8cf43b715a7438b01becd47a9ebe773db92f90bb5",
+    "20260804060000_phase3c_controlled_draft_import.sql": "25527ada5de1e288e13b70e30126fa9432d89df4f63c5c618b2f8a8eea3b1533",
+    "20260805000000_add_ai_proposed_answer_source.sql": "c7e7fb45f51f3617abd08fbdc78017d0eb106820345f5c468bd26feab7bc280a",
+    "20260805000050_catalogue_parent_prerequisites.sql": "15c6d4a6ae43b8bf16e721cb1d0981f2e27e5372ce343dc6dbf0f521e45189f2",
+    "20260805000100_phase3e_compatibility.sql": "d0f843eedc74a9d558f7d8cea713e0ba4e1c691746149e2d58d4c02553422bd5",
+    "20260805010000_import_recovery_fast_drafts.sql": "9e7b653dd2bf3b4ef80427babc02c52c1003274209f71b7a1078290a07f73318",
+    "20260805020000_visual_fingerprint_and_review_flow.sql": "8b402db88ff3cc9226909c78e79c1cade2de21a99201829b6581f87e24f718fe",
+    "20260806000000_source_option_anomaly_publish_centre.sql": "7b328391f8deda1e12ad4f209d5d6c8de1ca4ca548badb2785f33ebf7f99f692",
+    "20260806010000_simple_test_builder_catalogue.sql": "74243af15a98dd788df98bbf13c47c344428a15dc8cce109603bf4593332674e",
+    "20260807010000_phase4a_dynamic_multifilter_test_builder.sql": "885d510b2128c91c3c15fc56024a84cf1a99668c60cf56d963b6f833a6d85d7f",
+    "20260807020000_mobile_test_runner_sections.sql": "fd9e86b538530a2fdd976229e6d8052b6144e96d292e4a2835a7e404a11accff",
+    "20260808010000_student_safe_image_repair_centre.sql": "89eed2c1f478eaa08cf24fb99717c9d1a32033d1c747a5ce65c1f264a1fb623d",
+    "20260808020000_compulsory_student_image_readiness.sql": "cc57b3b4c27df714281f1686767ad7b8d970547af44bb6bf9f02bf5a22045067",
+    "20260810010000_student_hub_v1.sql": "6ee421f5bab48e122663a0a7ca12d534df5576de2ecc296ea17d931decc76c8c",
+    "20260811020000_public_catalogue_baseline.sql": "ba79c0b015926969c371ab1f9edfe438728b482697dc646a48fa4c644a44fbf6"
+  }
+}
