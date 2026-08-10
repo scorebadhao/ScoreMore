@@ -1,4 +1,4 @@
-import { isConfigured } from './config.js';
+import { APP_CONFIG, isConfigured } from './config.js';
 import { api } from './api.js';
 import { toast } from './toast.js';
 
@@ -167,7 +167,7 @@ async function showBuilder() {
   if (profile?.role !== 'ADMIN') {
     await api.signOut();
     showLogin();
-    throw new Error('This account is not authorized as a ScoreMore admin.');
+    throw new Error(`This account is not authorized as a ${APP_CONFIG.name} admin.`);
   }
 
   state.profile = profile;

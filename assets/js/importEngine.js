@@ -569,7 +569,7 @@ async function parseImportHtml(file) {
   if (file.size > MAX_IMPORT_FILE_BYTES) throw new Error('The HTML package exceeds the 20 MB Phase 3B limit.');
   const extensionOkay = /\.(html?|xhtml)$/i.test(file.name);
   const mimeOkay = ['text/html', 'application/xhtml+xml', ''].includes((file.type || '').toLowerCase());
-  if (!extensionOkay && !mimeOkay) throw new Error('Choose an .html, .htm or .xhtml ScoreMore import package.');
+  if (!extensionOkay && !mimeOkay) throw new Error('Choose an .html, .htm or .xhtml question import package.');
   if (!globalThis.crypto?.subtle) throw new Error('Secure SHA-256 hashing is not available in this browser.');
 
   const bytes = await file.arrayBuffer();

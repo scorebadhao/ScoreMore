@@ -1,4 +1,4 @@
-import { isConfigured } from './config.js';
+import { APP_CONFIG, isConfigured } from './config.js';
 import { api } from './api.js';
 import { toast } from './toast.js';
 import { downloadJson, formatBytes, parseImportHtml } from './importEngine.js';
@@ -152,7 +152,7 @@ async function showAdmin() {
   if (profile?.role !== 'ADMIN') {
     await api.signOut();
     showLogin();
-    throw new Error('This account is not authorized as a ScoreMore admin.');
+    throw new Error(`This account is not authorized as a ${APP_CONFIG.name} admin.`);
   }
   elements.loginPanel.classList.add('hidden');
   elements.adminPanel.classList.remove('hidden');
@@ -1937,7 +1937,7 @@ async function recoverTimedOutDryRun() {
   if (!parsedImportPackage) return false;
   setImportProgress({
     title: 'Checking server state…',
-    text: 'A timeout does not necessarily mean failure. ScoreMore is checking whether the server finished safely.',
+    text: `A timeout does not necessarily mean failure. ${APP_CONFIG.name} is checking whether the server finished safely.`,
     value: 10,
     max: 100,
   });
@@ -2167,7 +2167,7 @@ async function importSelectedDrafts() {
     loading.close();
     const confirmed = await requestImportConfirmation({
       title: `Process ${ready + reusable} remaining record${ready + reusable === 1 ? '' : 's'}?`,
-      message: 'ScoreMore will create only new drafts. Exact duplicates will reuse an existing draft or master question, and nothing is published automatically.',
+      message: `${APP_CONFIG.name} will create only new drafts. Exact duplicates will reuse an existing draft or master question, and nothing is published automatically.`,
       buttonLabel: 'Import remaining drafts',
     });
     if (!confirmed) {

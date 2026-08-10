@@ -100,7 +100,7 @@ function testCardMarkup(test, { compact = false } = {}) {
         <span class="test-type-icon"><svg class="icon"><use href="#${typeIcon(test.test_type)}"></use></svg></span>
         <div>
           <h3>${escapeHtml(test.test_name)}</h3>
-          <p>${escapeHtml(test.boards?.board_name || 'ScoreMore')} ${test.exams?.exam_name ? `· ${escapeHtml(test.exams.exam_name)}` : ''}</p>
+          <p>${escapeHtml(test.boards?.board_name || APP_CONFIG.name)} ${test.exams?.exam_name ? `· ${escapeHtml(test.exams.exam_name)}` : ''}</p>
         </div>
       </div>
       <div class="test-meta">
@@ -126,7 +126,7 @@ function renderTests(tests) {
       <div class="empty-state catalogue-empty">
         <span class="empty-icon"><svg class="icon"><use href="#i-grid"></use></svg></span>
         <h3>No published tests yet</h3>
-        <p>Reviewed tests will appear here as soon as the ScoreMore administrator publishes them.</p>
+        <p>Reviewed tests will appear here as soon as the ${APP_CONFIG.name} administrator publishes them.</p>
       </div>
     `;
     return;
@@ -188,8 +188,8 @@ function renderScopes(config) {
 async function loadPublicConfiguration() {
   publicConfig = await api.getPublicConfiguration();
   const settings = publicConfig.settings || {};
-  document.getElementById('brandName').textContent = settings.app_name || APP_CONFIG.name;
-  document.getElementById('brandTagline').textContent = settings.app_tagline || 'Prepare smarter';
+  document.getElementById('brandName').textContent = APP_CONFIG.name;
+  document.getElementById('brandTagline').textContent = settings.app_tagline || APP_CONFIG.tagline;
   document.getElementById('scopeBadge').textContent = settings.scope_badge || 'Dynamic exam platform';
   document.getElementById('heroTitle').textContent = settings.hero_title || 'Prepare Smarter';
   document.getElementById('heroSubtitle').textContent = settings.hero_subtitle || 'Previous-year questions, sectional practice and meaningful analytics.';
@@ -283,7 +283,7 @@ async function initialize() {
   });
 
   const reason = new URLSearchParams(window.location.search).get('reason');
-  if (reason === 'signin') toast.info('Sign in to access your ScoreMore student dashboard.');
+  if (reason === 'signin') toast.info(`Sign in to access your ${APP_CONFIG.name} student dashboard.`);
 }
 
 initialize();

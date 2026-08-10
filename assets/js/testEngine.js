@@ -761,7 +761,7 @@ export async function mountTestEngine(root, attemptId, { onExit, onViewResult } 
         <div class="result-hero">
           <span class="eyebrow light">${automatic ? 'Time completed' : 'Test completed'}</span>
           <h2>${escapeHtml(state.attempt.tests?.test_name || 'Test complete')}</h2>
-          <p>${automatic ? 'The time limit ended and your saved answers were scored securely.' : 'Your attempt was scored securely on the ScoreMore database.'}</p>
+          <p>${automatic ? 'The time limit ended and your saved answers were scored securely.' : `Your attempt was scored securely on the ${APP_CONFIG.name} database.`}</p>
           <div class="result-score-line"><strong>${escapeHtml(result.score ?? 0)}</strong><span>/ ${escapeHtml(maxScore)}</span></div>
         </div>
         <div class="result-grid">

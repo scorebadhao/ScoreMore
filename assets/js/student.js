@@ -143,8 +143,8 @@ async function loadBrand() {
   try {
     const config = await api.getPublicConfiguration();
     const settings = config.settings || {};
-    input('brandName').textContent = settings.app_name || APP_CONFIG.name;
-    input('brandTagline').textContent = settings.app_tagline || 'Prepare smarter';
+    input('brandName').textContent = APP_CONFIG.name;
+    input('brandTagline').textContent = settings.app_tagline || APP_CONFIG.tagline;
   } catch (error) {
     toast.warning(error.message);
   }
@@ -269,7 +269,7 @@ function testCardMarkup(test) {
   const action = isResume ? 'Resume test' : hasHistory ? 'Reattempt' : 'Start test';
   return `<article class="catalogue-test-card test-card">
     <div class="test-card-topline"><span class="eyebrow">${escapeHtml(testTypeLabel(test.test_type))}</span><span class="access-badge ${String(test.access_state).toLowerCase()}">${escapeHtml(test.access_state)}</span></div>
-    <div class="test-card-heading"><span class="test-type-icon"><svg class="icon"><use href="#${typeIcon(test.test_type)}"></use></svg></span><div><h3>${escapeHtml(test.test_name)}</h3><p>${escapeHtml(test.board_name || 'ScoreMore')} ${test.exam_name ? `· ${escapeHtml(test.exam_name)}` : ''}</p></div></div>
+    <div class="test-card-heading"><span class="test-type-icon"><svg class="icon"><use href="#${typeIcon(test.test_type)}"></use></svg></span><div><h3>${escapeHtml(test.test_name)}</h3><p>${escapeHtml(test.board_name || APP_CONFIG.name)} ${test.exam_name ? `· ${escapeHtml(test.exam_name)}` : ''}</p></div></div>
     <div class="test-meta">${test.subject_name ? `<span class="chip">${escapeHtml(test.subject_name)}</span>` : ''}${test.topic_name ? `<span class="chip">${escapeHtml(test.topic_name)}</span>` : ''}${dateShift ? `<span class="chip">${escapeHtml(dateShift)}</span>` : ''}<span class="chip">${test.question_count} questions</span><span class="chip">${test.duration_minutes} min</span></div>
     <div class="test-card-facts"><span><b>${formatNumber(test.marks_per_question)}</b> mark/question</span><span><b>${formatNumber(test.negative_marks)}</b> negative</span>${hasHistory ? `<span><b>${formatNumber(test.best_score)}</b> best score</span>` : ''}</div>
     ${hasHistory ? `<div class="test-performance-strip"><span>Last: <b>${formatNumber(test.last_score)}</b></span><span>${formatNumber(test.last_accuracy)}% accuracy</span><span>${test.attempt_count} attempt${Number(test.attempt_count) === 1 ? '' : 's'}</span></div>` : ''}
@@ -289,7 +289,7 @@ function renderTests() {
   const tests = testResult.items || [];
   elements.catalogueCount.textContent = testResult.total || 0;
   elements.catalogueResultText.textContent = `${testResult.total || 0} ${Number(testResult.total) === 1 ? 'test' : 'tests'} found`;
-  elements.catalogueScopeText.textContent = testFilters.testType ? testTypeLabel(testFilters.testType) : 'All student-ready ScoreMore tests';
+  elements.catalogueScopeText.textContent = testFilters.testType ? testTypeLabel(testFilters.testType) : `All student-ready ${APP_CONFIG.name} tests`;
   if (!tests.length) {
     elements.studentTestList.innerHTML = emptyState({ icon: 'i-search', title: 'No matching tests', message: 'Try another filter or clear your search.', action: '<button id="emptyClearFilters" class="button button-ghost" type="button">Clear filters</button>' });
     input('emptyClearFilters')?.addEventListener('click', clearTestFilters);
@@ -649,7 +649,7 @@ async function initialize() {
   subscribeRoute(handleRoute);
   if (!isConfigured) {
     elements.setupNotice.classList.remove('hidden');
-    elements.studentLoading.textContent = 'ScoreMore is not configured.';
+    elements.studentLoading.textContent = `${APP_CONFIG.name} is not configured.`;
     return;
   }
   try {

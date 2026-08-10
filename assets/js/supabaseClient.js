@@ -13,7 +13,7 @@ export const supabase = isConfigured
 
 export function requireSupabase() {
   if (!supabase) {
-    throw new Error('ScoreMore is not configured. Add the Supabase environment variables.');
+    throw new Error(`${APP_CONFIG.name} is not configured. Add the Supabase environment variables.`);
   }
   return supabase;
 }
