@@ -94,17 +94,17 @@ jobs:
           fi
           echo "Supabase access token can see the RankTiger project."
 
-      - name: Verify RankTiger Data API endpoint and publishable key
+      - name: Verify RankTiger Auth API endpoint and publishable key
         shell: bash
         run: |
           HTTP_CODE="$(curl --silent --show-error --output /tmp/ranktiger-data-api.json --write-out '%{http_code}' \
-            "${RANKTIGER_SUPABASE_URL%/}/rest/v1/" \
+            "${RANKTIGER_SUPABASE_URL%/}/auth/v1/settings" \
             -H "apikey: ${RANKTIGER_SUPABASE_PUBLISHABLE_KEY}")"
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "Blocked: RankTiger Data API check returned HTTP $HTTP_CODE."
+            echo "Blocked: RankTiger Auth API check returned HTTP $HTTP_CODE."
             exit 1
           fi
-          echo "RankTiger Data API endpoint accepted the publishable key successfully."
+          echo "RankTiger Auth API endpoint accepted the publishable key successfully."
 
       - name: Link RankTiger PROD using the production database password
         shell: bash
