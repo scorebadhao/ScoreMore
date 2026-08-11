@@ -1,3 +1,4 @@
+# SCOREMORE PATCH 6.2 — RANKTIGER RC WORKFLOW — FINAL
 name: Prepare RankTiger Release Candidate — SAFE NO DEPLOY
 
 on:
@@ -6,10 +7,12 @@ on:
       release_version:
         description: 'Candidate version, for example 1.0.0-rc.1'
         required: true
+        default: '1.0.0-rc.1'
         type: string
       confirmation:
         description: 'Type PREPARE_RANKTIGER_RC exactly. This prepares an artifact only; it does NOT deploy.'
         required: true
+        default: ''
         type: string
 
 permissions:
@@ -25,8 +28,10 @@ jobs:
     steps:
       - name: Safety gate
         shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
         run: |
-          if [ "${{ inputs.confirmation }}" != "PREPARE_RANKTIGER_RC" ]; then
+          if [ "$CONFIRMATION" != "PREPARE_RANKTIGER_RC" ]; then
             echo "Blocked: confirmation must be PREPARE_RANKTIGER_RC"
             exit 1
           fi
@@ -39,32 +44,82 @@ jobs:
         with:
           node-version: 22
 
-      - name: Require dependency lock before any production candidate
+      - name: Require committed dependency lock before candidate build
         shell: bash
         run: |
           if [ ! -f package-lock.json ]; then
-            echo "Blocked safely: package-lock.json does not exist yet."
-            echo "Patch 3 intentionally refuses to create a production candidate without locked dependencies."
+            echo "Blocked safely: package-lock.json is not committed in ScoreMore yet."
+            echo "Run Bootstrap ScoreMore Dependency Lock — SAFE NO DEPLOY, download its artifact, then upload package-lock.json to the ScoreMore repository root."
             exit 1
           fi
 
-      - name: Require future RankTiger PROD public environment secrets
+      - name: Require RankTiger PROD browser-safe environment secrets
+        shell: bash
+        env:
+          RANKTIGER_SUPABASE_PROJECT_ID: ${{ secrets.RANKTIGER_SUPABASE_PROJECT_ID }}
+          RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
+          RANKTIGER_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.RANKTIGER_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$RANKTIGER_SUPABASE_PROJECT_ID" ] || [ -z "$RANKTIGER_SUPABASE_URL" ] || [ -z "$RANKTIGER_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "Blocked safely: RankTiger PROD browser-safe Supabase/project identity values are missing."
+            exit 1
+          fi
+          if [ "$RANKTIGER_SUPABASE_PROJECT_ID" = "stejewkuikvqpqotjnnt" ]; then
+            echo "Blocked: RankTiger candidate target matches ScoreMore DEV project ID."
+            exit 1
+          fi
+          EXPECTED_URL="https://${RANKTIGER_SUPABASE_PROJECT_ID}.supabase.co"
+          if [ "${RANKTIGER_SUPABASE_URL%/}" != "$EXPECTED_URL" ]; then
+            echo "Blocked: RankTiger PROD URL does not match RankTiger project ID."
+            exit 1
+          fi
+
+      - name: Install exactly locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify complete ScoreMore → RankTiger candidate safety chain
+        run: npm run verify:patch6
+
+      - name: Verify RankTiger PROD public API is ready — READ ONLY
         shell: bash
         env:
           RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
           RANKTIGER_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.RANKTIGER_SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          if [ -z "$RANKTIGER_SUPABASE_URL" ] || [ -z "$RANKTIGER_SUPABASE_PUBLISHABLE_KEY" ]; then
-            echo "Blocked safely: RankTiger PROD browser-safe Supabase secrets are not configured yet."
-            echo "No production system has been touched."
+          AUTH_CODE="$(curl --silent --show-error --output /tmp/ranktiger-auth-settings.json --write-out '%{http_code}' \
+            "${RANKTIGER_SUPABASE_URL%/}/auth/v1/settings" \
+            -H "apikey: ${RANKTIGER_SUPABASE_PUBLISHABLE_KEY}")"
+          if [ "$AUTH_CODE" != "200" ]; then
+            echo "Blocked: RankTiger Auth API returned HTTP $AUTH_CODE."
             exit 1
           fi
 
-      - name: Install locked dependencies
-        run: npm ci
+          API="${RANKTIGER_SUPABASE_URL%/}/rest/v1"
+          check_public() {
+            local label="$1"
+            local path="$2"
+            local expected="$3"
+            local out="/tmp/ranktiger-rc-${label}.json"
+            local code
+            code="$(curl --silent --show-error --output "$out" --write-out '%{http_code}' \
+              "${API}/${path}" \
+              -H "apikey: ${RANKTIGER_SUPABASE_PUBLISHABLE_KEY}")"
+            if [ "$code" != "200" ]; then
+              echo "Blocked: RankTiger public API check for $label returned HTTP $code."
+              cat "$out" || true
+              exit 1
+            fi
+            if ! grep -Fq "$expected" "$out"; then
+              echo "Blocked: RankTiger public API check for $label did not return the expected production baseline."
+              cat "$out" || true
+              exit 1
+            fi
+          }
 
-      - name: Verify ScoreMore → RankTiger release foundation
-        run: npm run verify:patch3
+          check_public "board" "boards?select=board_id&board_id=eq.GSSSB&limit=1" '"board_id":"GSSSB"'
+          check_public "exam" "exams?select=exam_id&exam_id=eq.CCE&limit=1" '"exam_id":"CCE"'
+          check_public "hero" "app_settings?select=setting_key&setting_key=eq.hero_title&limit=1" '"setting_key":"hero_title"'
+          echo "RankTiger PROD public baseline is reachable and ready for candidate build."
 
       - name: Build RankTiger production target
         env:
@@ -72,9 +127,12 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.RANKTIGER_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run build:ranktiger
 
-      - name: Package candidate release
+      - name: Package RankTiger candidate release
         env:
           RANKTIGER_RELEASE_VERSION: ${{ inputs.release_version }}
+          RANKTIGER_SUPABASE_PROJECT_ID: ${{ secrets.RANKTIGER_SUPABASE_PROJECT_ID }}
+          RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
+          RANKTIGER_PROD_PUBLIC_BASELINE_VERIFIED: 'true'
         run: npm run package:ranktiger
 
       - name: Upload RankTiger release-candidate artifact
@@ -83,11 +141,13 @@ jobs:
           name: ranktiger-${{ inputs.release_version }}-${{ github.sha }}
           path: release/ranktiger
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
-      - name: Confirm no production deployment occurred
+      - name: Confirm candidate-only outcome
+        shell: bash
         run: |
-          echo "RankTiger release candidate prepared as a GitHub artifact only."
-          echo "RankTiger repository push: DISABLED in Patch 3."
-          echo "RankTiger PROD database migration: DISABLED in Patch 3."
-          echo "Cloudflare production deployment: NOT CONFIGURED in Patch 3."
+          echo "RankTiger release candidate prepared as a GitHub Actions artifact only."
+          echo "RankTiger repository push: NO"
+          echo "RankTiger PROD database migration: NO"
+          echo "Cloudflare deployment: NO"
+          echo "Student-facing domain deployment: NO"
