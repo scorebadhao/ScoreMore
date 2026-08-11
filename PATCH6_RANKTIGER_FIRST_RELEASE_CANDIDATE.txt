@@ -1,0 +1,18 @@
+SCOREMORE PATCH 6 — RANKTIGER FIRST RELEASE CANDIDATE
+Status: CANDIDATE ONLY / SAFE NO DEPLOY
+
+Adds:
+- one-time dependency-lock bootstrap workflow
+- committed package-lock requirement for RankTiger candidates
+- npm ci production-candidate install
+- RankTiger PROD project-ID/URL target guard
+- read-only PROD Auth/public catalogue preflight
+- RankTiger production-target build
+- release candidate packaging + RELEASE.json traceability
+- GitHub Actions artifact upload
+
+Does NOT:
+- migrate RankTiger PROD
+- push RankTiger GitHub
+- deploy Cloudflare
+- deploy ranktiger.in

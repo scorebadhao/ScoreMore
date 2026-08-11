@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "ScoreMore — Supabase-based GSSSB CCE examination platform starter.",
+  "description": "ScoreMore \u2014 Supabase-based GSSSB CCE examination platform starter.",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -22,7 +22,10 @@
     "verify:ranktiger-prod-connection": "node scripts/verify-ranktiger-prod-connection.mjs",
     "verify:patch4": "npm run verify:patch3 && npm run verify:ranktiger-prod-connection",
     "verify:ranktiger-prod-db-init": "node scripts/verify-ranktiger-prod-database-init.mjs",
-    "verify:patch5": "npm run verify:patch4 && npm run verify:ranktiger-prod-db-init"
+    "verify:patch5": "npm run verify:patch4 && npm run verify:ranktiger-prod-db-init",
+    "verify:dependency-lock": "node scripts/verify-dependency-lock.mjs",
+    "verify:ranktiger-rc": "node scripts/verify-ranktiger-release-candidate.mjs",
+    "verify:patch6": "npm run verify:patch5 && npm run verify:ranktiger-rc && npm run verify:dependency-lock"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.110.8"

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "product": "RankTiger",
   "sourceRepository": "ScoreMore",
   "productionRepository": "RankTiger",
@@ -12,5 +12,9 @@
   "releaseStatus": "candidate",
   "productionDeployEnabled": false,
   "productionDatabaseMigrationEnabled": false,
-  "notes": "Patch 3 foundation only. This policy may prepare a RankTiger release candidate artifact but must not deploy RankTiger PROD or push to the RankTiger repository."
+  "notes": "Patch 6 operational release-candidate policy. A candidate may be built only from a committed dependency lock and RankTiger PROD browser-safe values. It remains artifact-only: no RankTiger repository push, no production database migration, and no Cloudflare/domain deployment.",
+  "dependencyLockRequired": true,
+  "requiredMigrationLockFile": "docs/LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json",
+  "requiredMigrationCount": 20,
+  "firstCandidateVersion": "1.0.0-rc.1"
 }

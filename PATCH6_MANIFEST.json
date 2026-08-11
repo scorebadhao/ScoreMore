@@ -1,0 +1,30 @@
+{
+  "patch": "6",
+  "title": "RankTiger First Release Candidate",
+  "base": "ScoreMore Patch 5.2 verified repository",
+  "date": "2026-08-11",
+  "candidate_only": true,
+  "production_repository_push_enabled": false,
+  "production_database_migration_enabled": false,
+  "cloudflare_deploy_enabled": false,
+  "dependency_lock_bootstrap_required": true,
+  "first_candidate_version": "1.0.0-rc.1",
+  "changed_files": {
+    ".github/workflows/bootstrap-package-lock.yml": "fe72eb38f2dc1bfd9cac358c9312b86619ac6c5e922f8e6dfbcd3b80268e4186",
+    ".github/workflows/deploy-pages.yml": "e78f87bf1084e206a8413716fe2c139db0c903bc640777ba547748eafb8ed4a4",
+    ".github/workflows/prepare-ranktiger-release.yml": "0ed9731fac15f1943c89b11ce1160cf88249651cbbe90307d6c863a33e993100",
+    "PATCH6_RANKTIGER_FIRST_RELEASE_CANDIDATE.txt": "e07f3feb607bdd6ff978ea439aa7b6d607af990ca137ec02d6cf8567da6f4c3c",
+    "PATCH6_UPLOAD_INSTRUCTIONS.md": "f35c2e844a29ac04edd342fbf805496677789a70b09d06d9508680ca1cf879a1",
+    "docs/RANKTIGER_FIRST_RELEASE_CANDIDATE_PATCH6.md": "2d299b52ccae3927bd8bd2ff778c18ee33cd3c45310353101910ad855e119ee0",
+    "docs/README.md": "4f8c25ffd4b631d744fa25f0ff533c327686e2cecfe65e8209f8bca0d1b249a5",
+    "package.json": "433d57137dbeacdd1985ccb7f3e63653ef8de322685deee2fd1d932c0997fe22",
+    "ranktiger-release.config.json": "94e1b4e2e8313a133f3becce603412f501ea762b94b7431e429a0f97f32c2051",
+    "scripts/package-ranktiger-release.mjs": "066681a9ffb389cd5f9a1f64272c5f4c59af9d921e485240e069c6ef61d7514e",
+    "scripts/verify-dependency-lock.mjs": "8e4b225bd336de519509ccfb3f142db15e8fa5928db3174e47198e2336555661",
+    "scripts/verify-ranktiger-release-candidate.mjs": "fb68d35f3f7ee0b8937b030565aaad7b9ff6c390f62b2f7f4ed01179ec3d225a"
+  },
+  "support_files": [
+    "PATCH6_MANIFEST.json",
+    "PATCH6_VALIDATION_REPORT.md"
+  ]
+}
