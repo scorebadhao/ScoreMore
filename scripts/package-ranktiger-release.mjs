@@ -6,6 +6,7 @@ import { resolve, relative, sep } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = resolve(ROOT, 'dist');
 const POLICY_FILE = resolve(ROOT, 'ranktiger-release.config.json');
+const PACKAGE_LOCK = resolve(ROOT, 'package-lock.json');
 
 function fail(message) {
   console.error(`\nERROR: ${message}`);
@@ -30,6 +31,10 @@ async function listFiles(dir) {
   return out;
 }
 
+async function sha256File(path) {
+  return createHash('sha256').update(await readFile(path)).digest('hex');
+}
+
 async function hashTree(dir) {
   const hash = createHash('sha256');
   const files = (await listFiles(dir)).sort((a, b) => a.localeCompare(b));
@@ -47,7 +52,7 @@ function resolveSourceCommit() {
   const envSha = String(process.env.GITHUB_SHA || '').trim();
   if (/^[0-9a-f]{7,40}$/i.test(envSha)) return envSha;
   try {
-    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch {
     return 'unknown';
   }
@@ -81,6 +86,7 @@ async function assertRankTigerDist() {
     'SUPABASE_DB_PASSWORD',
     'SUPABASE_ACCESS_TOKEN',
     'RANKTIGER_RELEASE_TOKEN',
+    'sb_secret_',
     'service_role',
     'postgresql://',
   ];
@@ -101,15 +107,44 @@ async function assertRankTigerDist() {
       }
     }
   }
+
+  return files.length;
 }
 
 const policy = JSON.parse(await readFile(POLICY_FILE, 'utf8'));
-if (policy.product !== 'RankTiger' || policy.productionDeployEnabled !== false || policy.productionDatabaseMigrationEnabled !== false) {
-  fail('Patch 3 release policy is not in safe candidate-only mode.');
+if (
+  policy.schemaVersion !== 2
+  || policy.product !== 'RankTiger'
+  || policy.dependencyLockRequired !== true
+  || policy.requiredMigrationCount !== 20
+  || policy.productionDeployEnabled !== false
+  || policy.productionDatabaseMigrationEnabled !== false
+) {
+  fail('Patch 6 release policy is not in the expected candidate-only safe mode.');
+}
+
+let packageLock;
+try {
+  packageLock = JSON.parse(await readFile(PACKAGE_LOCK, 'utf8'));
+} catch {
+  fail('package-lock.json is required before packaging a RankTiger release candidate.');
+}
+if (Number(packageLock.lockfileVersion) < 3) fail('package-lock.json must use lockfileVersion 3 or newer.');
+
+const productionProjectId = String(process.env.RANKTIGER_PROD_PROJECT_ID || '').trim();
+if (!/^[a-z0-9]{20}$/.test(productionProjectId)) {
+  fail('RANKTIGER_PROD_PROJECT_ID is missing or invalid.');
+}
+if (productionProjectId === 'stejewkuikvqpqotjnnt') {
+  fail('Refusing to package RankTiger candidate against the ScoreMore DEV project ID.');
+}
+
+if (String(process.env.RANKTIGER_PROD_PUBLIC_BASELINE_VERIFIED || '').toLowerCase() !== 'true') {
+  fail('RankTiger PROD public baseline must be verified read-only before packaging the candidate.');
 }
 
 const version = normalizeVersion(process.env.RANKTIGER_RELEASE_VERSION || process.argv[2]);
-await assertRankTigerDist();
+const distFileCount = await assertRankTigerDist();
 
 const outputRoot = resolve(ROOT, policy.artifactDirectory);
 const outputDist = resolve(outputRoot, 'dist');
@@ -120,9 +155,12 @@ await cp(DIST, outputDist, { recursive: true });
 const migrationFiles = (await readdir(resolve(ROOT, 'supabase/migrations')))
   .filter((name) => name.endsWith('.sql'))
   .sort();
+if (migrationFiles.length !== policy.requiredMigrationCount) {
+  fail(`Expected ${policy.requiredMigrationCount} approved migrations, found ${migrationFiles.length}.`);
+}
 
 const metadata = {
-  schema_version: 1,
+  schema_version: 2,
   product: 'RankTiger',
   environment: 'production',
   release_status: 'candidate',
@@ -133,19 +171,32 @@ const metadata = {
   build_target: policy.buildTarget,
   base_path: policy.basePath,
   built_at_utc: new Date().toISOString(),
+  dist_file_count: distFileCount,
   dist_sha256: await hashTree(outputDist),
+  dependencies: {
+    package_lock_required: true,
+    package_json_sha256: await sha256File(resolve(ROOT, 'package.json')),
+    package_lock_sha256: await sha256File(PACKAGE_LOCK),
+    package_lock_version: packageLock.lockfileVersion,
+  },
   database: {
     migrations_in_source: migrationFiles.length,
     latest_source_migration: migrationFiles.at(-1) || null,
+    required_migration_lock_file: policy.requiredMigrationLockFile,
+    required_migration_count: policy.requiredMigrationCount,
+    production_project_id: productionProjectId,
+    production_public_baseline_verified_before_build: true,
     production_migration_applied_by_this_workflow: false,
   },
   promotion: {
     ranktiger_repository_updated: false,
     cloudflare_deployed: false,
-    note: 'Patch 3 release-candidate package only. Production promotion is intentionally disabled.',
+    student_domain_deployed: false,
+    note: 'Patch 6 release-candidate artifact only. Stable promotion remains intentionally disabled.',
   },
 };
 
 await writeFile(resolve(outputRoot, policy.releaseMetadataFile), `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
 console.log(`RankTiger release candidate ${version} packaged at ${relative(ROOT, outputRoot)}/`);
 console.log(`dist SHA-256: ${metadata.dist_sha256}`);
+console.log(`package-lock SHA-256: ${metadata.dependencies.package_lock_sha256}`);
