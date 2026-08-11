@@ -65,9 +65,10 @@ const packager = await readFile(resolve(ROOT, 'scripts/package-ranktiger-release
 pass(packager.includes('package_lock_sha256'), 'Release metadata must record package-lock SHA-256.');
 pass(packager.includes('required_migration_lock_file'), 'Release metadata must record the required migration lock file.');
 pass(packager.includes('production_project_id'), 'Release metadata must record the RankTiger PROD project ID used for the candidate.');
-pass(packager.includes('process.env.RANKTIGER_SUPABASE_PROJECT_ID'), 'Release packager must consume the already-validated RankTiger project ID directly.');
+pass(packager.includes('hostMatch') && packager.includes('supabase\\.co'), 'Release packager must derive the RankTiger project reference from the validated Supabase URL.');
+pass(packager.includes('suppliedProductionProjectId') && packager.includes('does not match the RankTiger Supabase URL'), 'Release packager must cross-check an explicit project ID when supplied.');
 pass(packager.includes('process.env.RANKTIGER_SUPABASE_URL'), 'Release packager must cross-check the project ID against the validated RankTiger Supabase URL.');
-pass(packager.includes('parsedProductionUrl.hostname !== `${productionProjectId}.supabase.co`'), 'Release packager must bind project identity to the Supabase hostname instead of a brittle fixed-length check.');
+pass(packager.includes('const productionProjectId = hostMatch[1]'), 'Release packager must bind project identity to the Supabase hostname instead of a brittle fixed-length check.');
 pass(!packager.includes('/^[a-z0-9]{20}$/'), 'Release packager must not assume Supabase project references are exactly 20 characters.');
 pass(packager.includes('production_public_baseline_verified_before_build'), 'Release metadata must record the read-only production baseline verification.');
 pass(!packager.includes('supabase db push'), 'Release packager must never migrate a database.');

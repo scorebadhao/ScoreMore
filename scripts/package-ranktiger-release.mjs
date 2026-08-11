@@ -131,19 +131,13 @@ try {
 }
 if (Number(packageLock.lockfileVersion) < 3) fail('package-lock.json must use lockfileVersion 3 or newer.');
 
-const productionProjectId = String(
+const suppliedProductionProjectId = String(
   process.env.RANKTIGER_SUPABASE_PROJECT_ID
   || process.env.RANKTIGER_PROD_PROJECT_ID
   || '',
 ).trim();
 const productionUrl = String(process.env.RANKTIGER_SUPABASE_URL || '').trim().replace(/\/+$/, '');
 
-if (!productionProjectId) {
-  fail('RankTiger Supabase project ID is missing.');
-}
-if (productionProjectId === 'stejewkuikvqpqotjnnt') {
-  fail('Refusing to package RankTiger candidate against the ScoreMore DEV project ID.');
-}
 if (!productionUrl) {
   fail('RankTiger Supabase URL is missing.');
 }
@@ -154,11 +148,21 @@ try {
 } catch {
   fail('RankTiger Supabase URL is invalid.');
 }
-if (
-  parsedProductionUrl.protocol !== 'https:'
-  || parsedProductionUrl.hostname !== `${productionProjectId}.supabase.co`
-) {
-  fail('RankTiger Supabase project ID does not match the validated Supabase URL.');
+if (parsedProductionUrl.protocol !== 'https:') {
+  fail('RankTiger Supabase URL must use HTTPS.');
+}
+
+const hostMatch = parsedProductionUrl.hostname.match(/^([a-z0-9]+)\.supabase\.co$/i);
+if (!hostMatch) {
+  fail('RankTiger Supabase URL must use the standard <project-ref>.supabase.co host.');
+}
+const productionProjectId = hostMatch[1];
+
+if (productionProjectId === 'stejewkuikvqpqotjnnt') {
+  fail('Refusing to package RankTiger candidate against the ScoreMore DEV project ID.');
+}
+if (suppliedProductionProjectId && suppliedProductionProjectId !== productionProjectId) {
+  fail('Explicit RankTiger Supabase project ID does not match the RankTiger Supabase URL.');
 }
 
 if (String(process.env.RANKTIGER_PROD_PUBLIC_BASELINE_VERIFIED || '').toLowerCase() !== 'true') {
