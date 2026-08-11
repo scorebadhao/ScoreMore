@@ -1,0 +1,78 @@
+name: Bootstrap ScoreMore Dependency Lock — SAFE NO DEPLOY
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type BOOTSTRAP_SCOREMORE_LOCK exactly. This generates package-lock.json as an artifact only; it does NOT deploy or push.'
+        required: true
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap-scoremore-dependency-lock
+  cancel-in-progress: false
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Safety gate
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != "BOOTSTRAP_SCOREMORE_LOCK" ]; then
+            echo "Blocked: confirmation must be BOOTSTRAP_SCOREMORE_LOCK"
+            exit 1
+          fi
+
+      - name: Checkout ScoreMore source
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Refuse to overwrite an existing committed dependency lock
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "Blocked safely: package-lock.json already exists in ScoreMore source."
+            echo "Use the committed lock; do not regenerate it during a release."
+            exit 1
+          fi
+
+      - name: Generate dependency lock only — NO PACKAGE INSTALL
+        shell: bash
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Verify generated dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+
+      - name: Record dependency lock SHA-256
+        shell: bash
+        run: sha256sum package-lock.json | tee PACKAGE_LOCK_SHA256.txt
+
+      - name: Upload dependency-lock bootstrap artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scoremore-package-lock-${{ github.sha }}
+          path: |
+            package-lock.json
+            PACKAGE_LOCK_SHA256.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Confirm no deployment occurred
+        shell: bash
+        run: |
+          echo "Dependency lock artifact prepared successfully."
+          echo "ScoreMore repository changed by this workflow: NO"
+          echo "RankTiger PROD database changed by this workflow: NO"
+          echo "RankTiger repository changed by this workflow: NO"
+          echo "Cloudflare deployment triggered by this workflow: NO"
