@@ -71,6 +71,12 @@ pass(packager.includes('process.env.RANKTIGER_SUPABASE_URL'), 'Release packager 
 pass(packager.includes('const productionProjectId = hostMatch[1]'), 'Release packager must bind project identity to the Supabase hostname instead of a brittle fixed-length check.');
 pass(!packager.includes('/^[a-z0-9]{20}$/'), 'Release packager must not assume Supabase project references are exactly 20 characters.');
 pass(packager.includes('production_public_baseline_verified_before_build'), 'Release metadata must record the read-only production baseline verification.');
+pass(packager.includes('SECRET_LEAK_SCAN_VERSION = 2'), 'Release packager must use the credential-shaped Patch 6.4 secret leak scanner.');
+pass(packager.includes('detectSecretLeak'), 'Release packager must run the credential-shaped secret leak detector against production assets.');
+pass(packager.includes('sb_secret_[A-Za-z0-9_-]{20,}'), 'Release packager must reject actual Supabase sb_secret credentials.');
+pass(!packager.includes("'sb_secret_',"), 'Release packager must not reject a harmless bare sb_secret_ marker used by browser-side redaction code.');
+pass(packager.includes("payload?.role === 'service_role'"), 'Release packager must reject legacy service_role JWT credentials by decoded role.');
+pass(!packager.includes('forbiddenSecretMarkers'), 'Release packager must not use the old marker-only secret scan.');
 pass(!packager.includes('supabase db push'), 'Release packager must never migrate a database.');
 pass(!/\bgit\s+push\b/.test(packager), 'Release packager must never push repositories.');
 

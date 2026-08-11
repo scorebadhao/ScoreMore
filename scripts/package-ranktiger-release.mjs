@@ -58,6 +58,43 @@ function resolveSourceCommit() {
   }
 }
 
+const SECRET_LEAK_SCAN_VERSION = 2;
+
+function decodeJwtPayload(token) {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const padded = payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '=');
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function detectSecretLeak(body) {
+  // A bare marker such as "sb_secret_" may legitimately appear in browser-side
+  // redaction/safety code. Reject actual credential-shaped values, not the marker text.
+  if (/\bsb_secret_[A-Za-z0-9_-]{20,}\b/.test(body)) {
+    return 'Supabase secret API key';
+  }
+
+  if (/\b(?:postgres|postgresql):\/\/[^:\s/@]+:[^@\s/]+@[^\s/]+/i.test(body)) {
+    return 'credential-bearing PostgreSQL connection URI';
+  }
+
+  const jwtCandidates = body.match(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g) || [];
+  for (const token of jwtCandidates) {
+    const payload = decodeJwtPayload(token);
+    if (payload?.role === 'service_role') return 'legacy Supabase service_role JWT';
+  }
+
+  if (/\bgithub_pat_[A-Za-z0-9_]{20,}\b/.test(body) || /\bgh[pousr]_[A-Za-z0-9]{20,}\b/.test(body)) {
+    return 'GitHub access token';
+  }
+
+  return null;
+}
+
 async function assertRankTigerDist() {
   try {
     if (!(await stat(DIST)).isDirectory()) fail('dist/ is not a directory. Run npm run build:ranktiger first.');
@@ -81,15 +118,6 @@ async function assertRankTigerDist() {
 
   const files = await listFiles(DIST);
   const forbiddenPathParts = ['/.git/', '/.github/', '/supabase/', '/scripts/', '/docs/', '/node_modules/'];
-  const forbiddenSecretMarkers = [
-    'SUPABASE_SERVICE_ROLE_KEY',
-    'SUPABASE_DB_PASSWORD',
-    'SUPABASE_ACCESS_TOKEN',
-    'RANKTIGER_RELEASE_TOKEN',
-    'sb_secret_',
-    'service_role',
-    'postgresql://',
-  ];
 
   for (const file of files) {
     const rel = `/${relative(DIST, file).split(sep).join('/')}`;
@@ -102,9 +130,8 @@ async function assertRankTigerDist() {
     const info = await stat(file);
     if (info.size <= 5_000_000) {
       const body = await readFile(file, 'utf8').catch(() => '');
-      for (const marker of forbiddenSecretMarkers) {
-        if (body.includes(marker)) fail(`Forbidden secret/private marker "${marker}" found in dist file ${rel}.`);
-      }
+      const leak = detectSecretLeak(body);
+      if (leak) fail(`Forbidden ${leak} found in dist file ${rel}.`);
     }
   }
 
@@ -226,3 +253,4 @@ await writeFile(resolve(outputRoot, policy.releaseMetadataFile), `${JSON.stringi
 console.log(`RankTiger release candidate ${version} packaged at ${relative(ROOT, outputRoot)}/`);
 console.log(`dist SHA-256: ${metadata.dist_sha256}`);
 console.log(`package-lock SHA-256: ${metadata.dependencies.package_lock_sha256}`);
+console.log(`Secret leak scan v${SECRET_LEAK_SCAN_VERSION}: PASS`);
