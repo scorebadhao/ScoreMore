@@ -43,6 +43,7 @@ pass(workflow.includes('package-lock.json'), 'RankTiger release candidate must r
 pass(workflow.includes('npm ci --no-audit --no-fund'), 'RankTiger release candidate must install from the dependency lock using npm ci.');
 pass(workflow.includes('npm run verify:patch6'), 'RankTiger release candidate must run the complete Patch 6 verifier chain.');
 pass(workflow.includes('RANKTIGER_SUPABASE_PROJECT_ID'), 'RankTiger release candidate must use the PROD project ID for target guarding.');
+pass(workflow.includes('RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}'), 'RankTiger packaging step must receive the same validated PROD Supabase URL.');
 pass(workflow.includes('stejewkuikvqpqotjnnt'), 'RankTiger release candidate must explicitly guard against the ScoreMore DEV project ID.');
 pass(workflow.includes('EXPECTED_URL'), 'RankTiger release candidate must cross-check PROD URL against project ID.');
 pass(workflow.includes('RANKTIGER_SUPABASE_URL'), 'RankTiger release candidate must use the PROD Supabase URL secret.');
@@ -64,6 +65,10 @@ const packager = await readFile(resolve(ROOT, 'scripts/package-ranktiger-release
 pass(packager.includes('package_lock_sha256'), 'Release metadata must record package-lock SHA-256.');
 pass(packager.includes('required_migration_lock_file'), 'Release metadata must record the required migration lock file.');
 pass(packager.includes('production_project_id'), 'Release metadata must record the RankTiger PROD project ID used for the candidate.');
+pass(packager.includes('process.env.RANKTIGER_SUPABASE_PROJECT_ID'), 'Release packager must consume the already-validated RankTiger project ID directly.');
+pass(packager.includes('process.env.RANKTIGER_SUPABASE_URL'), 'Release packager must cross-check the project ID against the validated RankTiger Supabase URL.');
+pass(packager.includes('parsedProductionUrl.hostname !== `${productionProjectId}.supabase.co`'), 'Release packager must bind project identity to the Supabase hostname instead of a brittle fixed-length check.');
+pass(!packager.includes('/^[a-z0-9]{20}$/'), 'Release packager must not assume Supabase project references are exactly 20 characters.');
 pass(packager.includes('production_public_baseline_verified_before_build'), 'Release metadata must record the read-only production baseline verification.');
 pass(!packager.includes('supabase db push'), 'Release packager must never migrate a database.');
 pass(!/\bgit\s+push\b/.test(packager), 'Release packager must never push repositories.');
