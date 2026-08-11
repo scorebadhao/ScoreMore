@@ -45,3 +45,7 @@ AI-proposed answers, canonical topic mapping, dynamic paper completeness, confid
 ## Student Hub v1
 
 - `STUDENT_HUB_V1.md` — five-section student navigation, server-side catalogue, active-attempt answer protection, result analytics, safe profile editing and deployment order.
+
+## RankTiger release path
+
+- `RANKTIGER_FIRST_RELEASE_CANDIDATE_PATCH6.md` — dependency-lock bootstrap and candidate-only RankTiger production build/artifact flow.
