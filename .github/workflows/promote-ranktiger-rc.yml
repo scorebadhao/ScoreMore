@@ -1,0 +1,275 @@
+name: Promote RankTiger RC to Stable Repository — GUARDED NO CLOUDFLARE
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: RankTiger release candidate version
+        required: true
+        default: 1.0.0-rc.1
+      source_commit:
+        description: Exact audited ScoreMore source commit
+        required: true
+        default: 0464715f3b495f2e07438ad6d9f795da7fccff4c
+      expected_dist_sha256:
+        description: Exact audited dist tree SHA-256
+        required: true
+        default: fb0f999ba6a364544a4111229ac12d91cf235b64234499ee7abafa27425709a8
+      confirmation:
+        description: Type PROMOTE_RANKTIGER_RC exactly
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  promote:
+    name: Promote verified RC only
+    runs-on: ubuntu-latest
+    env:
+      RANKTIGER_REPOSITORY: scorebadhao/RankTiger
+      RANKTIGER_PROD_PROJECT_ID: ysyeskosmwpzsaxlpksv
+      RELEASE_VERSION: ${{ inputs.release_version }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      EXPECTED_DIST_SHA256: ${{ inputs.expected_dist_sha256 }}
+
+    steps:
+      - name: Safety gate
+        shell: bash
+        run: |
+          if [ "${{ inputs.confirmation }}" != "PROMOTE_RANKTIGER_RC" ]; then
+            echo "Blocked safely: confirmation text is incorrect."
+            exit 1
+          fi
+          if ! printf '%s' "$RELEASE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
+            echo "Blocked safely: this workflow promotes release candidates only."
+            exit 1
+          fi
+          if ! printf '%s' "$SOURCE_COMMIT" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Blocked safely: source_commit must be a full 40-character commit SHA."
+            exit 1
+          fi
+          if ! printf '%s' "$EXPECTED_DIST_SHA256" | grep -Eq '^[0-9a-f]{64}$'; then
+            echo "Blocked safely: expected_dist_sha256 must be a SHA-256 digest."
+            exit 1
+          fi
+
+      - name: Require RankTiger repository token
+        shell: bash
+        env:
+          RANKTIGER_REPO_TOKEN: ${{ secrets.RANKTIGER_REPO_TOKEN }}
+        run: |
+          if [ -z "$RANKTIGER_REPO_TOKEN" ]; then
+            echo "Blocked safely: repository secret RANKTIGER_REPO_TOKEN is missing."
+            exit 1
+          fi
+
+      - name: Find and download exact ScoreMore RC artifact
+        id: artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_NAME="ranktiger-${RELEASE_VERSION}-${SOURCE_COMMIT}"
+          echo "Looking for exact artifact: ${ARTIFACT_NAME}"
+
+          ARTIFACT_ID="$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=100" \
+            --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id // empty')"
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "Blocked safely: exact non-expired RC artifact was not found."
+            exit 1
+          fi
+
+          mkdir -p /tmp/ranktiger-artifact
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > /tmp/ranktiger-artifact.zip
+          unzip -q /tmp/ranktiger-artifact.zip -d /tmp/ranktiger-artifact
+
+          echo "artifact_id=${ARTIFACT_ID}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=${ARTIFACT_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify immutable RankTiger RC contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const crypto = require('crypto');
+
+          const root = '/tmp/ranktiger-artifact';
+          const releasePath = path.join(root, 'RELEASE.json');
+          const dist = path.join(root, 'dist');
+          const fail = (msg) => { console.error(`Blocked safely: ${msg}`); process.exit(1); };
+
+          if (!fs.existsSync(releasePath)) fail('RELEASE.json is missing from the artifact.');
+          if (!fs.existsSync(dist) || !fs.statSync(dist).isDirectory()) fail('dist/ is missing from the artifact.');
+
+          const release = JSON.parse(fs.readFileSync(releasePath, 'utf8'));
+          const expectedVersion = process.env.RELEASE_VERSION;
+          const expectedCommit = process.env.SOURCE_COMMIT;
+          const expectedDist = process.env.EXPECTED_DIST_SHA256;
+
+          if (release.schema_version !== 2) fail('unexpected release metadata schema.');
+          if (release.product !== 'RankTiger') fail('artifact is not RankTiger.');
+          if (release.environment !== 'production') fail('artifact is not a production-target build.');
+          if (release.release_status !== 'candidate') fail('artifact is not a release candidate.');
+          if (release.version !== expectedVersion) fail('release version mismatch.');
+          if (release.source_repository !== 'scorebadhao/ScoreMore') fail('source repository mismatch.');
+          if (release.source_commit !== expectedCommit) fail('source commit mismatch.');
+          if (release.build_target !== 'ranktiger') fail('build target mismatch.');
+          if (release.base_path !== '/') fail('RankTiger base path must be /.');
+          if (release.database?.production_project_id !== process.env.RANKTIGER_PROD_PROJECT_ID) fail('RankTiger PROD project ID mismatch.');
+          if (release.database?.production_public_baseline_verified_before_build !== true) fail('RankTiger PROD public baseline was not verified before build.');
+          if (release.database?.production_migration_applied_by_this_workflow !== false) fail('candidate workflow must not apply production migrations.');
+          if (release.promotion?.ranktiger_repository_updated !== false) fail('artifact metadata is not an unpromoted candidate.');
+          if (release.promotion?.cloudflare_deployed !== false) fail('artifact metadata unexpectedly indicates Cloudflare deployment.');
+          if (release.promotion?.student_domain_deployed !== false) fail('artifact metadata unexpectedly indicates student-domain deployment.');
+
+          function files(dir) {
+            const out = [];
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isSymbolicLink()) fail(`symlink is forbidden: ${full}`);
+              if (entry.isDirectory()) out.push(...files(full));
+              else if (entry.isFile()) out.push(full);
+            }
+            return out;
+          }
+
+          const distFiles = files(dist).sort((a, b) => a.localeCompare(b));
+          if (distFiles.length !== release.dist_file_count) fail('dist file count does not match RELEASE.json.');
+
+          const hash = crypto.createHash('sha256');
+          for (const file of distFiles) {
+            const rel = path.relative(dist, file).split(path.sep).join('/');
+            hash.update(rel);
+            hash.update('\0');
+            hash.update(fs.readFileSync(file));
+            hash.update('\0');
+          }
+          const actualDist = hash.digest('hex');
+          if (actualDist !== release.dist_sha256) fail('dist tree hash does not match RELEASE.json.');
+          if (actualDist !== expectedDist) fail('dist tree hash does not match the audited digest supplied to the promotion workflow.');
+
+          for (const required of ['index.html', 'student.html', 'admin.html', 'test-builder.html']) {
+            const file = path.join(dist, required);
+            if (!fs.existsSync(file)) fail(`required production page is missing: ${required}`);
+            const html = fs.readFileSync(file, 'utf8');
+            if (!html.includes('RankTiger')) fail(`${required} is not branded RankTiger.`);
+            if (html.includes('/ScoreMore/')) fail(`${required} contains the ScoreMore GitHub Pages base path.`);
+          }
+
+          for (const file of distFiles) {
+            const rel = '/' + path.relative(dist, file).split(path.sep).join('/');
+            const lower = rel.toLowerCase();
+            if (lower.endsWith('.map') || lower.includes('/.env') || lower.includes('/.git/') || lower.includes('/.github/') || lower.includes('/supabase/') || lower.includes('/scripts/') || lower.includes('/docs/') || lower.includes('/node_modules/')) {
+              fail(`forbidden development/private path in production artifact: ${rel}`);
+            }
+            const stat = fs.statSync(file);
+            if (stat.size <= 5_000_000) {
+              const body = fs.readFileSync(file, 'utf8');
+              if (/\bsb_secret_[A-Za-z0-9_-]{20,}\b/.test(body)) fail(`Supabase secret API key found in ${rel}`);
+              if (/\b(?:postgres|postgresql):\/\/[^:\s/@]+:[^@\s/]+@[^\s/]+/i.test(body)) fail(`credential-bearing PostgreSQL URI found in ${rel}`);
+              if (/\bgithub_pat_[A-Za-z0-9_]{20,}\b/.test(body) || /\bgh[pousr]_[A-Za-z0-9]{20,}\b/.test(body)) fail(`GitHub token found in ${rel}`);
+            }
+          }
+
+          console.log(`Verified RankTiger ${release.version}`);
+          console.log(`Verified source commit: ${release.source_commit}`);
+          console.log(`Verified dist SHA-256: ${actualDist}`);
+          console.log(`Verified production file count: ${distFiles.length}`);
+          NODE
+
+      - name: Prepare RankTiger repository content
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/ranktiger-content
+          mkdir -p /tmp/ranktiger-content
+          cp -a /tmp/ranktiger-artifact/dist/. /tmp/ranktiger-content/
+          cp /tmp/ranktiger-artifact/RELEASE.json /tmp/ranktiger-content/RELEASE.json
+
+          test -f /tmp/ranktiger-content/index.html
+          test -d /tmp/ranktiger-content/assets
+          test -f /tmp/ranktiger-content/RELEASE.json
+
+          echo "Prepared immutable built files for RankTiger repository promotion."
+
+      - name: Create safe RankTiger holding main and immutable RC branch
+        shell: bash
+        env:
+          RANKTIGER_REPO_TOKEN: ${{ secrets.RANKTIGER_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          REMOTE_URL="https://github.com/${RANKTIGER_REPOSITORY}.git"
+          RC_BRANCH="rc-${RELEASE_VERSION}"
+          AUTH_HEADER="$(printf 'x-access-token:%s' "$RANKTIGER_REPO_TOKEN" | base64 -w0)"
+
+          git_auth() {
+            git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${AUTH_HEADER}" "$@"
+          }
+
+          rm -rf /tmp/ranktiger-repo
+          mkdir -p /tmp/ranktiger-repo
+          cd /tmp/ranktiger-repo
+          git init -b main
+          git config user.name "ScoreMore RankTiger Promotion"
+          git config user.email "actions@users.noreply.github.com"
+          git remote add origin "$REMOTE_URL"
+
+          if git_auth ls-remote --exit-code --heads origin refs/heads/main >/dev/null 2>&1; then
+            git_auth fetch --depth=1 origin main
+            git checkout -B main FETCH_HEAD
+          else
+            printf '%s\n' \
+              '# RankTiger' \
+              '' \
+              'Student-facing stable repository for RankTiger production builds.' \
+              '' \
+              'The `main` branch is intentionally held until a release candidate completes hosted smoke testing and is explicitly approved for stable promotion.' \
+              > README.md
+            git add README.md
+            git commit -m "Initialize RankTiger stable holding branch"
+            git_auth push origin main
+          fi
+
+          if git_auth ls-remote --exit-code --heads origin "refs/heads/${RC_BRANCH}" >/dev/null 2>&1; then
+            echo "Blocked safely: ${RC_BRANCH} already exists. Release-candidate branches are immutable."
+            exit 1
+          fi
+
+          git checkout -b "$RC_BRANCH"
+          git rm -rf . >/dev/null 2>&1 || true
+          cp -a /tmp/ranktiger-content/. .
+          git add -A
+
+          test -f index.html
+          test -f RELEASE.json
+          test -d assets
+
+          git commit -m "RankTiger ${RELEASE_VERSION} verified release candidate"
+          git_auth push origin "$RC_BRANCH"
+
+          echo "RankTiger repository branch created: ${RC_BRANCH}"
+          echo "Cloudflare deployment: NOT PERFORMED"
+          echo "Student domain deployment: NOT PERFORMED"
+          echo "RankTiger PROD database changes: NONE"
+
+      - name: Promotion boundary confirmation
+        shell: bash
+        run: |
+          echo "Verified RC repository promotion complete."
+          echo "RankTiger main remains a holding branch."
+          echo "Only rc-${RELEASE_VERSION} contains the audited production build."
+          echo "Next stage is Cloudflare Pages preview configuration and hosted smoke testing."
