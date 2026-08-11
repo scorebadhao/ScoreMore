@@ -25,10 +25,17 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
-          
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies from committed lock
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "Using committed package-lock.json with npm ci."
+            npm ci --no-audit --no-fund
+          else
+            echo "package-lock.json is absent; using npm install fallback."
+            npm install --no-audit --no-fund
+          fi
 
       - name: Build
         env:
