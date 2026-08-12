@@ -1,10 +1,10 @@
-import { APP_CONFIG, isConfigured, resolvePublicSettings } from './config.js';
+import { APP_CONFIG, isConfigured } from './config.js';
 import { api } from './api.js';
 import { navigate, startRouter, subscribeRoute } from './router.js';
 import { mountTestEngine } from './testEngine.js';
 import { toast } from './toast.js';
 
-const PENDING_TEST_KEY = `${APP_CONFIG.cacheVersion}:pending-test-id`;
+const PENDING_TEST_KEY = 'scoremore:pending-test-id';
 const TEST_PAGE_SIZE = 12;
 const SAVED_PAGE_SIZE = 20;
 const RESULT_PAGE_SIZE = 12;
@@ -142,9 +142,9 @@ function redirectToLanding(reason = 'signin') {
 async function loadBrand() {
   try {
     const config = await api.getPublicConfiguration();
-    const settings = resolvePublicSettings(config.settings || {});
-    input('brandName').textContent = settings.appName;
-    input('brandTagline').textContent = settings.tagline;
+    const settings = config.settings || {};
+    input('brandName').textContent = settings.app_name || APP_CONFIG.name;
+    input('brandTagline').textContent = settings.app_tagline || 'Prepare smarter';
   } catch (error) {
     toast.warning(error.message);
   }
@@ -269,7 +269,7 @@ function testCardMarkup(test) {
   const action = isResume ? 'Resume test' : hasHistory ? 'Reattempt' : 'Start test';
   return `<article class="catalogue-test-card test-card">
     <div class="test-card-topline"><span class="eyebrow">${escapeHtml(testTypeLabel(test.test_type))}</span><span class="access-badge ${String(test.access_state).toLowerCase()}">${escapeHtml(test.access_state)}</span></div>
-    <div class="test-card-heading"><span class="test-type-icon"><svg class="icon"><use href="#${typeIcon(test.test_type)}"></use></svg></span><div><h3>${escapeHtml(test.test_name)}</h3><p>${escapeHtml(test.board_name || APP_CONFIG.name)} ${test.exam_name ? `· ${escapeHtml(test.exam_name)}` : ''}</p></div></div>
+    <div class="test-card-heading"><span class="test-type-icon"><svg class="icon"><use href="#${typeIcon(test.test_type)}"></use></svg></span><div><h3>${escapeHtml(test.test_name)}</h3><p>${escapeHtml(test.board_name || 'ScoreMore')} ${test.exam_name ? `· ${escapeHtml(test.exam_name)}` : ''}</p></div></div>
     <div class="test-meta">${test.subject_name ? `<span class="chip">${escapeHtml(test.subject_name)}</span>` : ''}${test.topic_name ? `<span class="chip">${escapeHtml(test.topic_name)}</span>` : ''}${dateShift ? `<span class="chip">${escapeHtml(dateShift)}</span>` : ''}<span class="chip">${test.question_count} questions</span><span class="chip">${test.duration_minutes} min</span></div>
     <div class="test-card-facts"><span><b>${formatNumber(test.marks_per_question)}</b> mark/question</span><span><b>${formatNumber(test.negative_marks)}</b> negative</span>${hasHistory ? `<span><b>${formatNumber(test.best_score)}</b> best score</span>` : ''}</div>
     ${hasHistory ? `<div class="test-performance-strip"><span>Last: <b>${formatNumber(test.last_score)}</b></span><span>${formatNumber(test.last_accuracy)}% accuracy</span><span>${test.attempt_count} attempt${Number(test.attempt_count) === 1 ? '' : 's'}</span></div>` : ''}
@@ -289,7 +289,7 @@ function renderTests() {
   const tests = testResult.items || [];
   elements.catalogueCount.textContent = testResult.total || 0;
   elements.catalogueResultText.textContent = `${testResult.total || 0} ${Number(testResult.total) === 1 ? 'test' : 'tests'} found`;
-  elements.catalogueScopeText.textContent = testFilters.testType ? testTypeLabel(testFilters.testType) : `All student-ready ${APP_CONFIG.name} tests`;
+  elements.catalogueScopeText.textContent = testFilters.testType ? testTypeLabel(testFilters.testType) : 'All student-ready ScoreMore tests';
   if (!tests.length) {
     elements.studentTestList.innerHTML = emptyState({ icon: 'i-search', title: 'No matching tests', message: 'Try another filter or clear your search.', action: '<button id="emptyClearFilters" class="button button-ghost" type="button">Clear filters</button>' });
     input('emptyClearFilters')?.addEventListener('click', clearTestFilters);
@@ -506,6 +506,11 @@ function renderProfile(data) {
       <div class="form-grid"><label><span>Full name</span><input id="profileFullName" name="full_name" value="${escapeHtml(profile.full_name || '')}" minlength="2" maxlength="100" required /></label><label><span>Preferred language</span><select id="profileLanguage" name="language">${languageOptions.map((value) => `<option value="${escapeHtml(value)}" ${value === language ? 'selected' : ''}>${escapeHtml(value[0] + value.slice(1).toLowerCase())}</option>`).join('')}</select></label><label><span>Target board</span><select id="profileBoard" name="target_board_id"><option value="">Choose board</option>${boards.map((board) => `<option value="${escapeHtml(board.board_id)}" ${board.board_id === profile.target_board_id ? 'selected' : ''}>${escapeHtml(board.board_name)}</option>`).join('')}</select></label><label><span>Target exam</span><select id="profileExam" name="target_exam_id"></select></label></div>
       <div class="protected-fields"><label><span>Verified email</span><input value="${escapeHtml(profile.email || '')}" readonly /></label><label><span>Registered mobile</span><input value="${escapeHtml(profile.mobile || '')}" readonly /></label><p><svg class="icon"><use href="#i-lock"></use></svg>Email, mobile, role and account authorization cannot be changed here.</p></div>
       <div class="button-row"><button class="button button-primary" type="submit">Save profile</button><button id="profileSignOut" class="button button-ghost" type="button">Sign out</button></div>
+    </form>
+    <form id="passwordForm" class="profile-form card" autocomplete="off"><div class="section-heading compact"><div><span class="eyebrow">Account security</span><h2>Change password</h2><p>Use a unique password that you do not reuse on other sites.</p></div><svg class="icon"><use href="#i-lock"></use></svg></div>
+      <div class="form-grid"><label><span>Current password</span><input id="currentPassword" type="password" autocomplete="current-password" required /></label><label><span>New password</span><input id="newPassword" type="password" autocomplete="new-password" minlength="12" required /></label><label><span>Confirm new password</span><input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required /></label></div>
+      <div class="protected-fields"><p><svg class="icon"><use href="#i-lock"></use></svg>Use at least 12 characters. A password manager-generated password is recommended.</p></div>
+      <div class="button-row"><button class="button button-primary" type="submit">Change password</button></div>
     </form>`;
   const boardSelect = input('profileBoard');
   const examSelect = input('profileExam');
@@ -525,6 +530,37 @@ function renderProfile(data) {
       renderProfile(updated);
       await loadHome({ refresh: true });
     } catch (error) { submit.disabled = false; toast.error(error.message); }
+  });
+  input('passwordForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submit = event.currentTarget.querySelector('[type="submit"]');
+    const currentPassword = input('currentPassword').value;
+    const newPassword = input('newPassword').value;
+    const confirmPassword = input('confirmPassword').value;
+
+    if (newPassword !== confirmPassword) {
+      toast.error('New password and confirmation do not match.');
+      return;
+    }
+    if (newPassword.length < 12) {
+      toast.error('Use at least 12 characters for the new password.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      toast.error('Choose a new password different from your current password.');
+      return;
+    }
+
+    submit.disabled = true;
+    try {
+      await api.changePassword({ currentPassword, newPassword });
+      toast.success('Password changed. Please sign in again with your new password.');
+      try { await api.signOut(); } catch { /* Password is already changed; continue to signed-out landing. */ }
+      redirectToLanding('');
+    } catch (error) {
+      submit.disabled = false;
+      toast.error(error.message);
+    }
   });
   input('profileSignOut').addEventListener('click', signOut);
 }
@@ -649,7 +685,7 @@ async function initialize() {
   subscribeRoute(handleRoute);
   if (!isConfigured) {
     elements.setupNotice.classList.remove('hidden');
-    elements.studentLoading.textContent = `${APP_CONFIG.name} is not configured.`;
+    elements.studentLoading.textContent = 'ScoreMore is not configured.';
     return;
   }
   try {

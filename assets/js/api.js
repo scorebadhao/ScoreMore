@@ -1,12 +1,12 @@
-import { APP_CONFIG, brandRuntimeText } from './config.js';
+import { APP_CONFIG } from './config.js';
 import { requireSupabase } from './supabaseClient.js';
 
 function normalizeError(error, fallback = 'Something went wrong.') {
   if (!error) return new Error(fallback);
   const message = error.message || error.error_description || error.details || fallback;
-  const normalized = new Error(brandRuntimeText(message, fallback));
+  const normalized = new Error(message);
   normalized.code = error.code || 'UNKNOWN_ERROR';
-  normalized.details = brandRuntimeText(error.details || '');
+  normalized.details = error.details || '';
   return normalized;
 }
 
@@ -163,6 +163,21 @@ export const api = Object.freeze({
   async signOut() {
     const client = requireSupabase();
     unwrap(await withTimeout(client.auth.signOut()), 'Unable to sign out.');
+  },
+
+  async changePassword({ currentPassword, newPassword }) {
+    const client = requireSupabase();
+    const current = typeof currentPassword === 'string' ? currentPassword : '';
+    const next = typeof newPassword === 'string' ? newPassword : '';
+
+    if (!current) throw new Error('Enter your current password.');
+    if (next.length < 12) throw new Error('Use at least 12 characters for the new password.');
+    if (next === current) throw new Error('Choose a new password different from your current password.');
+
+    return unwrap(await withTimeout(client.auth.updateUser({
+      password: next,
+      current_password: current,
+    })), 'Unable to change password.');
   },
 
   getUser,
