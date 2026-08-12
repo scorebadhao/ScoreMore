@@ -1,12 +1,12 @@
-import { APP_CONFIG } from './config.js';
+import { APP_CONFIG, brandRuntimeText } from './config.js';
 import { requireSupabase } from './supabaseClient.js';
 
 function normalizeError(error, fallback = 'Something went wrong.') {
   if (!error) return new Error(fallback);
   const message = error.message || error.error_description || error.details || fallback;
-  const normalized = new Error(message);
+  const normalized = new Error(brandRuntimeText(message, fallback));
   normalized.code = error.code || 'UNKNOWN_ERROR';
-  normalized.details = error.details || '';
+  normalized.details = brandRuntimeText(error.details || '');
   return normalized;
 }
 
@@ -178,9 +178,8 @@ export const api = Object.freeze({
     const email = user?.email;
     if (!email) throw new Error('Unable to verify the current account email.');
 
-    // Explicitly verify the current password before any password update.
-    // Do not rely on the optional Supabase project-level
-    // "Require current password when changing password" setting.
+    // Explicit current-password verification. This deliberately does not rely
+    // on the optional Supabase project-level current-password enforcement.
     unwrap(await withTimeout(client.auth.signInWithPassword({
       email,
       password: current,
