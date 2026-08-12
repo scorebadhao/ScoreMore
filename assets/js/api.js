@@ -174,9 +174,20 @@ export const api = Object.freeze({
     if (next.length < 12) throw new Error('Use at least 12 characters for the new password.');
     if (next === current) throw new Error('Choose a new password different from your current password.');
 
+    const user = await getUser();
+    const email = user?.email;
+    if (!email) throw new Error('Unable to verify the current account email.');
+
+    // Explicitly verify the current password before any password update.
+    // Do not rely on the optional Supabase project-level
+    // "Require current password when changing password" setting.
+    unwrap(await withTimeout(client.auth.signInWithPassword({
+      email,
+      password: current,
+    })), 'Current password is incorrect.');
+
     return unwrap(await withTimeout(client.auth.updateUser({
       password: next,
-      currentPassword: current,
     })), 'Unable to change password.');
   },
 
