@@ -176,7 +176,7 @@ export const api = Object.freeze({
 
     return unwrap(await withTimeout(client.auth.updateUser({
       password: next,
-      current_password: current,
+      currentPassword: current,
     })), 'Unable to change password.');
   },
 
