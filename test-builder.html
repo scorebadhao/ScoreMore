@@ -11,15 +11,24 @@
 </head>
 <body class="admin-body phase4a-body">
   <div class="app-shell">
-    <header class="topbar topbar-dark phase4a-topbar">
-      <a class="brand" href="./admin.html">
-        <span class="brand-mark">__APP_MARK__</span>
-        <span><strong>__APP_NAME__ Admin</strong><small>Dynamic test builder</small></span>
-      </a>
-      <div class="topbar-actions">
-        <a class="button button-ghost-light" href="./admin.html#testManagerSection">Admin</a>
-        <a class="button button-ghost-light" href="./student.html">Student site</a>
-        <button id="phase4aSignOut" class="button button-ghost-light hidden" type="button">Sign out</button>
+    <header class="topbar topbar-dark admin-topbar phase4a-topbar">
+      <div class="admin-topbar-leading">
+        <button aria-controls="adminSidebar" aria-expanded="false" aria-label="Open admin navigation" class="admin-sidebar-toggle" id="adminSidebarToggle" type="button"><span aria-hidden="true"><i></i><i></i><i></i></span></button>
+        <a class="brand" href="./admin.html#admin-dashboard">
+          <span class="brand-mark">__APP_MARK__</span>
+          <span><strong>__APP_NAME__ Admin</strong><small>Unified operations workspace</small></span>
+        </a>
+      </div>
+      <div class="topbar-actions admin-topbar-actions">
+        <a class="button button-ghost-light admin-topbar-action admin-topbar-student-link" href="./student.html">Student site</a>
+        <div class="admin-account">
+          <button aria-controls="adminAccountMenu" aria-expanded="false" aria-label="Open admin account menu" class="admin-account-toggle" id="adminAccountMenuToggle" type="button">•••</button>
+          <div class="admin-account-menu" id="adminAccountMenu">
+            <a href="./admin.html#admin-dashboard">Admin dashboard</a>
+            <a href="./student.html">Open student site</a>
+            <button id="phase4aSignOut" class="hidden" type="button">Sign out</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -40,13 +49,45 @@
       </section>
 
       <section id="phase4aBuilderPanel" class="hidden phase4a-builder-shell">
-        <div class="dashboard-header phase4a-heading">
+        <div class="admin-workspace phase4a-admin-workspace">
+          <aside aria-label="Admin navigation" class="admin-sidebar" id="adminSidebar">
+            <div class="admin-sidebar-head">
+              <div><span class="admin-sidebar-kicker">Operations</span><strong>Admin workspace</strong><small>Controlled content, review and testing</small></div>
+              <button id="adminSidebarClose" class="admin-sidebar-close" type="button" aria-label="Close admin navigation">×</button>
+            </div>
+            <nav class="admin-sidebar-nav">
+              <div class="admin-sidebar-group">
+                <span class="admin-sidebar-group-label">Workspace</span>
+                <a class="admin-sidebar-link" href="./admin.html#admin-dashboard"><span aria-hidden="true" class="admin-nav-icon">H</span><span><strong>Dashboard</strong><small>Queues, priorities &amp; quick actions</small></span></a>
+              </div>
+              <div class="admin-sidebar-group">
+                <span class="admin-sidebar-group-label">Question workflow</span>
+                <a class="admin-sidebar-link" href="./admin.html#admin-import"><span class="admin-stage-badge">1</span><span><strong>Import</strong><small>Sources, manual drafts &amp; HTML packages</small></span></a>
+                <a class="admin-sidebar-link" href="./admin.html#admin-repair"><span class="admin-stage-badge">2</span><span><strong>Image &amp; Content Repair</strong><small>Prepare final student presentation</small></span></a>
+                <a class="admin-sidebar-link" href="./admin.html#admin-review"><span class="admin-stage-badge">3</span><span><strong>Final Review</strong><small>Verify answer, topic &amp; presentation</small></span></a>
+                <a class="admin-sidebar-link" href="./admin.html#admin-publish"><span class="admin-stage-badge">4</span><span><strong>Publish</strong><small>Release reviewed repair revision</small></span></a>
+              </div>
+              <div class="admin-sidebar-group">
+                <span class="admin-sidebar-group-label">Tests</span>
+                <a class="admin-sidebar-link" href="./admin.html#admin-tests"><span aria-hidden="true" class="admin-nav-icon">T</span><span><strong>Build Tests</strong><small>Simple fixed-question builder</small></span></a>
+                <a aria-current="page" class="admin-sidebar-link active" href="./test-builder.html"><span aria-hidden="true" class="admin-nav-icon">D</span><span><strong>Dynamic Builder</strong><small>Smart multi-filter fixed builder</small></span></a>
+                <a class="admin-sidebar-link" href="./admin.html#admin-catalogue"><span aria-hidden="true" class="admin-nav-icon">C</span><span><strong>Test Catalogue</strong><small>Find, edit and archive tests</small></span></a>
+              </div>
+            </nav>
+            <div class="admin-sidebar-footer"><strong>Single-copy master questions</strong><span>Dynamic filters create links, never duplicate questions.</span></div>
+          </aside>
+          <button aria-label="Close admin navigation" class="admin-sidebar-backdrop" id="adminSidebarBackdrop" tabindex="-1" type="button"></button>
+          <div class="admin-workspace-main phase4a-workspace-main">
+        <div class="dashboard-header admin-page-header phase4a-heading">
           <div>
-            <span class="eyebrow">Phase 4A · fixed question list</span>
-            <h1>Dynamic Multi-Filter Test Builder</h1>
-            <p>Combine active import packages, subjects and topics from the student-ready question bank without copying any master question.</p>
+            <span class="eyebrow">Test operations · smart fixed builder</span>
+            <h1>Dynamic Test Builder</h1>
+            <p>Build fixed tests from the student-ready master bank using cascading database facets. Every saved test links master question IDs; questions are never copied.</p>
           </div>
-          <button id="phase4aRefresh" class="button button-secondary" type="button">Refresh catalogue</button>
+          <div class="phase4a-heading-actions">
+            <div aria-label="Current environment" class="admin-page-context"><span aria-hidden="true" class="admin-env-dot"></span><span><strong>ScoreMore DEV</strong><small>Admin-only workspace</small></span></div>
+            <button id="phase4aRefresh" class="button button-ghost phase4a-refresh-button" type="button">↻ Refresh</button>
+          </div>
         </div>
 
         <section class="panel-card phase4a-mode-card" aria-labelledby="builderModeTitle">
@@ -82,69 +123,54 @@
         </section>
 
         <section class="panel-card phase4a-filter-card" aria-labelledby="filterTitle">
-          <div class="section-heading compact">
+          <div class="section-heading compact phase4a-filter-heading">
             <div>
               <span class="eyebrow">Step 2</span>
-              <h2 id="filterTitle">Filter student-ready published questions</h2>
-              <p class="muted">Visual questions still awaiting compulsory Image Repair review are excluded. Selections inside one filter are OR; different filter groups are combined with AND.</p>
+              <h2 id="filterTitle">Smart filters</h2>
+              <p class="muted">Available values and counts come from the current student-ready question bank. Select within a group with OR; groups combine with AND.</p>
             </div>
-            <button id="phase4aClearFilters" class="button button-ghost" type="button">Clear filters</button>
+            <button id="phase4aClearFilters" class="button button-ghost" type="button">Clear</button>
           </div>
 
-          <div id="phase4aPrimaryFilters" class="phase4a-filter-grid">
-            <details class="phase4a-multiselect" data-filter-menu="package_ids" open>
-              <summary><span>Import Package IDs</span><strong data-filter-summary="package_ids">All active packages</strong></summary>
-              <div class="phase4a-filter-options" data-filter-options="package_ids"></div>
-            </details>
-            <details class="phase4a-multiselect" data-filter-menu="subject_ids">
-              <summary><span>Subjects</span><strong data-filter-summary="subject_ids">All subjects</strong></summary>
-              <div class="phase4a-filter-options" data-filter-options="subject_ids"></div>
-            </details>
-            <details class="phase4a-multiselect" data-filter-menu="topic_ids">
-              <summary><span>Topics</span><strong data-filter-summary="topic_ids">All topics</strong></summary>
-              <div class="phase4a-filter-options" data-filter-options="topic_ids"></div>
-            </details>
+          <div class="phase4a-filter-section" id="phase4aFilterContext">
+            <div class="phase4a-filter-section-heading"><strong>Exam context</strong><span>Choose the paper context first. Later filters recalculate automatically.</span></div>
+            <div class="phase4a-filter-grid phase4a-filter-grid-context">
+              <details class="phase4a-multiselect" data-filter-menu="board_ids" data-mode-visibility="CUSTOM PYQ_SECTIONAL">
+                <summary><span>Board</span><strong data-filter-summary="board_ids">All</strong></summary><div class="phase4a-filter-options" data-filter-options="board_ids"></div>
+              </details>
+              <details class="phase4a-multiselect" data-filter-menu="exam_ids" data-mode-visibility="CUSTOM PYQ_SECTIONAL">
+                <summary><span>Exam</span><strong data-filter-summary="exam_ids">All</strong></summary><div class="phase4a-filter-options" data-filter-options="exam_ids"></div>
+              </details>
+              <details class="phase4a-multiselect" data-filter-menu="exam_years" data-mode-visibility="CUSTOM PYQ_SECTIONAL">
+                <summary><span>Year</span><strong data-filter-summary="exam_years">All</strong></summary><div class="phase4a-filter-options" data-filter-options="exam_years"></div>
+              </details>
+              <details class="phase4a-multiselect phase4a-package-filter" data-filter-menu="package_ids" data-mode-visibility="CUSTOM PYQ_ORIGINAL PYQ_COMPLETED PYQ_SECTIONAL" open>
+                <summary><span>Paper / Package</span><strong data-filter-summary="package_ids">All active packages</strong></summary><div class="phase4a-filter-options" data-filter-options="package_ids"></div>
+              </details>
+            </div>
           </div>
 
-          <details class="phase4a-advanced-filters">
-            <summary>More dynamic filters</summary>
+          <div class="phase4a-filter-section" data-mode-visibility="CUSTOM PYQ_SECTIONAL">
+            <div class="phase4a-filter-section-heading"><strong>Question classification</strong><span>Narrow to subjects and topics that actually exist under the selected context.</span></div>
+            <div class="phase4a-filter-grid phase4a-filter-grid-classification">
+              <details class="phase4a-multiselect" data-filter-menu="subject_ids" data-mode-visibility="CUSTOM PYQ_SECTIONAL">
+                <summary><span>Subject</span><strong data-filter-summary="subject_ids">All subjects</strong></summary><div class="phase4a-filter-options" data-filter-options="subject_ids"></div>
+              </details>
+              <details class="phase4a-multiselect" data-filter-menu="topic_ids" data-mode-visibility="CUSTOM PYQ_SECTIONAL">
+                <summary><span>Topic</span><strong data-filter-summary="topic_ids">All topics</strong></summary><div class="phase4a-filter-options" data-filter-options="topic_ids"></div>
+              </details>
+            </div>
+          </div>
+
+          <details class="phase4a-advanced-filters" data-mode-visibility="CUSTOM PYQ_SECTIONAL">
+            <summary>More filters</summary>
             <div class="phase4a-filter-grid phase4a-filter-grid-advanced">
-              <details class="phase4a-multiselect" data-filter-menu="board_ids">
-                <summary><span>Boards</span><strong data-filter-summary="board_ids">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="board_ids"></div>
-              </details>
-              <details class="phase4a-multiselect" data-filter-menu="exam_ids">
-                <summary><span>Exams</span><strong data-filter-summary="exam_ids">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="exam_ids"></div>
-              </details>
-              <details class="phase4a-multiselect" data-filter-menu="exam_years">
-                <summary><span>Years</span><strong data-filter-summary="exam_years">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="exam_years"></div>
-              </details>
-              <details class="phase4a-multiselect" data-filter-menu="shift_nos">
-                <summary><span>Shifts</span><strong data-filter-summary="shift_nos">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="shift_nos"></div>
-              </details>
-              <details class="phase4a-multiselect" data-filter-menu="section_codes">
-                <summary><span>Sections</span><strong data-filter-summary="section_codes">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="section_codes"></div>
-              </details>
-              <details class="phase4a-multiselect" data-filter-menu="languages">
-                <summary><span>Languages</span><strong data-filter-summary="languages">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="languages"></div>
-              </details>
-              <details class="phase4a-multiselect" data-filter-menu="difficulties">
-                <summary><span>Difficulty</span><strong data-filter-summary="difficulties">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="difficulties"></div>
-              </details>
-              <details class="phase4a-multiselect" data-filter-menu="question_types">
-                <summary><span>Question types</span><strong data-filter-summary="question_types">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="question_types"></div>
-              </details>
-              <details class="phase4a-multiselect" data-filter-menu="membership_types">
-                <summary><span>Membership types</span><strong data-filter-summary="membership_types">All</strong></summary>
-                <div class="phase4a-filter-options" data-filter-options="membership_types"></div>
-              </details>
+              <details class="phase4a-multiselect" data-filter-menu="shift_nos"><summary><span>Shift</span><strong data-filter-summary="shift_nos">All</strong></summary><div class="phase4a-filter-options" data-filter-options="shift_nos"></div></details>
+              <details class="phase4a-multiselect" data-filter-menu="section_codes"><summary><span>Section</span><strong data-filter-summary="section_codes">All</strong></summary><div class="phase4a-filter-options" data-filter-options="section_codes"></div></details>
+              <details class="phase4a-multiselect" data-filter-menu="languages"><summary><span>Language</span><strong data-filter-summary="languages">All</strong></summary><div class="phase4a-filter-options" data-filter-options="languages"></div></details>
+              <details class="phase4a-multiselect" data-filter-menu="difficulties"><summary><span>Difficulty</span><strong data-filter-summary="difficulties">All</strong></summary><div class="phase4a-filter-options" data-filter-options="difficulties"></div></details>
+              <details class="phase4a-multiselect" data-filter-menu="question_types"><summary><span>Question type</span><strong data-filter-summary="question_types">All</strong></summary><div class="phase4a-filter-options" data-filter-options="question_types"></div></details>
+              <details class="phase4a-multiselect" data-filter-menu="membership_types"><summary><span>Membership</span><strong data-filter-summary="membership_types">All</strong></summary><div class="phase4a-filter-options" data-filter-options="membership_types"></div></details>
             </div>
             <div class="phase4a-switch-row">
               <label class="phase4a-switch"><input id="phase4aIncludeSupplements" type="checkbox" checked /> Include supplemental NORMAL questions</label>
@@ -157,20 +183,13 @@
           <div id="phase4aFacetSummary" class="phase4a-summary-grid" aria-live="polite"></div>
 
           <div class="phase4a-search-row">
-            <label>Search filtered stack
-              <input id="phase4aSearch" type="search" placeholder="Question ID, text, package, subject or topic" autocomplete="off" />
-            </label>
-            <label>Question order
-              <select id="phase4aOrder">
-                <option value="PACKAGE_ORIGINAL">Package → original order</option>
-                <option value="SUBJECT">Subject → topic → source order</option>
-                <option value="TOPIC">Topic → subject → source order</option>
-                <option value="QUESTION_ID">Question ID</option>
-                <option value="DETERMINISTIC_RANDOM">Deterministic mixed order</option>
-                <option value="SELECTED">Manual selection order</option>
-              </select>
-            </label>
-            <button id="phase4aLoadQuestions" class="button button-primary" type="button">Load question stack</button>
+            <label>Search filtered stack<input id="phase4aSearch" type="search" placeholder="Question ID, text, package, subject or topic" autocomplete="off" /></label>
+            <label>Question order<select id="phase4aOrder"><option value="PACKAGE_ORIGINAL">Package → original order</option><option value="SUBJECT">Subject → topic → source order</option><option value="TOPIC">Topic → subject → source order</option><option value="QUESTION_ID">Question ID</option><option value="DETERMINISTIC_RANDOM">Deterministic mixed order</option><option value="SELECTED">Manual selection order</option></select></label>
+          </div>
+          <div class="phase4a-apply-bar">
+            <div><strong id="phase4aFilterState">Filters ready</strong><span id="phase4aFilterStateMeta">Choose filters, then apply to load the question stack.</span></div>
+            <button id="phase4aApplyFilters" class="button button-primary" type="button">Apply filters</button>
+            <button id="phase4aLoadQuestions" class="hidden" type="button" aria-hidden="true" tabindex="-1">Load question stack</button>
           </div>
         </section>
 
@@ -243,6 +262,8 @@
             </div>
           </form>
         </section>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -252,6 +273,7 @@
   </dialog>
 
   <div id="toastRoot" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+  <script type="module" src="./assets/js/adminShell.js"></script>
   <script type="module" src="./assets/js/testBuilder4A.js"></script>
 </body>
 </html>

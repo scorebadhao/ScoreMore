@@ -1,0 +1,55 @@
+{
+  "patch": "ScoreMore Admin Console — Unified Workspace + Smart Dynamic Filters",
+  "version": "1.4 VERIFIED",
+  "target": "ScoreMore DEV only",
+  "database_changes": false,
+  "api_js_changes": false,
+  "ranktiger_prod_changes": false,
+  "files": [
+    {
+      "path": "PATCH_README_v1_4.md",
+      "size_bytes": 4449,
+      "sha256": "afbe5c731e4a6cd1b51207e6de6b1f1c1c7f1e9ec7255d57b2e73c7b0ca25760"
+    },
+    {
+      "path": "PATCH_VALIDATION_REPORT_v1_4.md",
+      "size_bytes": 2565,
+      "sha256": "cd3f6956cbe94fafd8c56920b3b4cc9881ea09233e64802a9ef92b43bc5039dc"
+    },
+    {
+      "path": "admin.html",
+      "size_bytes": 29169,
+      "sha256": "f1c8d80c7fafc92fd27bb5bc95bc67076dfcfd018d7e0d1404c539300bbb3d55"
+    },
+    {
+      "path": "assets/css/main.css",
+      "size_bytes": 115040,
+      "sha256": "dcb98d1bd7187acaf519688d09a96d56e0cfb3b8228045eaa72f8488010395cb"
+    },
+    {
+      "path": "assets/css/testBuilder4A.css",
+      "size_bytes": 15051,
+      "sha256": "fe224ea01b7db030d4791004711d47ca71679b91fefdb9cff288bd924751addd"
+    },
+    {
+      "path": "assets/js/admin.js",
+      "size_bytes": 149640,
+      "sha256": "616edeb6899e3301955321c35f81d511e63cc1a95de7aae33dd8745df8bd33e8"
+    },
+    {
+      "path": "assets/js/adminShell.js",
+      "size_bytes": 1785,
+      "sha256": "1f4d920a7905043f62bc210e5c80f1f9d700177a5bc740d9fd8f199fdb4eb166"
+    },
+    {
+      "path": "assets/js/testBuilder4A.js",
+      "size_bytes": 38070,
+      "sha256": "6dd470f12ad690de331f27c3530e53b955ad48071e9fb78a000eb9e654e3f356"
+    },
+    {
+      "path": "test-builder.html",
+      "size_bytes": 20455,
+      "sha256": "1bf5f1030a3268ecd6d253b9d17ff4c36b37124720b0d5176f92347c3c191dee"
+    }
+  ]
+}

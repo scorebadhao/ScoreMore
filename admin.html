@@ -17,8 +17,14 @@
 <span><strong>__APP_NAME__ Admin</strong><small>Import → repair → final review → publish → test</small></span>
 </a></div>
 <div class="topbar-actions admin-topbar-actions">
-<a class="button button-ghost-light admin-topbar-action" href="./student.html">Student site</a>
-<button class="button button-ghost-light hidden admin-topbar-action" id="adminSignOut" type="button">Sign out</button>
+<a class="button button-ghost-light admin-topbar-action admin-topbar-student-link" href="./student.html">Student site</a>
+<div class="admin-account">
+<button aria-controls="adminAccountMenu" aria-expanded="false" aria-label="Open admin account menu" class="admin-account-toggle" id="adminAccountMenuToggle" type="button">•••</button>
+<div class="admin-account-menu" id="adminAccountMenu">
+<a href="./student.html">Open student site</a>
+<button class="hidden" id="adminSignOut" type="button">Sign out</button>
+</div>
+</div>
 </div>
 </header>
 <main class="admin-main">
@@ -43,8 +49,12 @@
 </div>
 <nav class="admin-sidebar-nav">
 <div class="admin-sidebar-group">
+<span class="admin-sidebar-group-label">Workspace</span>
+<button aria-current="page" class="admin-sidebar-link active" data-admin-view="dashboard" type="button"><span aria-hidden="true" class="admin-nav-icon">H</span><span><strong>Dashboard</strong><small>Queues, priorities &amp; quick actions</small></span></button>
+</div>
+<div class="admin-sidebar-group">
 <span class="admin-sidebar-group-label">Question workflow</span>
-<button aria-current="page" class="admin-sidebar-link active" data-admin-view="import" type="button"><span class="admin-stage-badge">1</span><span><strong>Import</strong><small>Sources, manual drafts &amp; HTML packages</small></span></button>
+<button class="admin-sidebar-link" data-admin-view="import" type="button"><span class="admin-stage-badge">1</span><span><strong>Import</strong><small>Sources, manual drafts &amp; HTML packages</small></span></button>
 <button class="admin-sidebar-link" data-admin-view="repair" type="button"><span class="admin-stage-badge">2</span><span><strong>Image &amp; Content Repair</strong><small>Prepare final student presentation</small></span></button>
 <button class="admin-sidebar-link" data-admin-view="review" type="button"><span class="admin-stage-badge">3</span><span><strong>Final Review</strong><small>Verify answer, topic &amp; presentation</small></span></button>
 <button class="admin-sidebar-link" data-admin-view="publish" type="button"><span class="admin-stage-badge">4</span><span><strong>Publish</strong><small>Release reviewed repair revision</small></span></button>
@@ -70,6 +80,46 @@
 <span aria-hidden="true" class="admin-env-dot"></span>
 <span><strong>ScoreMore DEV</strong><small>Admin-only workspace</small></span>
 </div>
+</div><div aria-label="Admin Dashboard" class="admin-view-panel" data-admin-view-panel="dashboard">
+<section class="admin-dashboard-grid">
+<article class="admin-dashboard-card admin-dashboard-card-primary">
+<span class="eyebrow">Image &amp; content repair</span>
+<strong id="adminDashboardRepairCount">—</strong>
+<span id="adminDashboardRepairLabel">Loading repair queue…</span>
+<button class="button button-secondary" data-admin-view="repair" type="button">Continue repair</button>
+</article>
+<article class="admin-dashboard-card">
+<span class="eyebrow">Final review</span>
+<strong id="adminDashboardReviewCount">—</strong>
+<span id="adminDashboardReviewLabel">Loading review queue…</span>
+<button class="button button-ghost" data-admin-view="review" type="button">Review next</button>
+</article>
+<article class="admin-dashboard-card">
+<span class="eyebrow">Publish</span>
+<strong id="adminDashboardPublishCount">—</strong>
+<span>Verified drafts ready now</span>
+<button class="button button-ghost" data-admin-view="publish" type="button">Open publish queue</button>
+</article>
+<article class="admin-dashboard-card">
+<span class="eyebrow">Tests</span>
+<strong id="adminDashboardTestCount">—</strong>
+<span>Configured fixed-question tests</span>
+<button class="button button-ghost" data-admin-view="catalogue" type="button">Open catalogue</button>
+</article>
+</section>
+<section class="panel-card admin-dashboard-actions">
+<div class="section-heading compact"><div><span class="eyebrow">Quick actions</span><h2>Continue operations</h2><p class="muted">Use the next safe action without hunting through the full admin page.</p></div></div>
+<div class="admin-quick-action-grid">
+<button class="admin-quick-action" data-admin-view="import" type="button"><span class="admin-stage-badge">1</span><span><strong>Import PYQ</strong><small>Validate a package or create controlled drafts.</small></span></button>
+<button class="admin-quick-action" data-admin-view="repair" type="button"><span class="admin-stage-badge">2</span><span><strong>Repair presentation</strong><small>Correct content and approve student-safe imagery.</small></span></button>
+<button class="admin-quick-action" data-admin-view="review" type="button"><span class="admin-stage-badge">3</span><span><strong>Final Review</strong><small>Verify the final question, answer and topic.</small></span></button>
+<a class="admin-quick-action" href="./test-builder.html"><span aria-hidden="true" class="admin-nav-icon">D</span><span><strong>Dynamic Builder</strong><small>Build fixed tests with smart database facets.</small></span></a>
+</div>
+</section>
+<section class="panel-card admin-dashboard-safety">
+<div><span class="eyebrow">Locked quality gate</span><h2>Draft-first publishing safety</h2></div>
+<div class="admin-workflow-rail"><span>Import</span><i>→</i><span>Repair</span><i>→</i><span>Final Review</span><i>→</i><span>Publish</span><i>→</i><span>Test</span></div>
+</section>
 </div><div aria-label="Import Centre" class="admin-view-panel" data-admin-view-panel="import"><div class="admin-grid">
 <section class="panel-card">
 <div class="section-heading compact">
@@ -396,18 +446,34 @@
 <button class="button button-secondary" id="refreshTests" type="button">Refresh</button>
 </div>
 <div aria-live="polite" class="test-catalogue-stats" id="testCatalogueStats"></div>
-<div class="test-catalogue-toolbar">
-<label>Search
-              <input autocomplete="off" id="testCatalogueSearch" placeholder="Test name, ID, type or paper" type="search"/>
+<div class="test-catalogue-toolbar test-catalogue-toolbar-smart">
+<label class="test-catalogue-search">Search
+<input autocomplete="off" id="testCatalogueSearch" placeholder="Test name, ID, type or paper" type="search"/>
 </label>
 <label>Status
-              <select aria-label="Test status filter" id="testStatusFilter">
+<select aria-label="Test status filter" id="testStatusFilter">
 <option value="">All statuses</option>
 <option value="DRAFT">Draft</option>
 <option value="PUBLISHED">Published</option>
 <option value="ARCHIVED">Archived</option>
 </select>
 </label>
+<label>Type
+<select aria-label="Test type filter" id="testTypeFilter"><option value="">All types</option></select>
+</label>
+<label>Board
+<select aria-label="Board filter" id="testBoardFilter"><option value="">All boards</option></select>
+</label>
+<label>Exam
+<select aria-label="Exam filter" id="testExamFilter"><option value="">All exams</option></select>
+</label>
+<label>Subject
+<select aria-label="Subject filter" id="testSubjectFilter"><option value="">All subjects</option></select>
+</label>
+<label>Year
+<select aria-label="Exam year filter" id="testYearFilter"><option value="">All years</option></select>
+</label>
+<button class="button button-ghost test-catalogue-clear" id="clearTestCatalogueFilters" type="button">Clear filters</button>
 </div>
 <div aria-live="polite" class="test-admin-list simplified-test-list" id="adminTestList"></div>
 </section></div></div></div>
@@ -432,6 +498,7 @@
 <div id="imageRepairDialogContent"></div>
 </dialog>
 <div aria-atomic="true" aria-live="polite" class="toast-root" id="toastRoot"></div>
+<script src="./assets/js/adminShell.js" type="module"></script>
 <script src="./assets/js/admin.js" type="module"></script>
 </body>
 </html>
