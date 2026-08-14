@@ -26,6 +26,18 @@ const elements = {
   testBuilderMode: document.getElementById('testBuilderMode'),
   testCatalogueStats: document.getElementById('testCatalogueStats'),
   testCatalogueSearch: document.getElementById('testCatalogueSearch'),
+  testTypeFilter: document.getElementById('testTypeFilter'),
+  testBoardFilter: document.getElementById('testBoardFilter'),
+  testExamFilter: document.getElementById('testExamFilter'),
+  testSubjectFilter: document.getElementById('testSubjectFilter'),
+  testYearFilter: document.getElementById('testYearFilter'),
+  clearTestCatalogueFilters: document.getElementById('clearTestCatalogueFilters'),
+  dashboardRepairCount: document.getElementById('adminDashboardRepairCount'),
+  dashboardRepairLabel: document.getElementById('adminDashboardRepairLabel'),
+  dashboardReviewCount: document.getElementById('adminDashboardReviewCount'),
+  dashboardReviewLabel: document.getElementById('adminDashboardReviewLabel'),
+  dashboardPublishCount: document.getElementById('adminDashboardPublishCount'),
+  dashboardTestCount: document.getElementById('adminDashboardTestCount'),
   testQuestionSearch: document.getElementById('testQuestionSearch'),
   questionSelectionMeta: document.getElementById('questionSelectionMeta'),
   testPaperFields: document.getElementById('testPaperFields'),
@@ -108,6 +120,11 @@ let activeRepairObjectUrl = '';
 
 
 const ADMIN_VIEW_META = Object.freeze({
+  dashboard: {
+    eyebrow: 'Operations overview',
+    title: 'Admin Dashboard',
+    description: 'See the current queues, continue the next safe action, and move between admin functions without scrolling through one long page.',
+  },
   import: {
     eyebrow: 'Question workflow · Stage 1',
     title: 'Import Centre',
@@ -140,7 +157,7 @@ const ADMIN_VIEW_META = Object.freeze({
   },
 });
 
-let activeAdminView = 'import';
+let activeAdminView = 'dashboard';
 
 function closeAdminSidebar() {
   document.body.classList.remove('admin-sidebar-open');
@@ -149,7 +166,7 @@ function closeAdminSidebar() {
 }
 
 function setAdminView(view, { updateHash = true, scroll = true } = {}) {
-  const nextView = Object.hasOwn(ADMIN_VIEW_META, view) ? view : 'import';
+  const nextView = Object.hasOwn(ADMIN_VIEW_META, view) ? view : 'dashboard';
   const meta = ADMIN_VIEW_META[nextView];
   activeAdminView = nextView;
 
@@ -182,32 +199,18 @@ function setAdminView(view, { updateHash = true, scroll = true } = {}) {
 }
 
 function initializeAdminWorkspaceNavigation() {
-  const fromHash = String(location.hash || '').match(/^#admin-(import|repair|review|publish|tests|catalogue)$/)?.[1];
+  const fromHash = String(location.hash || '').match(/^#admin-(dashboard|import|repair|review|publish|tests|catalogue)$/)?.[1];
   let stored = '';
   try { stored = sessionStorage.getItem('scoremore-admin-active-view') || ''; } catch {}
-  setAdminView(fromHash || stored || 'import', { updateHash: Boolean(fromHash), scroll: false });
+  setAdminView(fromHash || stored || 'dashboard', { updateHash: Boolean(fromHash), scroll: false });
 
   document.querySelectorAll('[data-admin-view]').forEach((control) => {
     control.addEventListener('click', () => setAdminView(control.dataset.adminView));
   });
 
-  const toggle = document.getElementById('adminSidebarToggle');
-  const closeButton = document.getElementById('adminSidebarClose');
-  const backdrop = document.getElementById('adminSidebarBackdrop');
-  toggle?.addEventListener('click', () => {
-    const open = document.body.classList.toggle('admin-sidebar-open');
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
-  closeButton?.addEventListener('click', closeAdminSidebar);
-  backdrop?.addEventListener('click', closeAdminSidebar);
-
   window.addEventListener('hashchange', () => {
-    const requested = String(location.hash || '').match(/^#admin-(import|repair|review|publish|tests|catalogue)$/)?.[1];
+    const requested = String(location.hash || '').match(/^#admin-(dashboard|import|repair|review|publish|tests|catalogue)$/)?.[1];
     if (requested && requested !== activeAdminView) setAdminView(requested, { updateHash: false, scroll: false });
-  });
-
-  window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && document.body.classList.contains('admin-sidebar-open')) closeAdminSidebar();
   });
 }
 
@@ -273,6 +276,27 @@ async function showAdmin() {
     loadRecentImportBatches(),
     loadImageRepairQueue(),
   ]);
+  renderAdminDashboard();
+}
+
+function renderAdminDashboard() {
+  const needsRepair = Number(imageRepairSummary?.needs_repair || 0) + Number(imageRepairSummary?.pending || 0);
+  const reviewReadyLoaded = reviewableDrafts().length;
+  if (elements.dashboardRepairCount) elements.dashboardRepairCount.textContent = String(needsRepair);
+  if (elements.dashboardRepairLabel) {
+    const edited = Number(imageRepairSummary?.content_edited || 0);
+    elements.dashboardRepairLabel.textContent = edited
+      ? `${Number(imageRepairSummary?.needs_repair || 0)} need repair · ${Number(imageRepairSummary?.pending || 0)} pending · ${edited} content edited`
+      : `${Number(imageRepairSummary?.needs_repair || 0)} need repair · ${Number(imageRepairSummary?.pending || 0)} pending`;
+  }
+  if (elements.dashboardReviewCount) elements.dashboardReviewCount.textContent = String(reviewReadyLoaded);
+  if (elements.dashboardReviewLabel) {
+    elements.dashboardReviewLabel.textContent = draftHasMore
+      ? `${reviewReadyLoaded} ready in the currently loaded draft page`
+      : `${reviewReadyLoaded} draft${reviewReadyLoaded === 1 ? '' : 's'} ready for final review`;
+  }
+  if (elements.dashboardPublishCount) elements.dashboardPublishCount.textContent = String(publishQueueTotal || 0);
+  if (elements.dashboardTestCount) elements.dashboardTestCount.textContent = String(configuredTests.length || 0);
 }
 
 function draftHasSourceImages(draft) {
@@ -331,6 +355,7 @@ function renderDrafts() {
   }
   if (elements.reviewNextDraft) elements.reviewNextDraft.disabled = reviewable.length === 0 && !draftHasMore;
   elements.loadMoreDrafts?.classList.toggle('hidden', !draftHasMore);
+  renderAdminDashboard();
 
   if (!drafts.length) {
     elements.draftList.innerHTML = '<div class="empty-state">No drafts match this status.</div>';
@@ -428,6 +453,7 @@ function updatePublishSelectionControls() {
 
 function renderPublishQueue() {
   if (!elements.publishQueueList) return;
+  renderAdminDashboard();
   if (elements.publishQueueMeta) {
     elements.publishQueueMeta.textContent = `${publishQueueTotal} verified draft${publishQueueTotal === 1 ? '' : 's'} ready to publish. Publishing is separate from human review.`;
   }
@@ -677,6 +703,7 @@ function imageRepairPaperLabel(item) {
 
 function renderImageRepairQueue() {
   if (!elements.imageRepairList) return;
+  renderAdminDashboard();
   const activeStatus = elements.imageRepairStatus?.value || 'NEEDS_REPAIR';
   elements.imageRepairQueueMeta.textContent = `${imageRepairTotal} ${activeStatus.toLowerCase().replaceAll('_', ' ')} visual draft${imageRepairTotal === 1 ? '' : 's'} · ${imageRepairItems.length} loaded.`;
   elements.loadMoreImageRepairs?.classList.toggle('hidden', !imageRepairHasMore);
@@ -1435,6 +1462,32 @@ function suggestTestIdentity() {
   }
 }
 
+function uniqueTestCatalogueOptions(accessor) {
+  const map = new Map();
+  configuredTests.forEach((test) => {
+    const item = accessor(test);
+    const value = String(item?.value ?? '').trim();
+    if (!value) return;
+    if (!map.has(value)) map.set(value, String(item?.label ?? value));
+  });
+  return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }));
+}
+
+function fillTestCatalogueSelect(select, options, allLabel) {
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = `<option value="">${escapeHtml(allLabel)}</option>${options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('')}`;
+  if ([...select.options].some((option) => option.value === current)) select.value = current;
+}
+
+function renderTestCatalogueFilters() {
+  fillTestCatalogueSelect(elements.testTypeFilter, uniqueTestCatalogueOptions((test) => ({ value: test.test_type, label: String(test.test_type || '').replaceAll('_', ' ') })), 'All types');
+  fillTestCatalogueSelect(elements.testBoardFilter, uniqueTestCatalogueOptions((test) => ({ value: test.board_id || test.boards?.board_id, label: test.boards?.board_name || test.board_id })), 'All boards');
+  fillTestCatalogueSelect(elements.testExamFilter, uniqueTestCatalogueOptions((test) => ({ value: test.exam_id || test.exams?.exam_id, label: test.exams?.exam_name || test.exam_id })), 'All exams');
+  fillTestCatalogueSelect(elements.testSubjectFilter, uniqueTestCatalogueOptions((test) => ({ value: test.subject_id || test.subjects?.subject_id, label: test.subjects?.subject_name || test.subject_id })), 'All subjects');
+  fillTestCatalogueSelect(elements.testYearFilter, uniqueTestCatalogueOptions((test) => ({ value: test.exam_year, label: test.exam_year })), 'All years');
+}
+
 function renderTestCatalogueStats() {
   if (!elements.testCatalogueStats) return;
   const counts = configuredTests.reduce((result, test) => {
@@ -1458,11 +1511,21 @@ function renderTestCatalogueStats() {
 
 function filteredConfiguredTests() {
   const status = elements.testStatusFilter?.value || '';
+  const type = elements.testTypeFilter?.value || '';
+  const board = elements.testBoardFilter?.value || '';
+  const exam = elements.testExamFilter?.value || '';
+  const subject = elements.testSubjectFilter?.value || '';
+  const year = elements.testYearFilter?.value || '';
   const search = String(elements.testCatalogueSearch?.value || '').trim().toLowerCase();
   return configuredTests.filter((test) => {
     if (status && test.status !== status) return false;
+    if (type && test.test_type !== type) return false;
+    if (board && String(test.board_id || test.boards?.board_id || '') !== board) return false;
+    if (exam && String(test.exam_id || test.exams?.exam_id || '') !== exam) return false;
+    if (subject && String(test.subject_id || test.subjects?.subject_id || '') !== subject) return false;
+    if (year && String(test.exam_year || '') !== year) return false;
     if (!search) return true;
-    return [test.test_id, test.test_name, test.test_type, test.paper_code, test.subjects?.subject_name, test.exams?.exam_name]
+    return [test.test_id, test.test_name, test.test_type, test.paper_code, test.subjects?.subject_name, test.exams?.exam_name, test.boards?.board_name, test.exam_year]
       .some((value) => String(value ?? '').toLowerCase().includes(search));
   });
 }
@@ -1484,6 +1547,8 @@ function nextStatusAction(test) {
 
 function renderConfiguredTests() {
   renderTestCatalogueStats();
+  renderTestCatalogueFilters();
+  renderAdminDashboard();
   const tests = filteredConfiguredTests();
   if (!tests.length) {
     elements.adminTestList.innerHTML = '<div class="empty-state">No configured test matches this filter.</div>';
@@ -2843,6 +2908,16 @@ function bindEvents() {
   document.getElementById('refreshTests')?.addEventListener('click', loadConfiguredTests);
   elements.testStatusFilter?.addEventListener('change', renderConfiguredTests);
   elements.testCatalogueSearch?.addEventListener('input', renderConfiguredTests);
+  [elements.testTypeFilter, elements.testBoardFilter, elements.testExamFilter, elements.testSubjectFilter, elements.testYearFilter].forEach((select) => {
+    select?.addEventListener('change', renderConfiguredTests);
+  });
+  elements.clearTestCatalogueFilters?.addEventListener('click', () => {
+    [elements.testStatusFilter, elements.testTypeFilter, elements.testBoardFilter, elements.testExamFilter, elements.testSubjectFilter, elements.testYearFilter].forEach((select) => {
+      if (select) select.value = '';
+    });
+    if (elements.testCatalogueSearch) elements.testCatalogueSearch.value = '';
+    renderConfiguredTests();
+  });
   document.getElementById('loadPublishedQuestions')?.addEventListener('click', loadPublishedQuestions);
   document.getElementById('newTest')?.addEventListener('click', resetTestBuilder);
   document.getElementById('suggestTestId')?.addEventListener('click', suggestTestIdentity);

@@ -56,6 +56,9 @@ const elements = {
   search: document.getElementById('phase4aSearch'),
   order: document.getElementById('phase4aOrder'),
   loadQuestions: document.getElementById('phase4aLoadQuestions'),
+  applyFilters: document.getElementById('phase4aApplyFilters'),
+  filterState: document.getElementById('phase4aFilterState'),
+  filterStateMeta: document.getElementById('phase4aFilterStateMeta'),
   questionMeta: document.getElementById('phase4aQuestionMeta'),
   questionList: document.getElementById('phase4aQuestionList'),
   loadMore: document.getElementById('phase4aLoadMore'),
@@ -89,6 +92,8 @@ const state = {
   previewSignature: '',
   facetRequestId: 0,
   questionRequestId: 0,
+  filtersDirty: true,
+  facetRefreshTimer: null,
 };
 
 function escapeHtml(value) {
@@ -142,15 +147,16 @@ function selectedQuestionArray() {
 
 function modeText(mode) {
   return ({
-    CUSTOM: 'Custom mode saves only your manually selected unique master questions. Package filters are optional.',
-    PYQ_ORIGINAL: 'Original full PYQ requires exactly one active import Package ID and excludes every supplemental NORMAL question.',
-    PYQ_COMPLETED: 'Completed PYQ practice requires exactly one active package and includes its genuine source questions plus clearly labelled supplements.',
-    PYQ_SECTIONAL: 'Sectional mode accepts multiple Package IDs and multiple subjects/topics. Repeated master questions are linked once.',
+    CUSTOM: 'Custom selected: use the complete smart filter set, inspect the stack, then manually select unique master questions.',
+    PYQ_ORIGINAL: 'Original full PYQ: choose exactly one active paper/package. Other filters are removed so the authoritative original paper cannot be accidentally narrowed.',
+    PYQ_COMPLETED: 'Completed PYQ practice: choose exactly one package. Genuine source PYQs plus approved labelled supplements are resolved automatically.',
+    PYQ_SECTIONAL: 'Sectional PYQ: choose one or more packages and at least one subject. Available subjects and topics recalculate from the selected paper context.',
   })[mode] || '';
 }
 
 function showLogin() {
   state.profile = null;
+  document.body.classList.remove('admin-authenticated');
   elements.loginPanel?.classList.remove('hidden');
   elements.builderPanel?.classList.add('hidden');
   elements.signOut?.classList.add('hidden');
@@ -171,12 +177,13 @@ async function showBuilder() {
   }
 
   state.profile = profile;
+  document.body.classList.add('admin-authenticated');
   elements.loginPanel?.classList.add('hidden');
   elements.builderPanel?.classList.remove('hidden');
   elements.signOut?.classList.remove('hidden');
   updateModeUI();
   await refreshFacets();
-  await loadQuestions({ reset: true });
+  markFiltersDirty('Choose filters, then apply to load the question stack.');
 }
 
 function setBusy(element, busy, busyText = '') {
@@ -263,8 +270,48 @@ function maybeSuggestIdentity() {
   testName.value = `${label} · ${suffix.replaceAll('-', ' ').toLowerCase()}`;
 }
 
+function markFiltersDirty(message = 'Filters changed. Apply them to refresh the question stack.') {
+  state.filtersDirty = true;
+  if (elements.filterState) elements.filterState.textContent = 'Filters changed';
+  if (elements.filterStateMeta) elements.filterStateMeta.textContent = message;
+  if (elements.applyFilters) elements.applyFilters.classList.add('attention');
+}
+
+function markFiltersApplied() {
+  state.filtersDirty = false;
+  const available = Number(state.summary?.unique_questions || state.total || 0);
+  if (elements.filterState) elements.filterState.textContent = 'Filters applied';
+  if (elements.filterStateMeta) elements.filterStateMeta.textContent = `${available} unique question${available === 1 ? '' : 's'} available under the current filter context.`;
+  if (elements.applyFilters) elements.applyFilters.classList.remove('attention');
+}
+
+function scheduleFacetRefresh() {
+  if (state.facetRefreshTimer) window.clearTimeout(state.facetRefreshTimer);
+  state.facetRefreshTimer = window.setTimeout(() => {
+    state.facetRefreshTimer = null;
+    refreshFacets();
+  }, 180);
+}
+
+function clearModeIncompatibleFilters() {
+  if (SINGLE_PACKAGE_MODES.has(state.mode)) {
+    FILTER_KEYS.filter((key) => key !== 'package_ids').forEach((key) => setSelectedValues(key, []));
+  }
+}
+
+function updateModeFilterVisibility() {
+  document.querySelectorAll('[data-mode-visibility]').forEach((element) => {
+    const allowed = String(element.dataset.modeVisibility || '').split(/\s+/).filter(Boolean);
+    const visible = allowed.includes(state.mode);
+    element.classList.toggle('mode-hidden', !visible);
+    if (!visible && element.matches('details')) element.open = false;
+  });
+}
+
 function applyModeControlState({ normalizeSelections = true } = {}) {
   elements.modeNote.textContent = modeText(state.mode);
+  if (normalizeSelections) clearModeIncompatibleFilters();
+  updateModeFilterVisibility();
   elements.customTypeField?.classList.toggle('hidden', state.mode !== 'CUSTOM');
   const selectedOrderOption = elements.order?.querySelector('option[value="SELECTED"]');
   if (selectedOrderOption) selectedOrderOption.disabled = state.mode !== 'CUSTOM';
@@ -273,15 +320,20 @@ function applyModeControlState({ normalizeSelections = true } = {}) {
   if (state.mode === 'PYQ_ORIGINAL') {
     elements.includeSupplements.checked = false;
     elements.includeSupplements.disabled = true;
+    elements.includeSuperseded.checked = false;
+    elements.includeSuperseded.disabled = true;
     elements.includeUnassigned.checked = false;
     elements.includeUnassigned.disabled = true;
   } else if (state.mode === 'PYQ_COMPLETED' || state.mode === 'PYQ_SECTIONAL') {
     elements.includeSupplements.checked = true;
     elements.includeSupplements.disabled = state.mode === 'PYQ_COMPLETED';
+    elements.includeSuperseded.checked = state.mode === 'PYQ_SECTIONAL' ? elements.includeSuperseded.checked : false;
+    elements.includeSuperseded.disabled = state.mode === 'PYQ_COMPLETED';
     elements.includeUnassigned.checked = false;
     elements.includeUnassigned.disabled = true;
   } else {
     elements.includeSupplements.disabled = false;
+    elements.includeSuperseded.disabled = false;
     elements.includeUnassigned.disabled = false;
   }
 
@@ -326,23 +378,32 @@ function renderFacet(key) {
     return;
   }
 
-  container.innerHTML = options.map((item) => {
+  const optionMarkup = options.map((item) => {
     const value = normalizeValue(item.value);
     const checked = selected.has(value) ? 'checked' : '';
     const sub = facetSubLabel(key, item);
+    const label = facetLabel(key, item);
     return `
-      <label class="phase4a-filter-option">
+      <label class="phase4a-filter-option" data-filter-search-text="${escapeHtml(`${label} ${sub} ${value}`.toLowerCase())}">
         <input type="checkbox" data-filter-key="${escapeHtml(key)}" value="${escapeHtml(value)}" ${checked} />
         <span class="phase4a-filter-option-main">
-          <strong>${escapeHtml(facetLabel(key, item))}</strong>
+          <strong>${escapeHtml(label)}</strong>
           ${sub ? `<small>${escapeHtml(sub)}</small>` : ''}
         </span>
         <span class="phase4a-filter-option-count">${escapeHtml(item.count ?? 0)}</span>
       </label>`;
   }).join('');
 
+  container.innerHTML = `${options.length > 8 ? `<div class="phase4a-facet-search-wrap"><input class="phase4a-facet-search" type="search" placeholder="Search ${escapeHtml(FILTER_LABELS[key].toLowerCase())}…" aria-label="Search ${escapeHtml(FILTER_LABELS[key])} options" /></div>` : ''}<div class="phase4a-filter-option-list">${optionMarkup}</div>`;
+
   container.querySelectorAll('[data-filter-key]').forEach((checkbox) => {
     checkbox.addEventListener('change', () => handleFilterCheckbox(checkbox));
+  });
+  container.querySelector('.phase4a-facet-search')?.addEventListener('input', (event) => {
+    const query = String(event.target.value || '').trim().toLowerCase();
+    container.querySelectorAll('[data-filter-search-text]').forEach((row) => {
+      row.hidden = Boolean(query) && !String(row.dataset.filterSearchText || '').includes(query);
+    });
   });
   updateFilterSummary(key);
 }
@@ -372,10 +433,10 @@ async function handleFilterCheckbox(checkbox) {
   }
   setSelectedValues(key, values);
   invalidatePreview('Filters changed. Preview the resolved test again.');
+  markFiltersDirty();
   renderFilterChips();
   maybeSuggestIdentity();
-  await refreshFacets();
-  await loadQuestions({ reset: true });
+  scheduleFacetRefresh();
 }
 
 function renderFilterChips() {
@@ -397,8 +458,8 @@ function renderFilterChips() {
       const key = button.dataset.removeFilter;
       setSelectedValues(key, selectedValues(key).filter((value) => value !== button.dataset.removeValue));
       invalidatePreview('Filters changed. Preview the resolved test again.');
+      markFiltersDirty();
       await refreshFacets();
-      await loadQuestions({ reset: true });
     });
   });
 }
@@ -427,6 +488,10 @@ async function refreshFacets() {
     FILTER_KEYS.forEach(renderFacet);
     renderFilterChips();
     renderFacetSummary();
+    if (state.filtersDirty && elements.filterStateMeta) {
+      const available = Number(state.summary?.unique_questions || 0);
+      elements.filterStateMeta.textContent = `${available} unique question${available === 1 ? '' : 's'} currently available. Apply filters to refresh the stack.`;
+    }
   } catch (error) {
     if (requestId !== state.facetRequestId) return;
     toast.error(error.message);
@@ -518,7 +583,7 @@ async function loadQuestions({ reset = true } = {}) {
     state.visibleQuestionIds = [];
     elements.questionList.innerHTML = '<div class="loading-state">Loading filtered published questions…</div>';
   }
-  setBusy(reset ? elements.loadQuestions : elements.loadMore, true, reset ? 'Loading…' : 'Loading more…');
+  setBusy(reset ? (elements.applyFilters || elements.loadQuestions) : elements.loadMore, true, reset ? 'Applying…' : 'Loading more…');
 
   try {
     const result = await api.searchPhase4ATestBuilderQuestions({
@@ -540,12 +605,13 @@ async function loadQuestions({ reset = true } = {}) {
       ? `${state.total} unique question${state.total === 1 ? '' : 's'} match · ${state.selectedIds.size} selected`
       : `${state.total} unique question${state.total === 1 ? '' : 's'} match · automatic mode resolves the authoritative set`;
     renderQuestions({ append: !reset });
+    if (reset) markFiltersApplied();
   } catch (error) {
     if (requestId !== state.questionRequestId) return;
     if (reset) elements.questionList.innerHTML = `<div class="phase4a-inline-error">${escapeHtml(error.message)}</div>`;
     toast.error(error.message);
   } finally {
-    setBusy(reset ? elements.loadQuestions : elements.loadMore, false);
+    setBusy(reset ? (elements.applyFilters || elements.loadQuestions) : elements.loadMore, false);
   }
 }
 
@@ -723,8 +789,8 @@ async function clearFilters() {
   elements.includeUnassigned.checked = state.mode === 'CUSTOM';
   elements.search.value = '';
   invalidatePreview('Filters cleared. Preview the resolved test again.');
+  markFiltersDirty('Filters cleared. Apply to refresh the question stack.');
   await refreshFacets();
-  await loadQuestions({ reset: true });
 }
 
 function bindEvents() {
@@ -758,28 +824,30 @@ function bindEvents() {
       if (!radio.checked) return;
       state.mode = radio.value;
       updateModeUI();
+      markFiltersDirty('Test mode changed. Choose the required filters, then apply.');
       maybeSuggestIdentity();
       await refreshFacets();
-      await loadQuestions({ reset: true });
     });
   });
 
   [elements.includeSupplements, elements.includeSuperseded, elements.includeUnassigned].forEach((checkbox) => {
-    checkbox?.addEventListener('change', async () => {
+    checkbox?.addEventListener('change', () => {
       invalidatePreview('Filters changed. Preview the resolved test again.');
-      await refreshFacets();
-      await loadQuestions({ reset: true });
+      markFiltersDirty();
+      scheduleFacetRefresh();
     });
   });
 
   elements.clearFilters?.addEventListener('click', clearFilters);
   elements.refresh?.addEventListener('click', async () => {
     await refreshFacets();
-    await loadQuestions({ reset: true });
+    markFiltersDirty('Catalogue refreshed. Apply filters to refresh the question stack.');
     toast.success('Dynamic catalogue refreshed.');
   });
+  elements.applyFilters?.addEventListener('click', () => loadQuestions({ reset: true }));
   elements.loadQuestions?.addEventListener('click', () => loadQuestions({ reset: true }));
   elements.loadMore?.addEventListener('click', () => loadQuestions({ reset: false }));
+  elements.search?.addEventListener('input', () => markFiltersDirty('Search changed. Apply filters to refresh the question stack.'));
   elements.search?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -788,7 +856,8 @@ function bindEvents() {
   });
   elements.order?.addEventListener('change', () => {
     invalidatePreview('Question order changed. Preview the resolved test again.');
-    loadQuestions({ reset: true });
+    if (state.questions.length) loadQuestions({ reset: true });
+    else markFiltersDirty('Question order changed. Apply filters to load the stack.');
   });
 
   elements.selectVisible?.addEventListener('click', () => {
