@@ -822,6 +822,211 @@ export const api = Object.freeze({
     ), 'Unable to reopen student-image review.');
   },
 
+
+  async listDraftImageRepairQueue({
+    status = 'NEEDS_REPAIR',
+    search = '',
+    paperCode = '',
+    shiftNo = '',
+    sectionCode = '',
+    originalQuestionNo = '',
+    page = 0,
+    pageSize = 20,
+  } = {}) {
+    const client = requireSupabase();
+    const limit = Math.min(Math.max(Math.round(Number(pageSize) || 20), 1), 100);
+    const offset = Math.max(Math.round(Number(page) || 0), 0) * limit;
+    return unwrap(await withTimeout(
+      client.rpc('list_draft_image_repair_queue', {
+        p_status: clean(status)?.toUpperCase() || 'NEEDS_REPAIR',
+        p_search: clean(search) || null,
+        p_paper_code: clean(paperCode)?.toUpperCase() || null,
+        p_shift_no: shiftNo === '' || shiftNo === null ? null : Math.max(1, Math.round(Number(shiftNo))),
+        p_section_code: clean(sectionCode)?.toUpperCase() || null,
+        p_original_question_no: originalQuestionNo === '' || originalQuestionNo === null
+          ? null
+          : Math.max(1, Math.round(Number(originalQuestionNo))),
+        p_limit: limit,
+        p_offset: offset,
+      }),
+    ), 'Unable to load the draft Image & Content Repair queue.');
+  },
+
+  async getDraftImageRepairDetail(draftId) {
+    const client = requireSupabase();
+    const detail = unwrap(await withTimeout(
+      client.rpc('get_draft_image_repair_detail', {
+        p_draft_id: draftId,
+      }),
+    ), 'Unable to load this draft repair record.');
+
+    const sourceImages = await resolveStorageImageRefs(client, detail?.question?.image_refs || [], { blockedOnFailure: true });
+    const studentImages = await resolveStorageImageRefs(client, detail?.question?.student_image_refs || [], { blockedOnFailure: true });
+    const repairs = await Promise.all((detail?.repairs || []).map(async (repair) => {
+      if (!['PENDING', 'APPROVED'].includes(repair.status)) return { ...repair, preview_url: '', preview_error: '' };
+      const [preview] = await resolveStorageImageRefs(client, [{
+        bucket: repair.storage_bucket,
+        path: repair.storage_path,
+      }], { blockedOnFailure: true });
+      return {
+        ...repair,
+        preview_url: preview?.url || '',
+        preview_error: preview?.preview_error || (preview?.blocked ? 'Preview blocked.' : ''),
+      };
+    }));
+
+    return {
+      ...detail,
+      question: {
+        ...detail.question,
+        source_image_refs: sourceImages,
+        student_image_preview_refs: studentImages,
+      },
+      repairs,
+    };
+  },
+
+  async saveDraftRepairContent({ draftId, questionText, options, adminNote = '' }) {
+    const client = requireSupabase();
+    const normalized = {
+      A: clean(options?.A),
+      B: clean(options?.B),
+      C: clean(options?.C),
+      D: clean(options?.D),
+    };
+    return unwrap(await withTimeout(
+      client.rpc('save_draft_repair_content', {
+        p_draft_id: draftId,
+        p_question_text: clean(questionText),
+        p_options: normalized,
+        p_admin_note: clean(adminNote) || null,
+      }),
+    ), 'Unable to save repaired draft content.');
+  },
+
+  async resetDraftRepairContent({ draftId, adminNote = '' }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('reset_draft_repair_content', {
+        p_draft_id: draftId,
+        p_admin_note: clean(adminNote) || null,
+        p_confirmation: 'RESET_TO_IMPORTED_CONTENT',
+      }),
+    ), 'Unable to reset the draft to imported content.');
+  },
+
+  async uploadDraftStudentImageRepair({ draftId, file, altText, adminNote = '' }) {
+    const client = requireSupabase();
+    const user = await getUser();
+    if (!user) throw new Error('Your session has expired.');
+    if (!draftId) throw new Error('Draft ID is required.');
+
+    const normalizedAlt = clean(altText);
+    if (!normalizedAlt) throw new Error('Describe the student-safe image.');
+
+    const dimensions = await inspectImageFile(file);
+    const checksum = await sha256File(file);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${user.id}/draft-${draftId}/${Date.now()}-${checksum.slice(0, 12)}-${safeName}`;
+
+    unwrap(await withTimeout(
+      client.storage.from(APP_CONFIG.studentImageBucket).upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type,
+      }),
+    ), 'Unable to upload the student-safe draft crop.');
+
+    try {
+      const result = unwrap(await withTimeout(
+        client.rpc('register_draft_student_image_upload', {
+          p_draft_id: draftId,
+          p_storage_path: storagePath,
+          p_original_file_name: file.name,
+          p_mime_type: file.type,
+          p_file_size_bytes: file.size,
+          p_checksum_sha256: checksum,
+          p_pixel_width: dimensions.width,
+          p_pixel_height: dimensions.height,
+          p_alt_text: normalizedAlt,
+          p_admin_note: clean(adminNote) || null,
+        }),
+      ), 'The crop uploaded, but its draft repair record could not be saved.');
+
+      const cleanupWarning = await removeStudentImageObject(client, result?.superseded_storage_path);
+      return { ...result, cleanup_warning: cleanupWarning };
+    } catch (error) {
+      await removeStudentImageObject(client, storagePath);
+      throw error;
+    }
+  },
+
+  async approveDraftStudentImageRepair({ repairId, altText, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('approve_draft_student_image_repair', {
+        p_repair_id: repairId,
+        p_alt_text: clean(altText),
+        p_admin_note: clean(adminNote) || null,
+        p_confirmation: 'APPROVE_DRAFT_STUDENT_IMAGE',
+      }),
+    ), 'Unable to approve the draft student-safe image.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.replaced_storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
+  },
+
+  async discardDraftStudentImageUpload({ repairId, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('discard_draft_student_image_upload', {
+        p_repair_id: repairId,
+        p_admin_note: clean(adminNote) || null,
+        p_confirmation: 'DISCARD_DRAFT_STUDENT_IMAGE',
+      }),
+    ), 'Unable to discard the pending draft crop.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
+  },
+
+  async removeDraftApprovedStudentImage({ draftId, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('remove_draft_approved_student_image', {
+        p_draft_id: draftId,
+        p_admin_note: clean(adminNote),
+        p_confirmation: 'REMOVE_DRAFT_STUDENT_IMAGE',
+      }),
+    ), 'Unable to remove the approved draft student image.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
+  },
+
+  async markDraftStudentImageNotRequired({ draftId, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('mark_draft_student_image_not_required', {
+        p_draft_id: draftId,
+        p_admin_note: clean(adminNote),
+        p_confirmation: 'NO_DRAFT_STUDENT_IMAGE_REQUIRED',
+      }),
+    ), 'Unable to confirm that no student image is required for this draft.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
+  },
+
+  async reopenDraftStudentImageReview({ draftId, adminNote = '' }) {
+    const client = requireSupabase();
+    const result = unwrap(await withTimeout(
+      client.rpc('reopen_draft_student_image_review', {
+        p_draft_id: draftId,
+        p_admin_note: clean(adminNote),
+        p_confirmation: 'REOPEN_DRAFT_STUDENT_IMAGE_REVIEW',
+      }),
+    ), 'Unable to reopen draft student-image review.');
+    const cleanupWarning = await removeStudentImageObject(client, result?.storage_path);
+    return { ...result, cleanup_warning: cleanupWarning };
+  },
+
   async getPhase4ATestBuilderFacets(filters = {}) {
     const client = requireSupabase();
     return unwrap(await withTimeout(
@@ -939,6 +1144,12 @@ export const api = Object.freeze({
       'source_option_anomaly_note',
       'is_supplemental',
       'explanation',
+      'image_refs',
+      'student_image_review_status',
+      'student_image_review_note',
+      'content_repair_version',
+      'repair_revision',
+      'reviewed_repair_revision',
       'created_at',
       'updated_at',
     ].join(',');
@@ -953,13 +1164,24 @@ export const api = Object.freeze({
 
   async getDraftReview(draftId) {
     const client = requireSupabase();
-    return unwrap(await withTimeout(
+    const draft = unwrap(await withTimeout(
       client
         .from('draft_questions')
         .select('*')
         .eq('draft_id', draftId)
         .single(),
     ), 'Unable to load this draft for review.');
+
+    const [sourceImageRefs, studentImageRefs] = await Promise.all([
+      resolveStorageImageRefs(client, draft?.image_refs || [], { blockedOnFailure: true }),
+      resolveStorageImageRefs(client, draft?.student_image_refs || [], { blockedOnFailure: true }),
+    ]);
+
+    return {
+      ...draft,
+      source_image_refs: sourceImageRefs,
+      student_image_preview_refs: studentImageRefs,
+    };
   },
 
   async createDraft(input) {
