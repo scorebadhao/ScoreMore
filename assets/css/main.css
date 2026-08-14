@@ -2805,3 +2805,241 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
   .image-repair-filter-actions { grid-column: auto; }
   .image-repair-filter-actions { display: grid; grid-template-columns: 1fr 1fr; }
 }
+
+/* --------------------------------------------------------------------------
+   ScoreMore Draft-First Image & Content Repair Workflow v1.1
+   Import -> Repair -> Final Review -> Publish
+   -------------------------------------------------------------------------- */
+
+.admin-workflow-ribbon {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 20px;
+}
+.admin-workflow-step {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--text);
+  background: linear-gradient(180deg, #fff, #f8fbfb);
+  text-decoration: none;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .04);
+}
+.admin-workflow-step:hover,
+.admin-workflow-step:focus-visible {
+  border-color: #7cc7be;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, .12);
+}
+.admin-workflow-number {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--primary);
+  font-weight: 900;
+}
+.admin-workflow-step strong,
+.admin-workflow-step small { display: block; }
+.admin-workflow-step strong { font-size: .8rem; line-height: 1.2; }
+.admin-workflow-step small { margin-top: 3px; color: var(--muted); font-size: .62rem; line-height: 1.35; }
+
+.repair-edited-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 3px 8px;
+  border: 1px solid #c4b5fd;
+  border-radius: 999px;
+  color: #5b21b6;
+  background: #f5f3ff;
+  font-size: .64rem;
+  font-weight: 850;
+}
+.draft-repair-blocked { border-color: #fed7aa; background: #fffdf9; }
+.image-repair-status.status-content-edited { color: #5b21b6; border-color: #c4b5fd; background: #f5f3ff; }
+
+.draft-repair-workspace { max-width: 1180px; margin: 0 auto; }
+.draft-repair-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, .92fr) minmax(420px, 1.25fr);
+  gap: 14px;
+  align-items: start;
+}
+.draft-repair-editor-card,
+.draft-repair-media-card,
+.final-student-presentation {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .035);
+}
+.repair-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.repair-card-heading h3 { margin: 2px 0 0; font-size: 1rem; }
+.draft-content-repair-form { display: grid; gap: 11px; }
+.draft-content-repair-form label { display: grid; gap: 5px; font-size: .74rem; font-weight: 780; }
+.draft-content-repair-form textarea { resize: vertical; min-height: 54px; }
+.repair-option-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.repair-editor-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.repair-imported-version {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+.repair-imported-version > summary { cursor: pointer; padding: 11px 13px; color: var(--primary-dark); font-size: .72rem; font-weight: 850; }
+.imported-version-body { display: grid; gap: 10px; padding: 0 12px 12px; }
+.imported-version-body > p { margin: 0; white-space: pre-wrap; line-height: 1.55; }
+
+.repair-media-tabs {
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 9px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.repair-media-tab {
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 800;
+}
+.repair-media-tab.is-active { color: var(--primary-dark); background: #fff; box-shadow: 0 3px 10px rgba(15,23,42,.06); }
+.repair-media-panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.repair-media-panel { min-width: 0; display: grid; align-content: start; gap: 7px; }
+.repair-media-panel > strong { color: var(--muted); font-size: .68rem; }
+.repair-media-images { display: grid; gap: 8px; }
+
+.repair-workspace-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #99d5cd;
+  border-radius: 16px;
+  background: rgba(247, 255, 253, .97);
+  box-shadow: 0 -5px 20px rgba(15, 118, 110, .08);
+  backdrop-filter: blur(8px);
+}
+.repair-workspace-footer > div { min-width: 0; display: grid; gap: 2px; }
+.repair-workspace-footer strong { color: var(--primary-dark); font-size: .78rem; }
+.repair-workspace-footer span { color: var(--muted); font-size: .67rem; line-height: 1.4; }
+
+.final-review-workspace { max-width: 900px; margin: 0 auto; }
+.final-student-presentation { border-color: #9bd5cd; background: linear-gradient(180deg, #fff, #fbfffe); }
+.final-review-image-grid { display: grid; gap: 9px; margin: 12px 0; }
+.final-review-student-image {
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #f8fbfb;
+}
+.final-review-student-image img { display: block; width: auto; max-width: 100%; max-height: 50vh; object-fit: contain; }
+.final-review-image-state {
+  display: grid;
+  gap: 3px;
+  margin: 11px 0;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #f8fafc;
+}
+.final-review-image-state strong { font-size: .76rem; }
+.final-review-image-state span { color: var(--muted); font-size: .68rem; line-height: 1.45; }
+.final-review-image-state.state-no-image { border-color: #7dd3fc; color: #075985; background: #f0f9ff; }
+.final-review-options { margin-top: 12px; }
+.final-review-source { margin-top: 12px; }
+.final-review-imported-copy { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.final-review-imported-copy > p { margin: 0; white-space: pre-wrap; }
+.final-review-sticky-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 -5px 18px rgba(15,23,42,.06);
+  backdrop-filter: blur(8px);
+}
+.repair-gate-card { max-width: 720px; margin: 0 auto; }
+
+@media (max-width: 980px) {
+  .admin-workflow-ribbon { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .draft-repair-layout { grid-template-columns: 1fr; }
+  .repair-media-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .admin-workflow-ribbon {
+    grid-template-columns: 1fr;
+    gap: 7px;
+    margin-top: 10px;
+  }
+  .admin-workflow-step { grid-template-columns: 34px minmax(0, 1fr); padding: 9px 10px; border-radius: 13px; }
+  .admin-workflow-number { width: 34px; height: 34px; border-radius: 10px; }
+  .admin-workflow-step small { display: none; }
+
+  .draft-repair-workspace { padding-bottom: max(74px, env(safe-area-inset-bottom)); }
+  .draft-repair-editor-card,
+  .draft-repair-media-card,
+  .final-student-presentation { padding: 12px; border-radius: 15px; }
+  .repair-option-grid { grid-template-columns: 1fr; }
+  .repair-editor-actions { display: grid; grid-template-columns: 1fr; }
+  .repair-editor-actions .button { width: 100%; }
+
+  .repair-media-tabs { display: grid; }
+  .repair-media-panels { display: block; }
+  .repair-media-panel { display: none; }
+  .repair-media-panel.is-active { display: grid; }
+  .repair-media-panel > strong { margin-bottom: 3px; }
+
+  .repair-workspace-footer {
+    left: 0;
+    right: 0;
+    bottom: max(0px, env(safe-area-inset-bottom));
+    display: grid;
+    border-radius: 14px;
+  }
+  .repair-workspace-footer .button { width: 100%; }
+  .final-review-sticky-actions { display: grid; grid-template-columns: 1fr; bottom: max(0px, env(safe-area-inset-bottom)); }
+  .final-review-sticky-actions .button { width: 100%; }
+}
+
+@media (max-width: 430px) {
+  .image-repair-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .draft-repair-editor-card,
+  .draft-repair-media-card { padding: 10px; }
+  .repair-card-heading { display: grid; }
+}
