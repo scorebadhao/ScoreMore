@@ -13,7 +13,7 @@
     <header class="topbar topbar-dark">
       <a class="brand" href="./admin.html">
         <span class="brand-mark">__APP_MARK__</span>
-        <span><strong>__APP_NAME__ Admin</strong><small>Import → review → publish → test</small></span>
+        <span><strong>__APP_NAME__ Admin</strong><small>Import → repair → final review → publish → test</small></span>
       </a>
       <div class="topbar-actions">
         <a class="button button-ghost-light" href="./student.html">Student site</a>
@@ -42,20 +42,39 @@
           <div>
             <span class="eyebrow">Content and test operations</span>
             <h1>Admin Operations Centre</h1>
-            <p>Import safely, review accurately, publish verified questions, then build dynamic tests.</p>
+            <p>Import safely, repair the final student presentation, complete human review, publish verified questions, then build tests.</p>
           </div>
           <button id="refreshDrafts" class="button button-secondary" type="button">Refresh review</button>
         </div>
 
         <nav class="admin-section-nav" aria-label="Admin sections">
           <a href="#htmlImportSection">Import</a>
-          <a href="#reviewSection">Review</a>
+          <a href="#imageRepairSection">Image &amp; content repair</a>
+          <a href="#reviewSection">Final review</a>
           <a href="#publishSection">Publish</a>
-          <a href="#imageRepairSection">Image repair</a>
           <a href="#testManagerSection">Build tests</a>
           <a href="./test-builder.html">Dynamic builder</a>
           <a href="#catalogueControlSection">Catalogue</a>
         </nav>
+
+        <section class="admin-workflow-ribbon" aria-label="Question publication workflow">
+          <a class="admin-workflow-step" href="#htmlImportSection">
+            <span class="admin-workflow-number">1</span>
+            <span><strong>Import</strong><small>Validate and create controlled drafts</small></span>
+          </a>
+          <a class="admin-workflow-step" href="#imageRepairSection">
+            <span class="admin-workflow-number">2</span>
+            <span><strong>Image &amp; Content Repair</strong><small>Prepare the final student presentation</small></span>
+          </a>
+          <a class="admin-workflow-step" href="#reviewSection">
+            <span class="admin-workflow-number">3</span>
+            <span><strong>Final Review</strong><small>Verify answer, explanation, topic and repaired view</small></span>
+          </a>
+          <a class="admin-workflow-step" href="#publishSection">
+            <span class="admin-workflow-number">4</span>
+            <span><strong>Publish</strong><small>Only the reviewed repair revision may publish</small></span>
+          </a>
+        </section>
 
         <div class="admin-grid">
           <section class="panel-card">
@@ -196,12 +215,59 @@
           </div>
         </section>
 
+        <section id="imageRepairSection" class="section panel-card image-repair-centre">
+          <div class="section-heading image-repair-heading">
+            <div>
+              <span class="eyebrow">Stage 2 · final student presentation</span>
+              <h2>Image &amp; Content Repair Centre</h2>
+              <p class="muted">Visual drafts are repaired here before human review. Correct question text or options when needed, then resolve the student-safe image decision.</p>
+            </div>
+            <button id="refreshImageRepairs" class="button button-secondary" type="button">Refresh queue</button>
+          </div>
+
+          <div class="import-safety-note image-repair-safety">
+            <strong>Repair-first safety boundary</strong>
+            <span>The immutable imported text/options and raw <code>image_refs</code> remain audit evidence. Any repair edit invalidates an older review; unresolved visual drafts cannot enter Final Review or Publish.</span>
+          </div>
+
+          <div id="imageRepairStats" class="image-repair-stats" aria-live="polite"></div>
+
+          <form id="imageRepairFilters" class="image-repair-filters" novalidate>
+            <label class="image-repair-search">Draft ID or text
+              <input id="imageRepairSearch" name="search" type="search" placeholder="GSSSB-CCE… or question words" autocomplete="off" />
+            </label>
+            <label>Status
+              <select id="imageRepairStatus" name="status">
+                <option value="NEEDS_REPAIR" selected>Needs repair</option>
+                <option value="PENDING">Pending approval</option>
+                <option value="APPROVED">Approved</option>
+                <option value="NO_IMAGE_REQUIRED">No student image required</option>
+                <option value="ALL">All visual drafts</option>
+              </select>
+            </label>
+            <label>Paper code<input id="imageRepairPaperCode" name="paperCode" placeholder="0401S1" /></label>
+            <label>Shift<input id="imageRepairShiftNo" name="shiftNo" type="number" min="1" step="1" placeholder="1" /></label>
+            <label>Section<input id="imageRepairSectionCode" name="sectionCode" placeholder="REASONING" /></label>
+            <label>Original Q. no.<input id="imageRepairQuestionNo" name="originalQuestionNo" type="number" min="1" step="1" placeholder="3" /></label>
+            <div class="image-repair-filter-actions">
+              <button class="button button-primary" type="submit">Apply filters</button>
+              <button id="clearImageRepairFilters" class="button button-ghost" type="button">Clear</button>
+            </div>
+          </form>
+
+          <p id="imageRepairQueueMeta" class="muted image-repair-queue-meta">Loading visual drafts…</p>
+          <div id="imageRepairList" class="image-repair-list" aria-live="polite">
+            <div class="empty-state">Loading repair-first draft queue…</div>
+          </div>
+          <button id="loadMoreImageRepairs" class="button button-ghost image-repair-load-more hidden" type="button">Load more drafts</button>
+        </section>
+
         <section id="reviewSection" class="section panel-card">
           <div class="section-heading draft-review-heading">
             <div>
-              <span class="eyebrow">Human review required</span>
-              <h2>Review Centre</h2>
-              <p id="draftListMeta" class="muted">Verify one question at a time. Saved verified drafts move automatically to the separate Publish Centre.</p>
+              <span class="eyebrow">Stage 3 · human approval of final presentation</span>
+              <h2>Final Review Centre</h2>
+              <p id="draftListMeta" class="muted">Review exactly what the student will see. Visual drafts must finish Image & Content Repair first; verified drafts then move to Publish.</p>
             </div>
             <div class="draft-review-tools">
               <select id="draftStatusFilter" aria-label="Draft status filter">
@@ -211,7 +277,7 @@
                 <option value="PUBLISHED">Published</option>
                 <option value="">All</option>
               </select>
-              <button id="reviewNextDraft" class="button button-primary" type="button">Review next</button>
+              <button id="reviewNextDraft" class="button button-primary" type="button">Review next ready</button>
             </div>
           </div>
           <div id="draftList" class="draft-list compact-draft-list" aria-live="polite"></div>
@@ -221,9 +287,9 @@
         <section id="publishSection" class="section panel-card publish-centre">
           <div class="section-heading publish-centre-heading">
             <div>
-              <span class="eyebrow">Verified questions only</span>
+              <span class="eyebrow">Stage 4 · reviewed repair revision only</span>
               <h2>Publish Centre</h2>
-              <p id="publishQueueMeta" class="muted">Only drafts that passed human answer, explanation and topic review appear here.</p>
+              <p id="publishQueueMeta" class="muted">Only drafts whose current repaired presentation has passed Final Review appear here.</p>
             </div>
             <button id="refreshPublishQueue" class="button button-secondary" type="button">Refresh queue</button>
           </div>
@@ -241,53 +307,6 @@
             <div class="empty-state">Loading verified drafts…</div>
           </div>
           <button id="loadMorePublishQueue" class="button button-ghost publish-load-more hidden" type="button">Load more verified drafts</button>
-        </section>
-
-        <section id="imageRepairSection" class="section panel-card image-repair-centre">
-          <div class="section-heading image-repair-heading">
-            <div>
-              <span class="eyebrow">Compulsory visual safety review · audited decisions</span>
-              <h2>Student-safe Image Repair Centre</h2>
-              <p class="muted">Every published question with a source image must receive an approved safe crop or an audited “No student image required” decision before it can enter a test.</p>
-            </div>
-            <button id="refreshImageRepairs" class="button button-secondary" type="button">Refresh queue</button>
-          </div>
-
-          <div class="import-safety-note image-repair-safety">
-            <strong>Compulsory readiness boundary</strong>
-            <span>Unresolved visual questions are excluded from Test Builders and block test publication or new attempts. Raw <code>image_refs</code> remain private and unchanged.</span>
-          </div>
-
-          <div id="imageRepairStats" class="image-repair-stats" aria-live="polite"></div>
-
-          <form id="imageRepairFilters" class="image-repair-filters" novalidate>
-            <label class="image-repair-search">Question ID or text
-              <input id="imageRepairSearch" name="search" type="search" placeholder="GSSSB-CCE… or question words" autocomplete="off" />
-            </label>
-            <label>Status
-              <select id="imageRepairStatus" name="status">
-                <option value="NEEDS_REPAIR" selected>Needs repair</option>
-                <option value="PENDING">Pending approval</option>
-                <option value="APPROVED">Approved</option>
-                <option value="NO_IMAGE_REQUIRED">No student image required</option>
-                <option value="ALL">All visual questions</option>
-              </select>
-            </label>
-            <label>Paper code<input id="imageRepairPaperCode" name="paperCode" placeholder="0401S1" /></label>
-            <label>Shift<input id="imageRepairShiftNo" name="shiftNo" type="number" min="1" step="1" placeholder="1" /></label>
-            <label>Section<input id="imageRepairSectionCode" name="sectionCode" placeholder="REASONING" /></label>
-            <label>Original Q. no.<input id="imageRepairQuestionNo" name="originalQuestionNo" type="number" min="1" step="1" placeholder="3" /></label>
-            <div class="image-repair-filter-actions">
-              <button class="button button-primary" type="submit">Apply filters</button>
-              <button id="clearImageRepairFilters" class="button button-ghost" type="button">Clear</button>
-            </div>
-          </form>
-
-          <p id="imageRepairQueueMeta" class="muted image-repair-queue-meta">Loading visual questions…</p>
-          <div id="imageRepairList" class="image-repair-list" aria-live="polite">
-            <div class="empty-state">Loading image-repair queue…</div>
-          </div>
-          <button id="loadMoreImageRepairs" class="button button-ghost image-repair-load-more hidden" type="button">Load more questions</button>
         </section>
 
         <section id="testManagerSection" class="section panel-card test-builder-panel">

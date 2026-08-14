@@ -1,0 +1,67 @@
+{
+  "patch_name": "ScoreMore Draft-First Image & Content Repair + DEV Migration History Repair",
+  "version": "1.2 REPO-INSPECTED",
+  "target": "ScoreMore DEV only",
+  "workflow": "Import -> Image & Content Repair -> Final Human Review -> Publish -> Test",
+  "based_on_upload": "ScoreMore-main (2).zip",
+  "changed_vs_uploaded_repo": [
+    ".github/workflows/repair-scoremore-dev-migration-history.yml",
+    "SCOREMORE_DEV_MIGRATION_HISTORY_REPAIR_NOTE.md",
+    "admin.html",
+    "assets/css/main.css",
+    "assets/js/admin.js",
+    "assets/js/api.js"
+  ],
+  "included_unchanged_for_reference": [
+    "supabase/migrations/20260814010000_draft_first_image_content_repair_workflow.sql"
+  ],
+  "normal_dev_database_workflow_modified": false,
+  "normal_dev_database_workflow_sha256": "f8410de9cdc767233ac20e2e2b536d6800cbc1a24b0029e25710a055359b48df",
+  "files": [
+    {
+      "path": ".github/workflows/repair-scoremore-dev-migration-history.yml",
+      "size_bytes": 2294,
+      "sha256": "075c595fbab5e020ba7e81c43acbc30cd447f9118b4cd4cc9a006912f1eb0f5d"
+    },
+    {
+      "path": "PATCH_README_v1_2.md",
+      "size_bytes": 3077,
+      "sha256": "9079452b5dba7dfdfc466ecc0dfb25c547a4b7367b38cd5dac1ef1ae2539e996"
+    },
+    {
+      "path": "PATCH_VALIDATION_REPORT_v1_2.md",
+      "size_bytes": 2397,
+      "sha256": "da7a8325bf81ebed7c7bc71466c8030d4ccf3b807d510544eb7727c677e5dc71"
+    },
+    {
+      "path": "SCOREMORE_DEV_MIGRATION_HISTORY_REPAIR_NOTE.md",
+      "size_bytes": 1743,
+      "sha256": "5e8c005288d9ad6167f6181a1aba842aa56c670df05075d73148a76cc32e2ed0"
+    },
+    {
+      "path": "admin.html",
+      "size_bytes": 27145,
+      "sha256": "675ce6b8e46bf70c2ff836754814de9f0cb4cf8377447c32befd223a52bb5412"
+    },
+    {
+      "path": "assets/css/main.css",
+      "size_bytes": 99572,
+      "sha256": "fe2908e60579ba23f3b4308f9fbd0ab75744b5b37420f26a242a3897991fd24e"
+    },
+    {
+      "path": "assets/js/admin.js",
+      "size_bytes": 139973,
+      "sha256": "d40bd4df4346803c2c3c610114a93d131ff4ce252acd1551fb4e522a80c56e7a"
+    },
+    {
+      "path": "assets/js/api.js",
+      "size_bytes": 58466,
+      "sha256": "4e792f499e1db2cc29ab6ab3a022df2f4fba1cdac2a2ccaf43ab55ad4162e3bc"
+    },
+    {
+      "path": "supabase/migrations/20260814010000_draft_first_image_content_repair_workflow.sql",
+      "size_bytes": 76756,
+      "sha256": "3efcdf415835004ab3c938cb15e668f70a870cfcc906613b8fe46f414db51838"
+    }
+  ]
+}
