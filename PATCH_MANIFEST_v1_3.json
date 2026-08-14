@@ -1,0 +1,40 @@
+{
+  "patch": "ScoreMore Admin UI Sidebar",
+  "version": "1.3 VERIFIED",
+  "target": "ScoreMore DEV only",
+  "repository_files_changed": [
+    "admin.html",
+    "assets/js/admin.js",
+    "assets/css/main.css"
+  ],
+  "database_changes": false,
+  "api_js_changed": false,
+  "ranktiger_prod_changes": false,
+  "files": [
+    {
+      "path": "PATCH_README_v1_3.md",
+      "size_bytes": 2433,
+      "sha256": "bdbaf0086441710190171e0b7577b708fdc28d769f83a774f1449a95de9769db"
+    },
+    {
+      "path": "PATCH_VALIDATION_REPORT_v1_3.md",
+      "size_bytes": 1699,
+      "sha256": "31fa9267ec0f10633d7402b1669c6d6215444f6b91cbd0391a0e5d414443191e"
+    },
+    {
+      "path": "admin.html",
+      "size_bytes": 24723,
+      "sha256": "b167e52f5fdc17fc349d11e19abf8bdd76ac8380b2a6acc94f242512b84e892a"
+    },
+    {
+      "path": "assets/css/main.css",
+      "size_bytes": 109996,
+      "sha256": "5218ac6a4e91b59a659fe04d969cef149652470c2211868ee910d82c8b1f74fd"
+    },
+    {
+      "path": "assets/js/admin.js",
+      "size_bytes": 144481,
+      "sha256": "beb4ab2e7e87bddba02af91bea2386a179dc9793540f96dd0227c900a6dbd184"
+    }
+  ]
+}
