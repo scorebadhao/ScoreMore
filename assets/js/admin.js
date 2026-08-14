@@ -106,6 +106,111 @@ let imageRepairItems = [];
 let imageRepairSummary = { total_candidates: 0, needs_repair: 0, pending: 0, approved: 0, no_image_required: 0 };
 let activeRepairObjectUrl = '';
 
+
+const ADMIN_VIEW_META = Object.freeze({
+  import: {
+    eyebrow: 'Question workflow · Stage 1',
+    title: 'Import Centre',
+    description: 'Bring source material into controlled drafts. Validate packages before any database write.',
+  },
+  repair: {
+    eyebrow: 'Question workflow · Stage 2',
+    title: 'Image & Content Repair',
+    description: 'Correct draft presentation and resolve student-safe imagery before academic review.',
+  },
+  review: {
+    eyebrow: 'Question workflow · Stage 3',
+    title: 'Final Review Centre',
+    description: 'Review the final student presentation, then verify answer, explanation and topic.',
+  },
+  publish: {
+    eyebrow: 'Question workflow · Stage 4',
+    title: 'Publish Centre',
+    description: 'Publish only drafts whose current repair revision has passed Final Review.',
+  },
+  tests: {
+    eyebrow: 'Test operations',
+    title: 'Build Tests',
+    description: 'Create fixed-question tests from student-ready published master questions without copying them.',
+  },
+  catalogue: {
+    eyebrow: 'Test operations',
+    title: 'Test Catalogue',
+    description: 'Find configured tests, edit their fixed question list, or safely change visibility.',
+  },
+});
+
+let activeAdminView = 'import';
+
+function closeAdminSidebar() {
+  document.body.classList.remove('admin-sidebar-open');
+  const toggle = document.getElementById('adminSidebarToggle');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+function setAdminView(view, { updateHash = true, scroll = true } = {}) {
+  const nextView = Object.hasOwn(ADMIN_VIEW_META, view) ? view : 'import';
+  const meta = ADMIN_VIEW_META[nextView];
+  activeAdminView = nextView;
+
+  document.querySelectorAll('[data-admin-view-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.adminViewPanel !== nextView;
+  });
+
+  document.querySelectorAll('[data-admin-view]').forEach((control) => {
+    const active = control.dataset.adminView === nextView;
+    control.classList.toggle('active', active);
+    if (active) control.setAttribute('aria-current', 'page');
+    else control.removeAttribute('aria-current');
+  });
+
+  const eyebrow = document.getElementById('adminPageEyebrow');
+  const title = document.getElementById('adminPageTitle');
+  const description = document.getElementById('adminPageDescription');
+  if (eyebrow) eyebrow.textContent = meta.eyebrow;
+  if (title) title.textContent = meta.title;
+  if (description) description.textContent = meta.description;
+
+  try { sessionStorage.setItem('scoremore-admin-active-view', nextView); } catch {}
+  if (updateHash) history.replaceState(null, '', `#admin-${nextView}`);
+  closeAdminSidebar();
+
+  if (scroll) {
+    const content = document.querySelector('.admin-workspace-main');
+    content?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function initializeAdminWorkspaceNavigation() {
+  const fromHash = String(location.hash || '').match(/^#admin-(import|repair|review|publish|tests|catalogue)$/)?.[1];
+  let stored = '';
+  try { stored = sessionStorage.getItem('scoremore-admin-active-view') || ''; } catch {}
+  setAdminView(fromHash || stored || 'import', { updateHash: Boolean(fromHash), scroll: false });
+
+  document.querySelectorAll('[data-admin-view]').forEach((control) => {
+    control.addEventListener('click', () => setAdminView(control.dataset.adminView));
+  });
+
+  const toggle = document.getElementById('adminSidebarToggle');
+  const closeButton = document.getElementById('adminSidebarClose');
+  const backdrop = document.getElementById('adminSidebarBackdrop');
+  toggle?.addEventListener('click', () => {
+    const open = document.body.classList.toggle('admin-sidebar-open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  closeButton?.addEventListener('click', closeAdminSidebar);
+  backdrop?.addEventListener('click', closeAdminSidebar);
+
+  window.addEventListener('hashchange', () => {
+    const requested = String(location.hash || '').match(/^#admin-(import|repair|review|publish|tests|catalogue)$/)?.[1];
+    if (requested && requested !== activeAdminView) setAdminView(requested, { updateHash: false, scroll: false });
+  });
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && document.body.classList.contains('admin-sidebar-open')) closeAdminSidebar();
+  });
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -140,6 +245,8 @@ function setBusy(form, busy) {
 
 function showLogin() {
   profile = null;
+  document.body.classList.remove('admin-authenticated');
+  closeAdminSidebar();
   elements.loginPanel.classList.remove('hidden');
   elements.adminPanel.classList.add('hidden');
   elements.signOut.classList.add('hidden');
@@ -156,6 +263,7 @@ async function showAdmin() {
   }
   elements.loginPanel.classList.add('hidden');
   elements.adminPanel.classList.remove('hidden');
+  document.body.classList.add('admin-authenticated');
   elements.signOut.classList.remove('hidden');
   await loadReferenceData();
   await Promise.all([
@@ -1488,6 +1596,7 @@ async function loadTestIntoBuilder(testId) {
     if (elements.testQuestionSearch) elements.testQuestionSearch.value = '';
     renderPublishedQuestions();
     updateTestTypeUi();
+    setAdminView('tests', { scroll: false });
     document.getElementById('testManagerSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     loading.close();
     toast.info('Test loaded. Save with the same ID to update it. Tests with attempts cannot change their structure.');
@@ -1508,6 +1617,7 @@ function resetTestBuilder() {
   refreshTestReferenceSelects();
   updateTestTypeUi();
   resetQuestionPicker('Choose catalogue or paper filters, then load published questions.');
+  setAdminView('tests', { scroll: false });
   document.getElementById('testManagerSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -1773,7 +1883,7 @@ async function openReview(draftId) {
   elements.dialogContent.querySelector('#dialogBackToRepair')?.addEventListener('click', () => {
     elements.dialog.close();
     if (visual) openImageRepair(draftId);
-    else document.getElementById('imageRepairSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else setAdminView('repair');
   });
   elements.dialogContent.querySelector('#dialogReject')?.addEventListener('click', () => openRejectDialog(draftId));
 
@@ -2641,6 +2751,7 @@ function downloadCurrentImportReport() {
 }
 
 function bindEvents() {
+  initializeAdminWorkspaceNavigation();
   elements.loginForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
