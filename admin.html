@@ -31,7 +31,13 @@
 <section class="notice notice-warning hidden" id="adminSetupNotice">
         Add the Supabase URL and publishable key to your environment before running __APP_NAME__.
       </section>
-<section class="auth-card section narrow-card" id="adminLoginPanel">
+<section class="auth-card section narrow-card" id="adminSessionPanel">
+<span class="eyebrow">Protected administration</span>
+<h1>Restoring admin session…</h1>
+<p id="adminSessionMessage">Checking your existing secure session. You should not need to sign in again.</p>
+<button class="button button-ghost button-block hidden" id="adminSessionRetry" type="button">Retry session</button>
+</section>
+<section class="auth-card section narrow-card hidden" id="adminLoginPanel">
 <span class="eyebrow">Protected administration</span>
 <h1>Admin sign in</h1>
 <p>Only profiles with the database role <strong>ADMIN</strong> may access content and test operations.</p>

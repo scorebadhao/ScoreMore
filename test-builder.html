@@ -37,7 +37,14 @@
         Add the __APP_NAME__ Supabase URL and browser-safe publishable key before using this page.
       </section>
 
-      <section id="phase4aLoginPanel" class="auth-card section narrow-card">
+      <section id="phase4aSessionPanel" class="auth-card section narrow-card">
+        <span class="eyebrow">Protected administration</span>
+        <h1>Restoring admin session…</h1>
+        <p id="phase4aSessionMessage">Checking your existing secure session. You should not need to sign in again.</p>
+        <button id="phase4aSessionRetry" class="button button-ghost button-block hidden" type="button">Retry session</button>
+      </section>
+
+      <section id="phase4aLoginPanel" class="auth-card section narrow-card hidden">
         <span class="eyebrow">Protected administration</span>
         <h1>Admin sign in</h1>
         <p>Only an active __APP_NAME__ profile with the database role <strong>ADMIN</strong> may build tests.</p>

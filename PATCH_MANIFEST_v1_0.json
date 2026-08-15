@@ -1,0 +1,51 @@
+{
+  "patch": "ScoreMore Admin Session Persistence Fix",
+  "version": "1.0 VERIFIED",
+  "target": "ScoreMore DEV only",
+  "repository_files_changed": [
+    "admin.html",
+    "test-builder.html",
+    "assets/js/api.js",
+    "assets/js/admin.js",
+    "assets/js/testBuilder4A.js"
+  ],
+  "database_changes": false,
+  "ranktiger_prod_changes": false,
+  "files": [
+    {
+      "path": "PATCH_README_v1_0.md",
+      "size_bytes": 2943,
+      "sha256": "f2c200d55164b313f5e907ab872f675e4039a3f29018480ab3b0ebd6aa8325af"
+    },
+    {
+      "path": "PATCH_VALIDATION_REPORT_v1_0.md",
+      "size_bytes": 1876,
+      "sha256": "ef6259b5a2b22dfa39e2aea631a2874dc29f1235f8ecb0b3dbe97703a10b1768"
+    },
+    {
+      "path": "admin.html",
+      "size_bytes": 29573,
+      "sha256": "fffb5316ab2b45f4ec9e6fa9626a95434040da729a7ad3acdb35f87b732215e0"
+    },
+    {
+      "path": "assets/js/admin.js",
+      "size_bytes": 154245,
+      "sha256": "ca549356770b482bd7987547c5fe7450e5b87f33c5f017f01d138ce46b0f8ec4"
+    },
+    {
+      "path": "assets/js/api.js",
+      "size_bytes": 60246,
+      "sha256": "5cd37a3b0f1c4e7de51921cab3d36ff51f28a8375c5fefbb001a7486d4357077"
+    },
+    {
+      "path": "assets/js/testBuilder4A.js",
+      "size_bytes": 42307,
+      "sha256": "8b17f320e2d0614dee5818e969fbc3bf34af70464f61d1edabbe875a67964d3e"
+    },
+    {
+      "path": "test-builder.html",
+      "size_bytes": 20910,
+      "sha256": "1212f0aa9ad03c32153e1af4b1d37aa62223f0dc27f58179fd626ef507f92c1f"
+    }
+  ]
+}
