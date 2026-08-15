@@ -76,6 +76,10 @@ const elements = {
   previewPanel: document.getElementById('phase4aPreviewPanel'),
   confirmDialog: document.getElementById('phase4aConfirmDialog'),
   confirmContent: document.getElementById('phase4aConfirmContent'),
+  identityHint: document.getElementById('phase4aIdentityHint'),
+  saveDraftButton: document.getElementById('phase4aSaveDraftButton'),
+  publishButton: document.getElementById('phase4aPublishButton'),
+  publishGuard: document.getElementById('phase4aPublishGuard'),
 };
 
 const state = {
@@ -299,12 +303,59 @@ function setBusy(element, busy, busyText = '') {
   }
 }
 
+function previewWarnings(preview) {
+  if (Array.isArray(preview?.warnings_v15)) return preview.warnings_v15;
+  return (Array.isArray(preview?.warnings) ? preview.warnings : []).map((warning) => ({ ...warning, severity: 'WARNING' }));
+}
+
+function previewBlockers(preview) {
+  return Array.isArray(preview?.publish_blockers) ? preview.publish_blockers : [];
+}
+
+function previewReviewWarnings(preview) {
+  return previewWarnings(preview).filter((issue) => String(issue?.severity || 'WARNING').toUpperCase() === 'WARNING');
+}
+
+function previewInfoNotices(preview) {
+  return previewWarnings(preview).filter((issue) => String(issue?.severity || '').toUpperCase() === 'INFO');
+}
+
+function updatePublishActionState() {
+  if (!elements.publishButton) return;
+  const hasCurrentPreview = Boolean(state.preview && state.previewSignature === previewSignature(buildPayload()));
+  const blockers = hasCurrentPreview ? previewBlockers(state.preview) : [];
+  const warnings = hasCurrentPreview ? previewReviewWarnings(state.preview) : [];
+  const infoNotices = hasCurrentPreview ? previewInfoNotices(state.preview) : [];
+
+  elements.publishButton.disabled = !hasCurrentPreview || blockers.length > 0;
+  if (!hasCurrentPreview) {
+    elements.publishButton.textContent = 'Preview before publish';
+    if (elements.publishGuard) elements.publishGuard.textContent = 'Publication stays locked until the current configuration has a clean authoritative preview.';
+    return;
+  }
+  if (blockers.length) {
+    elements.publishButton.textContent = 'Resolve blockers first';
+    if (elements.publishGuard) elements.publishGuard.textContent = `${blockers.length} publication blocker${blockers.length === 1 ? '' : 's'} must be resolved before this test can be published.`;
+    return;
+  }
+
+  elements.publishButton.textContent = warnings.length ? 'Publish with warnings' : 'Publish test';
+  if (elements.publishGuard) {
+    elements.publishGuard.textContent = warnings.length
+      ? `${warnings.length} non-blocking review warning${warnings.length === 1 ? '' : 's'} will be shown again before publication.`
+      : infoNotices.length
+        ? `${infoNotices.length} informational notice${infoNotices.length === 1 ? '' : 's'} recorded. Publication is allowed.`
+        : 'Authoritative preview passed. This test is ready for protected publication.';
+  }
+}
+
 function invalidatePreview(message = 'Preview is required before publication.') {
   state.preview = null;
   state.previewSignature = '';
   elements.previewPanel?.classList.add('hidden');
   if (elements.previewPanel) elements.previewPanel.innerHTML = '';
   if (elements.previewState) elements.previewState.textContent = message;
+  updatePublishActionState();
 }
 
 function buildPayload() {
@@ -351,23 +402,96 @@ function validateModeBeforeRequest() {
   }
 }
 
-function maybeSuggestIdentity() {
-  const testId = elements.testForm?.elements?.testId;
-  const testName = elements.testForm?.elements?.testName;
-  if (!testId || !testName || testId.value.trim() || testName.value.trim()) return;
+function stableIdentityToken(parts = []) {
+  const input = parts.map((value) => normalizeValue(value)).filter(Boolean).sort().join('|');
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).toUpperCase().padStart(8, '0').slice(0, 6);
+}
+
+function buildIdentitySuggestion() {
   const packages = selectedValues('package_ids');
-  const packageId = packages[0] || '';
-  if (!packageId) return;
+  if (!packages.length) return null;
+  const subjects = selectedValues('subject_ids');
+  const years = selectedValues('exam_years');
+
+  if (state.mode === 'PYQ_SECTIONAL' && packages.length > 1) {
+    const subjectPart = subjects.length === 1 ? subjects[0] : subjects.length > 1 ? 'MULTI-SUBJECT' : 'SECTIONAL';
+    const yearPart = years.length === 1 ? years[0] : '';
+    const token = stableIdentityToken([...packages, ...subjects, ...years]);
+    return {
+      testId: ['SECTIONAL', 'MULTI', yearPart, subjectPart, token].filter(Boolean).join('-').replace(/[^A-Z0-9-]/g, '-').replace(/-+/g, '-'),
+      testName: `Sectional test · ${packages.length} packages${subjects.length === 1 ? ` · ${subjects[0].replaceAll('_', ' ')}` : subjects.length > 1 ? ` · ${subjects.length} subjects` : ''}`,
+      neutral: true,
+    };
+  }
+
+  const packageId = packages[0];
   const suffix = ({
     PYQ_ORIGINAL: 'ORIGINAL-FULL-TEST',
     PYQ_COMPLETED: 'COMPLETED-PRACTICE-TEST',
     PYQ_SECTIONAL: 'SECTIONAL-TEST',
     CUSTOM: 'CUSTOM-TEST',
   })[state.mode] || 'TEST';
-  testId.value = `${packageId}-${suffix}`.replace(/[^A-Z0-9-]/g, '-').replace(/-+/g, '-');
   const packageOption = (state.facets.packages || []).find((item) => normalizeValue(item.value) === packageId);
   const label = packageOption?.label || packageId;
-  testName.value = `${label} · ${suffix.replaceAll('-', ' ').toLowerCase()}`;
+  return {
+    testId: `${packageId}-${suffix}`.replace(/[^A-Z0-9-]/g, '-').replace(/-+/g, '-'),
+    testName: `${label} · ${suffix.replaceAll('-', ' ').toLowerCase()}`,
+    neutral: false,
+  };
+}
+
+function updateIdentityHint() {
+  if (!elements.identityHint) return;
+  const packages = selectedValues('package_ids');
+  if (state.mode === 'PYQ_SECTIONAL' && packages.length > 1) {
+    elements.identityHint.textContent = `Multi-package sectional test: use a neutral test ID. ScoreMore will preserve all ${packages.length} source package IDs in test provenance.`;
+    elements.identityHint.classList.add('is-important');
+  } else {
+    elements.identityHint.textContent = 'Use a clear test identity. Multi-package sectional tests use a neutral generated ID while preserving every source package in provenance.';
+    elements.identityHint.classList.remove('is-important');
+  }
+}
+
+function maybeSuggestIdentity({ force = false } = {}) {
+  const testId = elements.testForm?.elements?.testId;
+  const testName = elements.testForm?.elements?.testName;
+  if (!testId || !testName) return;
+  const suggestion = buildIdentitySuggestion();
+  updateIdentityHint();
+  if (!suggestion) return;
+
+  const idCanUpdate = force || !testId.value.trim() || testId.dataset.autoSuggested === 'true';
+  const nameCanUpdate = force || !testName.value.trim() || testName.dataset.autoSuggested === 'true';
+  if (idCanUpdate) {
+    testId.value = suggestion.testId;
+    testId.dataset.autoSuggested = 'true';
+  }
+  if (nameCanUpdate) {
+    testName.value = suggestion.testName;
+    testName.dataset.autoSuggested = 'true';
+  }
+}
+
+function validateTestIdentity(payload) {
+  if (payload.builderMode !== 'PYQ_SECTIONAL') return;
+  const packages = Array.isArray(payload.filters?.package_ids) ? payload.filters.package_ids.map(normalizeValue) : [];
+  if (packages.length <= 1) return;
+  const testId = normalizeValue(payload.testId);
+  const misleading = packages.some((packageId) => testId === packageId || testId.startsWith(`${packageId}-`));
+  if (misleading) {
+    throw new Error('Multi-package sectional tests must use a neutral Test ID that does not look like one selected source package. Use the generated neutral ID or enter another neutral ID.');
+  }
+}
+
+function updateApplyFilterButton() {
+  if (!elements.applyFilters) return;
+  const available = Number(state.summary?.unique_questions || state.total || 0);
+  elements.applyFilters.textContent = available ? `Apply filters · ${available}` : 'Apply filters';
 }
 
 function markFiltersDirty(message = 'Filters changed. Apply them to refresh the question stack.') {
@@ -375,6 +499,7 @@ function markFiltersDirty(message = 'Filters changed. Apply them to refresh the 
   if (elements.filterState) elements.filterState.textContent = 'Filters changed';
   if (elements.filterStateMeta) elements.filterStateMeta.textContent = message;
   if (elements.applyFilters) elements.applyFilters.classList.add('attention');
+  updateApplyFilterButton();
 }
 
 function markFiltersApplied() {
@@ -383,6 +508,7 @@ function markFiltersApplied() {
   if (elements.filterState) elements.filterState.textContent = 'Filters applied';
   if (elements.filterStateMeta) elements.filterStateMeta.textContent = `${available} unique question${available === 1 ? '' : 's'} available under the current filter context.`;
   if (elements.applyFilters) elements.applyFilters.classList.remove('attention');
+  updateApplyFilterButton();
 }
 
 function scheduleFacetRefresh() {
@@ -588,6 +714,7 @@ async function refreshFacets() {
     FILTER_KEYS.forEach(renderFacet);
     renderFilterChips();
     renderFacetSummary();
+    updateApplyFilterButton();
     if (state.filtersDirty && elements.filterStateMeta) {
       const available = Number(state.summary?.unique_questions || 0);
       elements.filterStateMeta.textContent = `${available} unique question${available === 1 ? '' : 's'} currently available. Apply filters to refresh the stack.`;
@@ -756,8 +883,15 @@ async function selectAllFiltered() {
   }
 }
 
+function renderPreviewIssue(issue) {
+  const severity = String(issue?.severity || 'WARNING').toUpperCase();
+  const label = severity === 'BLOCKER' ? 'Publication blocker' : severity === 'INFO' ? 'Information' : 'Review notice';
+  return `<div class="phase4a-issue-item ${escapeHtml(severity.toLowerCase())}"><strong>${escapeHtml(issue?.code || label)}</strong><span>${escapeHtml(label)}</span><p>${escapeHtml(issue?.message || '')}</p></div>`;
+}
+
 function renderPreview(preview) {
-  const warnings = Array.isArray(preview?.warnings) ? preview.warnings : [];
+  const warnings = previewWarnings(preview);
+  const blockers = previewBlockers(preview);
   const packages = Array.isArray(preview?.packages) ? preview.packages : [];
   const rows = [
     ['Questions', preview.question_count || 0],
@@ -779,11 +913,16 @@ function renderPreview(preview) {
     <div class="phase4a-preview-grid">
       ${rows.map(([label, value]) => `<div class="phase4a-preview-stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join('')}
     </div>
-    ${packages.length ? `<div class="phase4a-package-list"><strong>Import packages</strong>${packages.map((pkg) => `<span>${escapeHtml(pkg.package_id)} · ${escapeHtml(pkg.completeness_status || 'UNSPECIFIED')} · ${escapeHtml(pkg.extracted_source_questions ?? '—')} source · ${escapeHtml(pkg.generated_supplement_count ?? 0)} supplemental</span>`).join('')}</div>` : ''}
-    ${warnings.length ? `<div class="phase4a-warning-list">${warnings.map((warning) => `<div class="phase4a-warning-item"><strong>${escapeHtml(warning.code || 'WARNING')}</strong><br>${escapeHtml(warning.message || '')}</div>`).join('')}</div>` : '<div class="notice notice-success">No blocking preview warning.</div>'}
+    ${packages.length ? `<div class="phase4a-package-list"><strong>Source package provenance</strong>${packages.map((pkg) => `<span>${escapeHtml(pkg.package_id)} · ${escapeHtml(pkg.completeness_status || 'UNSPECIFIED')} · ${escapeHtml(pkg.extracted_source_questions ?? '—')} source · ${escapeHtml(pkg.generated_supplement_count ?? 0)} supplemental</span>`).join('')}</div>` : ''}
+    ${blockers.length ? `<div class="phase4a-issue-list blocker-list">${blockers.map(renderPreviewIssue).join('')}</div>` : ''}
+    ${warnings.length ? `<div class="phase4a-issue-list">${warnings.map(renderPreviewIssue).join('')}</div>` : ''}
+    ${!blockers.length && !warnings.length ? '<div class="notice notice-success">No publication blocker or review notice.</div>' : ''}
   `;
   elements.previewPanel.classList.remove('hidden');
-  elements.previewState.textContent = `${preview.question_count} questions resolved as ${preview.proposed_test_type}.`;
+  elements.previewState.textContent = blockers.length
+    ? `${preview.question_count} questions resolved · ${blockers.length} publication blocker${blockers.length === 1 ? '' : 's'}.`
+    : `${preview.question_count} questions resolved as ${preview.proposed_test_type}.`;
+  updatePublishActionState();
 }
 
 async function previewTest({ silent = false } = {}) {
@@ -803,6 +942,7 @@ async function previewTest({ silent = false } = {}) {
     elements.previewPanel.classList.remove('hidden');
     elements.previewPanel.innerHTML = `<div class="phase4a-inline-error">${escapeHtml(error.message)}</div>`;
     elements.previewState.textContent = 'Preview failed. Resolve the reported issue.';
+    updatePublishActionState();
     throw error;
   } finally {
     setBusy(elements.previewButton, false);
@@ -817,15 +957,26 @@ function requestConfirmation({ publish, preview }) {
       settled = true;
       resolve(value);
     };
-    const warnings = Array.isArray(preview?.warnings) ? preview.warnings : [];
+    const warnings = previewWarnings(preview);
+    const reviewWarnings = previewReviewWarnings(preview);
+    const blockers = previewBlockers(preview);
+    const packages = Array.isArray(preview?.package_ids) ? preview.package_ids : [];
+    const publishLabel = reviewWarnings.length ? 'Publish with warnings' : 'Publish test';
     elements.confirmContent.innerHTML = `
       <div class="phase4a-confirm-content">
         <span class="eyebrow">${publish ? 'Publication confirmation' : 'Draft confirmation'}</span>
         <h2>${publish ? 'Publish' : 'Save'} this ${escapeHtml(preview.question_count)}-question fixed test?</h2>
         <p>The server will re-resolve every filter, validate published questions and write only links to existing master questions.</p>
-        ${warnings.length ? `<div class="phase4a-warning-list">${warnings.map((warning) => `<div class="phase4a-warning-item">${escapeHtml(warning.message || '')}</div>`).join('')}</div>` : ''}
+        <div class="phase4a-confirm-summary">
+          <span><strong>${escapeHtml(preview.question_count || 0)}</strong> questions</span>
+          <span><strong>${escapeHtml(packages.length)}</strong> source package${packages.length === 1 ? '' : 's'}</span>
+          <span><strong>${escapeHtml(preview.source_pyq_count || 0)}</strong> source PYQs</span>
+          <span><strong>${escapeHtml(preview.supplemental_count || 0)}</strong> supplemental</span>
+        </div>
+        ${blockers.length ? `<div class="phase4a-issue-list blocker-list">${blockers.map(renderPreviewIssue).join('')}</div>` : ''}
+        ${warnings.length ? `<div class="phase4a-issue-list">${warnings.map(renderPreviewIssue).join('')}</div>` : ''}
         <div class="phase4a-confirm-actions">
-          <button id="phase4aConfirmYes" class="button button-primary" type="button">${publish ? 'Publish test' : 'Save draft'}</button>
+          <button id="phase4aConfirmYes" class="button button-primary" type="button">${publish ? publishLabel : 'Save draft'}</button>
           <button id="phase4aConfirmNo" class="button button-ghost" type="button">Cancel</button>
         </div>
       </div>`;
@@ -848,6 +999,13 @@ async function saveTest(event) {
   const publish = submitter?.value === 'PUBLISH';
   const payload = buildPayload();
 
+  try {
+    validateTestIdentity(payload);
+  } catch (error) {
+    toast.warning(error.message);
+    return;
+  }
+
   if (!payload.testId || !payload.testName) {
     toast.warning('Test ID and test name are required.');
     return;
@@ -863,6 +1021,12 @@ async function saveTest(event) {
     const preview = state.preview && state.previewSignature === signature
       ? state.preview
       : await previewTest({ silent: true });
+    const blockers = previewBlockers(preview);
+    if (publish && blockers.length) {
+      updatePublishActionState();
+      toast.error(`Publication is blocked by ${blockers.length} unresolved safety issue${blockers.length === 1 ? '' : 's'}.`);
+      return;
+    }
     const confirmed = await requestConfirmation({ publish, preview });
     if (!confirmed) return;
 
@@ -874,11 +1038,13 @@ async function saveTest(event) {
     state.preview = result?.preview || preview;
     state.previewSignature = signature;
     renderPreview(state.preview);
+    maybeSuggestIdentity();
   } catch (error) {
     toast.error(error.message);
   } finally {
     [...elements.testForm.elements].forEach((control) => { control.disabled = false; });
     applyModeControlState({ normalizeSelections: false });
+    updatePublishActionState();
   }
 }
 
@@ -989,6 +1155,13 @@ function bindEvents() {
     }
   });
   elements.testForm?.addEventListener('submit', saveTest);
+  elements.testForm?.elements?.testId?.addEventListener('input', (event) => {
+    if (event.isTrusted) event.target.dataset.autoSuggested = 'false';
+    updateIdentityHint();
+  });
+  elements.testForm?.elements?.testName?.addEventListener('input', (event) => {
+    if (event.isTrusted) event.target.dataset.autoSuggested = 'false';
+  });
   elements.testForm?.addEventListener('input', (event) => {
     if (event.target.matches('input, select')) invalidatePreview('Test settings changed. Preview the resolved test again.');
   });
@@ -996,6 +1169,8 @@ function bindEvents() {
 
 async function initialize() {
   bindEvents();
+  updateIdentityHint();
+  updatePublishActionState();
   if (!isConfigured) {
     elements.setupNotice?.classList.remove('hidden');
     showLogin();

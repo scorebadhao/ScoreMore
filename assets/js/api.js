@@ -1135,7 +1135,7 @@ export const api = Object.freeze({
     )];
 
     return unwrap(await withTimeout(
-      client.rpc('preview_phase4a_dynamic_test', {
+      client.rpc('preview_phase4a_dynamic_test_v15', {
         p_builder_mode: clean(input.builderMode)?.toUpperCase() || 'CUSTOM',
         p_filters: input.filters && typeof input.filters === 'object' ? input.filters : {},
         p_question_ids: questionIds,
@@ -1155,7 +1155,7 @@ export const api = Object.freeze({
     )];
 
     return unwrap(await withTimeout(
-      client.rpc('save_phase4a_dynamic_test', {
+      client.rpc('save_phase4a_dynamic_test_v15', {
         p_test_id: clean(input.testId)?.toUpperCase(),
         p_test_name: clean(input.testName),
         p_builder_mode: clean(input.builderMode)?.toUpperCase() || 'CUSTOM',

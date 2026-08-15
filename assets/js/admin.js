@@ -713,13 +713,29 @@ async function publishSelectedQueue(draftIds) {
   const ids = [...new Set((Array.isArray(draftIds) ? draftIds : []).filter(Boolean))];
   if (!ids.length) return toast.warning('Select at least one verified draft.');
 
+  const selectedDrafts = ids.map((id) => publishQueue.find((draft) => draft.draft_id === id)).filter(Boolean);
+  const repairedCount = selectedDrafts.filter((draft) => Number(draft.content_repair_version || 0) > 0).length;
+  const safeCropCount = selectedDrafts.filter((draft) => draft.student_image_review_status === 'SAFE_CROP_APPROVED').length;
+  const noImageCount = selectedDrafts.filter((draft) => ['NOT_APPLICABLE', 'NO_STUDENT_IMAGE_REQUIRED'].includes(draft.student_image_review_status)).length;
+  const supplementalCount = selectedDrafts.filter((draft) => draft.is_supplemental).length;
+  const anomalyCount = selectedDrafts.filter((draft) => draft.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED').length;
+
   const confirmed = await requestAdminConfirmation({
     eyebrow: 'Separate Publish Centre',
     title: `Publish ${ids.length} verified question${ids.length === 1 ? '' : 's'}?`,
-    message: 'Only drafts that already passed human answer, explanation and topic verification are selected. This creates published master questions and their source occurrences.',
+    message: 'Every selected draft is currently in the protected Publish Centre. Publishing creates master questions and source occurrences only after the database rechecks the current reviewed repair revision.',
     safetyTitle: 'Publication protection',
-    safetyMessage: 'The database rechecks every draft. A failed item remains unpublished and is reported separately.',
-    buttonLabel: ids.length === 1 ? 'Publish question' : 'Publish verified questions',
+    safetyMessage: 'Image readiness, verified answer/explanation/topic, repair revision and publish eligibility are checked again on the server. A failed item remains unpublished and is reported separately.',
+    buttonLabel: ids.length === 1 ? 'Confirm Publish' : `Confirm Publish (${ids.length})`,
+    summaryRows: [
+      ['Selected', ids.length],
+      ['Image readiness', 'Resolved for all'],
+      ['Repaired content', repairedCount],
+      ['Safe image crops', safeCropCount],
+      ['No student image', noImageCount],
+      ['Supplemental', supplementalCount],
+      ['Printed option anomalies', anomalyCount],
+    ],
   });
   if (!confirmed) return;
 
@@ -1989,8 +2005,8 @@ async function openReview(draftId) {
         </details>
 
         <div class="simple-review-actions final-review-sticky-actions">
-          <button class="button button-primary" type="submit" name="reviewAction" value="SAVE_NEXT">Verify final view &amp; next</button>
-          <button class="button button-secondary" type="submit" name="reviewAction" value="SAVE">Save final review</button>
+          <button class="button button-primary" type="submit" name="reviewAction" value="SAVE_NEXT">Approve &amp; Next</button>
+          <button class="button button-secondary" type="submit" name="reviewAction" value="SAVE">Save Draft Review</button>
           <button id="dialogBackToRepair" class="button button-ghost" type="button">Back to repair</button>
           <button id="dialogReject" class="button button-danger button-small" type="button">Reject</button>
         </div>
@@ -2622,6 +2638,7 @@ function requestAdminConfirmation({
   safetyTitle = 'Protected operation',
   safetyMessage = 'The database validates this action before saving changes.',
   buttonLabel = 'Continue',
+  summaryRows = [],
 }) {
   return new Promise((resolve) => {
     let settled = false;
@@ -2636,6 +2653,7 @@ function requestAdminConfirmation({
         <span class="eyebrow">${escapeHtml(eyebrow)}</span>
         <h2>${escapeHtml(title)}</h2>
         <p>${escapeHtml(message)}</p>
+        ${Array.isArray(summaryRows) && summaryRows.length ? `<div class="admin-confirm-summary">${summaryRows.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</div>` : ''}
         <div class="import-safety-note">
           <strong>${escapeHtml(safetyTitle)}</strong>
           <span>${escapeHtml(safetyMessage)}</span>
