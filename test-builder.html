@@ -233,7 +233,8 @@
           <form id="phase4aTestForm" class="stack-form" novalidate>
             <div class="phase4a-test-grid">
               <label>Test ID
-                <input name="testId" placeholder="GSSSB-CCE-2024-S1-FULL-PYQ-0001" required />
+                <input name="testId" placeholder="GSSSB-CCE-2024-S1-FULL-PYQ-0001" required aria-describedby="phase4aIdentityHint" />
+                <small id="phase4aIdentityHint" class="phase4a-identity-hint">Use a clear test identity. Multi-package sectional tests use a neutral generated ID while preserving every source package in provenance.</small>
               </label>
               <label>Test name
                 <input name="testName" placeholder="GSSSB CCE 1 April 2024 Shift 1" required />
@@ -264,8 +265,9 @@
             </div>
             <div id="phase4aPreviewPanel" class="phase4a-preview-panel hidden" aria-live="polite"></div>
             <div class="phase4a-save-actions">
-              <button class="button button-ghost" type="submit" name="testAction" value="DRAFT">Save as draft</button>
-              <button class="button button-primary" type="submit" name="testAction" value="PUBLISH">Publish test</button>
+              <button id="phase4aSaveDraftButton" class="button button-ghost" type="submit" name="testAction" value="DRAFT">Save as draft</button>
+              <button id="phase4aPublishButton" class="button button-primary" type="submit" name="testAction" value="PUBLISH" disabled>Preview before publish</button>
+              <div id="phase4aPublishGuard" class="phase4a-publish-guard" aria-live="polite">Publication stays locked until the current configuration has a clean authoritative preview.</div>
             </div>
           </form>
         </section>

@@ -1,0 +1,70 @@
+{
+  "patch": "ScoreMore Admin Safety & Efficiency",
+  "version": "1.5 VERIFIED",
+  "target": "ScoreMore DEV only",
+  "database_first": true,
+  "new_migration": "supabase/migrations/20260816010000_phase4a_safety_efficiency_v1.sql",
+  "repository_files": [
+    "test-builder.html",
+    "assets/js/api.js",
+    "assets/js/admin.js",
+    "assets/js/testBuilder4A.js",
+    "assets/css/main.css",
+    "assets/css/testBuilder4A.css",
+    "supabase/migrations/20260816010000_phase4a_safety_efficiency_v1.sql",
+    "supabase/migrations/README.md"
+  ],
+  "ranktiger_prod_changes": false,
+  "files": [
+    {
+      "path": "PATCH_README_v1_5.md",
+      "size_bytes": 4489,
+      "sha256": "a7de8620572ff189f48e2280b0c2a7d3c0562f70e32ec7defe34a8f2ac203466"
+    },
+    {
+      "path": "PATCH_VALIDATION_REPORT_v1_5.md",
+      "size_bytes": 2812,
+      "sha256": "d03eb83525cee41c48613b80f2abed7341a05d57647e21c36a6f6cc3d74cf803"
+    },
+    {
+      "path": "assets/css/main.css",
+      "size_bytes": 115794,
+      "sha256": "481b1543c09867645e43a396bc2f1fd1927a88734fe03a0d92dc00412881ec96"
+    },
+    {
+      "path": "assets/css/testBuilder4A.css",
+      "size_bytes": 17828,
+      "sha256": "ef04118483df2baadf3d4898ec9a3d171a2f70f1fdbcaacc0b355a052e766c8e"
+    },
+    {
+      "path": "assets/js/admin.js",
+      "size_bytes": 155673,
+      "sha256": "a2fb98288c59245588d12bc5827415f611cca3b61866bdf44a8f7787faf39cca"
+    },
+    {
+      "path": "assets/js/api.js",
+      "size_bytes": 60254,
+      "sha256": "cba1b4a22b54f030c5e5a2c297826cfa08bcd0890e3d37cfe0f815c83f63e8ce"
+    },
+    {
+      "path": "assets/js/testBuilder4A.js",
+      "size_bytes": 50681,
+      "sha256": "dd58f430d925b63a9c53757814d00ac0cfb4e5749bb0fa36a34e545f7657923d"
+    },
+    {
+      "path": "supabase/migrations/20260816010000_phase4a_safety_efficiency_v1.sql",
+      "size_bytes": 12313,
+      "sha256": "63483eef851cf0cfb7bf8116631521d6f99e33e9053245bdc151e5d2515b24ba"
+    },
+    {
+      "path": "supabase/migrations/README.md",
+      "size_bytes": 5053,
+      "sha256": "e546798c2a8bab7708dca60cebd5f80c3fe8c282ee51ea4ba8fbf9857c70188c"
+    },
+    {
+      "path": "test-builder.html",
+      "size_bytes": 21436,
+      "sha256": "2754e736779237b363256cfc64aac4e26976531edc284bd6a5aef3de2f6593af"
+    }
+  ]
+}
