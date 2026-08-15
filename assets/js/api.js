@@ -118,20 +118,73 @@ function normalizeIndianMobile(value) {
   return `+91${nationalNumber}`;
 }
 
-async function getUser() {
+async function getSession() {
   const client = requireSupabase();
   const sessionData = unwrap(
     await withTimeout(client.auth.getSession()),
     'Unable to read your session.',
   );
+  return sessionData?.session || null;
+}
 
-  if (!sessionData?.session) return null;
+async function getUser() {
+  const client = requireSupabase();
+  const session = await getSession();
+  if (!session) return null;
 
   const data = unwrap(
     await withTimeout(client.auth.getUser()),
     'Unable to verify your session.',
   );
   return data.user || null;
+}
+
+async function getProfileForUser(userId) {
+  const normalizedUserId = clean(userId);
+  if (!normalizedUserId) return null;
+  const client = requireSupabase();
+  const response = await withTimeout(
+    client.from('profiles').select('*').eq('user_id', normalizedUserId).maybeSingle(),
+  );
+  if (response?.error) throw normalizeError(response.error, 'Unable to load profile.');
+  return response?.data || null;
+}
+
+async function getAdminContext({ attempts = 2, retryDelayMs = 350 } = {}) {
+  const client = requireSupabase();
+  const maxAttempts = Math.max(1, Number(attempts) || 1);
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const session = await getSession();
+      if (!session) return { status: 'SIGNED_OUT', user: null, profile: null };
+
+      // Verify the current session once. Do not call getUser() again while
+      // resolving the same admin page because that would perform a second
+      // session read during navigation/token refresh.
+      const userData = unwrap(
+        await withTimeout(client.auth.getUser()),
+        'Unable to verify your session.',
+      );
+      const user = userData?.user || null;
+      if (!user) return { status: 'SIGNED_OUT', user: null, profile: null };
+
+      const profile = await getProfileForUser(user.id);
+      if (!profile || profile.role !== 'ADMIN') {
+        return { status: 'UNAUTHORIZED', user, profile };
+      }
+
+      return { status: 'AUTHORIZED', user, profile };
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => window.setTimeout(resolve, retryDelayMs * attempt));
+      }
+    }
+  }
+
+  return { status: 'ERROR', user: null, profile: null, error: lastError };
 }
 
 export const api = Object.freeze({
@@ -190,21 +243,21 @@ export const api = Object.freeze({
     })), 'Unable to change password.');
   },
 
+  getSession,
   getUser,
+  getAdminContext,
 
   onAuthStateChange(callback) {
     const client = requireSupabase();
     return client.auth.onAuthStateChange((event, session) => callback(event, session));
   },
 
+  getProfileForUser,
+
   async getProfile() {
-    const client = requireSupabase();
     const user = await getUser();
     if (!user) return null;
-    const data = unwrap(await withTimeout(
-      client.from('profiles').select('*').eq('user_id', user.id).single(),
-    ), 'Unable to load profile.');
-    return data;
+    return getProfileForUser(user.id);
   },
 
   async getStudentHome() {

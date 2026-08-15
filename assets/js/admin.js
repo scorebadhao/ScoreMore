@@ -5,6 +5,9 @@ import { downloadJson, formatBytes, parseImportHtml } from './importEngine.js';
 
 const elements = {
   setupNotice: document.getElementById('adminSetupNotice'),
+  sessionPanel: document.getElementById('adminSessionPanel'),
+  sessionMessage: document.getElementById('adminSessionMessage'),
+  sessionRetry: document.getElementById('adminSessionRetry'),
   loginPanel: document.getElementById('adminLoginPanel'),
   adminPanel: document.getElementById('adminPanel'),
   signOut: document.getElementById('adminSignOut'),
@@ -85,6 +88,9 @@ const elements = {
 };
 
 let profile = null;
+let adminRestorePromise = null;
+let adminSessionRecheckTimer = null;
+let adminAuthSubscription = null;
 let drafts = [];
 let referenceData = { boards: [], exams: [], subjects: [], topics: [] };
 let publishedQuestions = [];
@@ -246,37 +252,139 @@ function setBusy(form, busy) {
   });
 }
 
+function showRestoringAdminSession(message = 'Checking your existing secure session. You should not need to sign in again.') {
+  elements.sessionMessage.textContent = message;
+  elements.sessionRetry.classList.add('hidden');
+  elements.sessionPanel.classList.remove('hidden');
+  elements.loginPanel.classList.add('hidden');
+  if (!document.body.classList.contains('admin-authenticated')) {
+    elements.adminPanel.classList.add('hidden');
+    elements.signOut.classList.add('hidden');
+  }
+}
+
+function showSessionProblem(error) {
+  const message = error?.message || 'The admin session could not be verified right now.';
+  if (document.body.classList.contains('admin-authenticated')) {
+    toast.warning(`${message} Your current admin workspace has been kept open.`);
+    return;
+  }
+  elements.sessionMessage.textContent = `${message} Your stored session has not been cleared. Retry when the connection is ready.`;
+  elements.sessionRetry.classList.remove('hidden');
+  elements.sessionPanel.classList.remove('hidden');
+  elements.loginPanel.classList.add('hidden');
+  elements.adminPanel.classList.add('hidden');
+  elements.signOut.classList.add('hidden');
+}
+
 function showLogin() {
   profile = null;
   document.body.classList.remove('admin-authenticated');
   closeAdminSidebar();
+  elements.sessionPanel.classList.add('hidden');
   elements.loginPanel.classList.remove('hidden');
   elements.adminPanel.classList.add('hidden');
   elements.signOut.classList.add('hidden');
 }
 
-async function showAdmin() {
-  const user = await api.getUser();
-  if (!user) return showLogin();
-  profile = await api.getProfile();
-  if (profile?.role !== 'ADMIN') {
-    await api.signOut();
-    showLogin();
-    throw new Error(`This account is not authorized as a ${APP_CONFIG.name} admin.`);
+async function showAdmin({ reloadData = true, announceSessionError = true } = {}) {
+  if (adminRestorePromise) return adminRestorePromise;
+
+  adminRestorePromise = (async () => {
+    if (!document.body.classList.contains('admin-authenticated')) {
+      showRestoringAdminSession();
+    }
+
+    const context = await api.getAdminContext({ attempts: 2, retryDelayMs: 350 });
+    if (context.status === 'SIGNED_OUT') {
+      showLogin();
+      return false;
+    }
+
+    if (context.status === 'UNAUTHORIZED') {
+      // This is the only automatic sign-out path: the profile lookup completed
+      // successfully and confirmed that the current account is not an admin.
+      try { await api.signOut(); } catch {}
+      showLogin();
+      throw new Error(`This account is not authorized as a ${APP_CONFIG.name} admin.`);
+    }
+
+    if (context.status === 'ERROR') {
+      showSessionProblem(context.error);
+      if (announceSessionError && document.body.classList.contains('admin-authenticated')) {
+        toast.warning('Admin session verification will retry automatically.');
+      }
+      return false;
+    }
+
+    profile = context.profile;
+    elements.sessionPanel.classList.add('hidden');
+    elements.loginPanel.classList.add('hidden');
+    elements.adminPanel.classList.remove('hidden');
+    document.body.classList.add('admin-authenticated');
+    elements.signOut.classList.remove('hidden');
+
+    if (reloadData) {
+      try {
+        await loadReferenceData();
+        await Promise.all([
+          loadDrafts(),
+          loadPublishQueue(),
+          loadConfiguredTests(),
+          loadRecentImportBatches(),
+          loadImageRepairQueue(),
+        ]);
+        renderAdminDashboard();
+      } catch (error) {
+        // Data/API failures must never be interpreted as an authentication failure.
+        toast.error(`${error.message} Admin session remains active.`);
+      }
+    }
+
+    return true;
+  })();
+
+  try {
+    return await adminRestorePromise;
+  } finally {
+    adminRestorePromise = null;
   }
-  elements.loginPanel.classList.add('hidden');
-  elements.adminPanel.classList.remove('hidden');
-  document.body.classList.add('admin-authenticated');
-  elements.signOut.classList.remove('hidden');
-  await loadReferenceData();
-  await Promise.all([
-    loadDrafts(),
-    loadPublishQueue(),
-    loadConfiguredTests(),
-    loadRecentImportBatches(),
-    loadImageRepairQueue(),
-  ]);
-  renderAdminDashboard();
+}
+
+function scheduleAdminSessionRecheck({ reloadData = false } = {}) {
+  window.clearTimeout(adminSessionRecheckTimer);
+  adminSessionRecheckTimer = window.setTimeout(() => {
+    showAdmin({ reloadData, announceSessionError: false }).catch((error) => {
+      showSessionProblem(error);
+    });
+  }, 120);
+}
+
+function bindAdminAuthLifecycle() {
+  const authState = api.onAuthStateChange((event, session) => {
+    // Supabase recommends keeping auth callbacks lightweight. Defer any API
+    // work so token refresh/navigation cannot deadlock the auth callback.
+    window.setTimeout(() => {
+      if (event === 'SIGNED_OUT') {
+        showLogin();
+        return;
+      }
+      if (session?.user && ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+        scheduleAdminSessionRecheck({ reloadData: false });
+      }
+    }, 0);
+  });
+  adminAuthSubscription = authState?.data?.subscription || null;
+
+  window.addEventListener('pageshow', () => {
+    if (isConfigured) scheduleAdminSessionRecheck({ reloadData: false });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && document.body.classList.contains('admin-authenticated')) {
+      scheduleAdminSessionRecheck({ reloadData: false });
+    }
+  });
 }
 
 function renderAdminDashboard() {
@@ -2826,15 +2934,23 @@ function bindEvents() {
     const loading = toast.loading('Signing in…');
     try {
       await api.signIn({ email: values.get('email'), password: values.get('password') });
-      await showAdmin();
+      const restored = await showAdmin();
       loading.close();
-      toast.success('Admin access verified.');
-      form.reset();
+      if (restored) {
+        toast.success('Admin access verified.');
+        form.reset();
+      }
     } catch (error) {
       loading.close();
       toast.error(error.message);
-      try { await api.signOut(); } catch {}
+      // Never destroy a valid stored session because a follow-up profile/data
+      // request failed transiently. Explicit sign-out remains user-controlled.
     } finally { setBusy(form, false); }
+  });
+
+  elements.sessionRetry?.addEventListener('click', () => {
+    showRestoringAdminSession('Retrying your secure admin session…');
+    showAdmin({ reloadData: true }).catch((error) => showSessionProblem(error));
   });
 
   elements.signOut?.addEventListener('click', async () => {
@@ -3034,8 +3150,13 @@ async function initialize() {
     showLogin();
     return;
   }
-  try { await showAdmin(); }
-  catch (error) { toast.error(error.message); showLogin(); }
+  bindAdminAuthLifecycle();
+  try {
+    await showAdmin();
+  } catch (error) {
+    toast.error(error.message);
+    if (!document.body.classList.contains('admin-authenticated')) showSessionProblem(error);
+  }
 }
 
 initialize();

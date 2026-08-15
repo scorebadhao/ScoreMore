@@ -40,6 +40,9 @@ const FILTER_LABELS = {
 
 const elements = {
   setupNotice: document.getElementById('phase4aSetupNotice'),
+  sessionPanel: document.getElementById('phase4aSessionPanel'),
+  sessionMessage: document.getElementById('phase4aSessionMessage'),
+  sessionRetry: document.getElementById('phase4aSessionRetry'),
   loginPanel: document.getElementById('phase4aLoginPanel'),
   loginForm: document.getElementById('phase4aLoginForm'),
   builderPanel: document.getElementById('phase4aBuilderPanel'),
@@ -95,6 +98,10 @@ const state = {
   filtersDirty: true,
   facetRefreshTimer: null,
 };
+
+let builderRestorePromise = null;
+let builderSessionRecheckTimer = null;
+let builderAuthSubscription = null;
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -154,36 +161,129 @@ function modeText(mode) {
   })[mode] || '';
 }
 
+function showRestoringBuilderSession(message = 'Checking your existing secure session. You should not need to sign in again.') {
+  if (elements.sessionMessage) elements.sessionMessage.textContent = message;
+  elements.sessionRetry?.classList.add('hidden');
+  elements.sessionPanel?.classList.remove('hidden');
+  elements.loginPanel?.classList.add('hidden');
+  if (!document.body.classList.contains('admin-authenticated')) {
+    elements.builderPanel?.classList.add('hidden');
+    elements.signOut?.classList.add('hidden');
+  }
+}
+
+function showBuilderSessionProblem(error) {
+  const message = error?.message || 'The admin session could not be verified right now.';
+  if (document.body.classList.contains('admin-authenticated')) {
+    toast.warning(`${message} Your Dynamic Builder has been kept open.`);
+    return;
+  }
+  if (elements.sessionMessage) {
+    elements.sessionMessage.textContent = `${message} Your stored session has not been cleared. Retry when the connection is ready.`;
+  }
+  elements.sessionRetry?.classList.remove('hidden');
+  elements.sessionPanel?.classList.remove('hidden');
+  elements.loginPanel?.classList.add('hidden');
+  elements.builderPanel?.classList.add('hidden');
+  elements.signOut?.classList.add('hidden');
+}
+
 function showLogin() {
   state.profile = null;
   document.body.classList.remove('admin-authenticated');
+  elements.sessionPanel?.classList.add('hidden');
   elements.loginPanel?.classList.remove('hidden');
   elements.builderPanel?.classList.add('hidden');
   elements.signOut?.classList.add('hidden');
 }
 
-async function showBuilder() {
-  const user = await api.getUser();
-  if (!user) {
-    showLogin();
-    return;
-  }
+async function showBuilder({ reloadData = true, announceSessionError = true } = {}) {
+  if (builderRestorePromise) return builderRestorePromise;
 
-  const profile = await api.getProfile();
-  if (profile?.role !== 'ADMIN') {
-    await api.signOut();
-    showLogin();
-    throw new Error(`This account is not authorized as a ${APP_CONFIG.name} admin.`);
-  }
+  builderRestorePromise = (async () => {
+    if (!document.body.classList.contains('admin-authenticated')) {
+      showRestoringBuilderSession();
+    }
 
-  state.profile = profile;
-  document.body.classList.add('admin-authenticated');
-  elements.loginPanel?.classList.add('hidden');
-  elements.builderPanel?.classList.remove('hidden');
-  elements.signOut?.classList.remove('hidden');
-  updateModeUI();
-  await refreshFacets();
-  markFiltersDirty('Choose filters, then apply to load the question stack.');
+    const context = await api.getAdminContext({ attempts: 2, retryDelayMs: 350 });
+    if (context.status === 'SIGNED_OUT') {
+      showLogin();
+      return false;
+    }
+
+    if (context.status === 'UNAUTHORIZED') {
+      try { await api.signOut(); } catch {}
+      showLogin();
+      throw new Error(`This account is not authorized as a ${APP_CONFIG.name} admin.`);
+    }
+
+    if (context.status === 'ERROR') {
+      showBuilderSessionProblem(context.error);
+      if (announceSessionError && document.body.classList.contains('admin-authenticated')) {
+        toast.warning('Admin session verification will retry automatically.');
+      }
+      return false;
+    }
+
+    state.profile = context.profile;
+    document.body.classList.add('admin-authenticated');
+    elements.sessionPanel?.classList.add('hidden');
+    elements.loginPanel?.classList.add('hidden');
+    elements.builderPanel?.classList.remove('hidden');
+    elements.signOut?.classList.remove('hidden');
+
+    if (reloadData) {
+      try {
+        updateModeUI();
+        await refreshFacets();
+        markFiltersDirty('Choose filters, then apply to load the question stack.');
+      } catch (error) {
+        toast.error(`${error.message} Admin session remains active.`);
+      }
+    }
+
+    return true;
+  })();
+
+  try {
+    return await builderRestorePromise;
+  } finally {
+    builderRestorePromise = null;
+  }
+}
+
+function scheduleBuilderSessionRecheck({ reloadData = false } = {}) {
+  window.clearTimeout(builderSessionRecheckTimer);
+  builderSessionRecheckTimer = window.setTimeout(() => {
+    showBuilder({ reloadData, announceSessionError: false }).catch((error) => {
+      showBuilderSessionProblem(error);
+    });
+  }, 120);
+}
+
+function bindBuilderAuthLifecycle() {
+  const authState = api.onAuthStateChange((event, session) => {
+    window.setTimeout(() => {
+      if (event === 'SIGNED_OUT') {
+        showLogin();
+        return;
+      }
+      if (session?.user && ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+        scheduleBuilderSessionRecheck({ reloadData: false });
+      }
+    }, 0);
+  });
+  builderAuthSubscription = authState?.data?.subscription || null;
+
+  window.addEventListener('pageshow', () => {
+    if (isConfigured) scheduleBuilderSessionRecheck({ reloadData: false });
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && document.body.classList.contains('admin-authenticated')) {
+      scheduleBuilderSessionRecheck({ reloadData: false });
+    }
+  });
 }
 
 function setBusy(element, busy, busyText = '') {
@@ -800,13 +900,19 @@ function bindEvents() {
     setBusy(elements.loginForm.querySelector('button[type="submit"]'), true, 'Signing in…');
     try {
       await api.signIn({ email: data.get('email'), password: data.get('password') });
-      await showBuilder();
-      toast.success('Admin access verified.');
+      const restored = await showBuilder();
+      if (restored) toast.success('Admin access verified.');
     } catch (error) {
       toast.error(error.message);
+      // Keep any valid stored session intact if a follow-up request failed.
     } finally {
       setBusy(elements.loginForm.querySelector('button[type="submit"]'), false);
     }
+  });
+
+  elements.sessionRetry?.addEventListener('click', () => {
+    showRestoringBuilderSession('Retrying your secure admin session…');
+    showBuilder({ reloadData: true }).catch((error) => showBuilderSessionProblem(error));
   });
 
   elements.signOut?.addEventListener('click', async () => {
@@ -895,10 +1001,12 @@ async function initialize() {
     showLogin();
     return;
   }
+  bindBuilderAuthLifecycle();
   try {
     await showBuilder();
   } catch (error) {
     toast.error(error.message);
+    if (!document.body.classList.contains('admin-authenticated')) showBuilderSessionProblem(error);
   }
 }
 
