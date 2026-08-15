@@ -369,3 +369,125 @@
     width: auto;
   }
 }
+
+/* ScoreMore Admin Console v1.5 — Phase 4A safety & efficiency */
+.phase4a-identity-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: .68rem;
+  line-height: 1.45;
+}
+.phase4a-identity-hint.is-important {
+  color: #8a4b08;
+  font-weight: 750;
+}
+.phase4a-issue-list {
+  display: grid;
+  gap: 8px;
+}
+.phase4a-issue-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 11px 12px;
+  border: 1px solid #d8e2e0;
+  border-radius: 13px;
+  background: #f7faf9;
+}
+.phase4a-issue-item strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #24343a;
+  font-size: .76rem;
+}
+.phase4a-issue-item > span {
+  align-self: start;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eaf2f1;
+  color: #49615f;
+  font-size: .62rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.phase4a-issue-item p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.5;
+}
+.phase4a-issue-item.info {
+  border-color: #a7d4ce;
+  background: #f1fbf9;
+}
+.phase4a-issue-item.info > span {
+  background: #daf2ee;
+  color: #11665d;
+}
+.phase4a-issue-item.warning {
+  border-color: #e8cd8a;
+  background: #fff8e6;
+}
+.phase4a-issue-item.warning > span {
+  background: #ffedbd;
+  color: #805500;
+}
+.phase4a-issue-item.blocker {
+  border-color: #e8a8a8;
+  background: #fff2f2;
+}
+.phase4a-issue-item.blocker strong,
+.phase4a-issue-item.blocker p { color: #8d1e1e; }
+.phase4a-issue-item.blocker > span {
+  background: #ffdede;
+  color: #9e1e1e;
+}
+.phase4a-confirm-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.phase4a-confirm-summary span {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: .68rem;
+}
+.phase4a-confirm-summary strong { color: var(--text-strong); font-size: .9rem; }
+.phase4a-save-actions { align-items: stretch; }
+.phase4a-save-actions .button:disabled {
+  opacity: .58;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.phase4a-publish-guard {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: .68rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media (max-width: 680px) {
+  .phase4a-apply-bar {
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    padding: 9px 10px;
+    gap: 8px;
+  }
+  .phase4a-apply-bar .button {
+    min-height: 44px;
+    white-space: nowrap;
+  }
+  .phase4a-apply-bar strong { font-size: .74rem; }
+  .phase4a-apply-bar span { font-size: .64rem; line-height: 1.35; }
+  .phase4a-confirm-summary { grid-template-columns: 1fr 1fr; }
+  .phase4a-issue-item { grid-template-columns: 1fr; }
+  .phase4a-issue-item > span { justify-self: start; }
+}
