@@ -2204,16 +2204,55 @@ function syncImportSelections(report) {
   selectedOccurrenceItemIds = new Set([...selectedOccurrenceItemIds].filter((id) => actionableOccurrenceIds.has(id)));
 }
 
+
+// SCOREMORE_Q81_SOURCE_ANOMALY_FIX_V1
+function importItemErrorCodes(item) {
+  return (item?.errors || [])
+    .map((issue) => String(issue?.code || '').trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function isConfirmablePrintedDuplicateOptions(item) {
+  const errorCodes = importItemErrorCodes(item);
+  return Boolean(
+    !item?.created_draft_id
+    && item?.validation_status === 'INVALID'
+    && String(item?.normalized_payload?.question_type || '').toUpperCase() === 'PYQ'
+    && errorCodes.length === 1
+    && errorCodes[0] === 'DUPLICATE_OPTIONS'
+  );
+}
+
+function confirmablePrintedSourceAnomalyCount(report = currentImportReport) {
+  return report?.items?.filter(isConfirmablePrintedDuplicateOptions).length || 0;
+}
+
+function duplicatePrintedOptionLabels(item) {
+  const options = item?.normalized_payload?.options || {};
+  const rows = ['A', 'B', 'C', 'D']
+    .map((label) => [label, String(options?.[label] || '').trim().replace(/\s+/g, ' ')])
+    .filter(([, value]) => value);
+  const groups = new Map();
+  rows.forEach(([label, value]) => {
+    const key = value.toLocaleLowerCase();
+    const labels = groups.get(key) || [];
+    labels.push(label);
+    groups.set(key, labels);
+  });
+  return [...groups.values()].filter((labels) => labels.length > 1);
+}
+
 function knownRepairableCount(report = currentImportReport) {
-  const summaryCount = Number(report?.summary?.repairable_items || 0);
-  if (summaryCount > 0) return summaryCount;
+  if (report?.summary && Object.prototype.hasOwnProperty.call(report.summary, 'repairable_items')) {
+    return Number(report.summary.repairable_items || 0);
+  }
+
   return report?.items?.filter((item) => (
-    !item.created_draft_id && (
-      (item.validation_status === 'INVALID'
-        && String(item.normalized_payload?.answer_source || '').toUpperCase() === 'AI_PROPOSED')
-      || Number(item.fingerprint_version || 1) < 2
-      || (item.errors || []).some((issue) => issue?.code === 'DRAFT_INSERT_FAILED')
-      || Boolean(item.matched_draft_id)
+    !item?.created_draft_id
+    && !isConfirmablePrintedDuplicateOptions(item)
+    && (
+      Number(item?.fingerprint_version || 1) < 2
+      || (item?.errors || []).some((issue) => issue?.code === 'DRAFT_INSERT_FAILED')
     )
   )).length || 0;
 }
@@ -2228,6 +2267,8 @@ function updateImportActionControls() {
   const occurrenceCount = selectedOccurrenceItemIds.size;
   const repairable = knownRepairableCount();
   const reusable = Number(summary.reusable_duplicates || 0);
+  const sourceAnomalies = confirmablePrintedSourceAnomalyCount();
+  const remainingErrors = Math.max(errors - sourceAnomalies, 0);
 
   if (elements.importValidDrafts) {
     elements.importValidDrafts.disabled = !batchId || (ready === 0 && repairable === 0 && reusable === 0 && imported === 0);
@@ -2240,7 +2281,7 @@ function updateImportActionControls() {
 
   if (elements.importSelectionSummary) {
     elements.importSelectionSummary.textContent = batchId
-      ? `${imported} drafts exist. ${ready} new drafts are ready.${repairable ? ` ${repairable} older records will be rechecked automatically.` : ''}${reusable ? ` ${reusable} exact duplicate${reusable === 1 ? '' : 's'} will be reused safely.` : ''}${errors ? ` ${errors} genuine errors/conflicts still need attention.` : ''}${duplicates && !reusable ? ` ${duplicates} true duplicates were already resolved.` : ''}${occurrenceCount ? ` ${occurrenceCount} occurrence selected.` : ''}`
+      ? `${imported} drafts exist. ${ready} new drafts are ready.${repairable ? ` ${repairable} older records will be rechecked automatically.` : ''}${reusable ? ` ${reusable} exact duplicate${reusable === 1 ? '' : 's'} will be reused safely.` : ''}${sourceAnomalies ? ` ${sourceAnomalies} printed source option anomal${sourceAnomalies === 1 ? 'y needs' : 'ies need'} explicit confirmation. Tap Import remaining drafts or use the Errors filter.` : ''}${remainingErrors ? ` ${remainingErrors} other genuine error${remainingErrors === 1 ? '' : 's'}/conflict${remainingErrors === 1 ? '' : 's'} still need attention.` : ''}${duplicates && !reusable ? ` ${duplicates} true duplicates were already resolved.` : ''}${occurrenceCount ? ` ${occurrenceCount} occurrence selected.` : ''}`
       : 'Validate a package, then use one button to import every remaining eligible draft.';
   }
 }
@@ -2325,6 +2366,23 @@ function importActionMarkup(item) {
         <input type="checkbox" data-import-occurrence-select="${escapeHtml(item.import_item_id)}" ${selectedOccurrenceItemIds.has(item.import_item_id) ? 'checked' : ''} />
         <span><strong>Link this PYQ occurrence</strong><small>Keep one master question and attach this confirmed paper occurrence.</small></span>
       </label>
+    `;
+  }
+
+  if (isConfirmablePrintedDuplicateOptions(item)) {
+    const duplicateGroups = duplicatePrintedOptionLabels(item)
+      .map((labels) => labels.join(' = '))
+      .join(', ');
+    return `
+      <div class="import-resolution resolution-warning">
+        <strong>Printed duplicate options need confirmation</strong>
+        <span>The genuine PYQ source contains duplicate option text${duplicateGroups ? ` (${escapeHtml(duplicateGroups)})` : ''}. Preserve it exactly, record a source-traceability note, then create this controlled draft for Final Review.</span>
+        <button
+          class="button button-primary"
+          type="button"
+          data-confirm-source-option-anomaly="${escapeHtml(item.import_item_id)}"
+        >Confirm source & create draft</button>
+      </div>
     `;
   }
 
@@ -2677,6 +2735,129 @@ function requestAdminConfirmation({
   });
 }
 
+function requestSourceOptionAnomalyConfirmation(item) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    const question = item?.normalized_payload || {};
+    const sourceLabel = [
+      question.paper_code || currentImportReport?.batch?.paper_code,
+      question.original_question_no ? `Q${question.original_question_no}` : item?.source_record_id,
+      question.source_page ? `page ${question.source_page}` : '',
+    ].filter(Boolean).join(' · ');
+    const duplicateGroups = duplicatePrintedOptionLabels(item)
+      .map((labels) => labels.join(' = '))
+      .join(', ');
+    const defaultNote = `Checked against the original source${sourceLabel ? ` (${sourceLabel})` : ''}. The genuine PYQ prints identical option text${duplicateGroups ? ` in ${duplicateGroups}` : ' in more than one option'}. Preserve all option text exactly as printed. Record as DUPLICATE_OPTIONS_PRINTED. The proposed answer remains unverified and requires human review.`;
+
+    elements.dialogContent.innerHTML = `
+      <div class="review-content">
+        <span class="eyebrow">Controlled source anomaly</span>
+        <h2>Confirm printed duplicate options</h2>
+        <p>${escapeHtml(sourceLabel || item?.proposed_question_id || 'This genuine PYQ record')}</p>
+        ${duplicateGroups ? `<p><strong>Duplicate printed labels:</strong> ${escapeHtml(duplicateGroups)}</p>` : ''}
+        <div class="import-safety-note">
+          <strong>Source preservation</strong>
+          <span>This does not fix, merge or rewrite the printed options. It records the genuine source anomaly and creates only a draft for human review. Nothing is published.</span>
+        </div>
+        <label class="field">
+          <span>Source traceability note</span>
+          <textarea id="sourceOptionAnomalyNote" rows="5" required>${escapeHtml(defaultNote)}</textarea>
+        </label>
+        <div class="draft-item-actions">
+          <button id="confirmSourceOptionAnomaly" class="button button-primary" type="button">Confirm & create draft</button>
+          <button id="cancelSourceOptionAnomaly" class="button button-ghost" type="button">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    elements.dialogContent.querySelector('#confirmSourceOptionAnomaly')?.addEventListener('click', () => {
+      const note = elements.dialogContent.querySelector('#sourceOptionAnomalyNote')?.value?.trim() || '';
+      if (!note) {
+        toast.warning('Add a source traceability note before confirming the printed duplicate options.');
+        return;
+      }
+      finish(note);
+      elements.dialog.close();
+    });
+
+    elements.dialogContent.querySelector('#cancelSourceOptionAnomaly')?.addEventListener('click', () => {
+      finish(null);
+      elements.dialog.close();
+    });
+
+    elements.dialog.addEventListener('close', () => finish(null), { once: true });
+    elements.dialog.showModal();
+  });
+}
+
+async function confirmPrintedSourceOptionAnomaly(importItemId) {
+  const batchId = currentImportReport?.batch?.import_batch_id;
+  const item = currentImportReport?.items?.find((row) => row.import_item_id === importItemId);
+
+  if (!batchId || !item) {
+    toast.error('Open the current import report and try again.');
+    return false;
+  }
+
+  if (!isConfirmablePrintedDuplicateOptions(item)) {
+    toast.warning('This record is not eligible for the printed duplicate-option exception.');
+    return false;
+  }
+
+  const note = await requestSourceOptionAnomalyConfirmation(item);
+  if (!note) return false;
+
+  const loading = toast.loading('Confirming the printed source anomaly…');
+  try {
+    const confirmation = await api.confirmImportSourceOptionAnomaly({
+      importItemId,
+      note,
+    });
+
+    const status = String(confirmation?.status || '').toUpperCase();
+    if (!['VALID', 'VALID_WITH_WARNINGS'].includes(status)) {
+      throw new Error(`The source anomaly was recorded, but the item is still ${status || 'blocked'}.`);
+    }
+
+    loading.update?.('Creating the controlled draft…');
+
+    await api.importBatchItemsToDrafts({
+      importBatchId: batchId,
+      importItemIds: [importItemId],
+    });
+
+    await api.reconcileImportBatchState(batchId);
+    const report = await api.getImportBatchReport(batchId);
+    renderImportReport(report);
+
+    await Promise.all([
+      loadDrafts({ reset: true }),
+      loadRecentImportBatches(),
+    ]);
+    renderAdminDashboard();
+
+    loading.close();
+    toast.success('Printed source anomaly confirmed. Draft created for Final Review. Nothing was published.');
+    return true;
+  } catch (error) {
+    loading.close();
+    toast.error(error.message);
+    try {
+      const report = await api.getImportBatchReport(batchId);
+      renderImportReport(report);
+    } catch {
+      // Preserve the original actionable error.
+    }
+    return false;
+  }
+}
+
 function requestImportConfirmation({ title, message, buttonLabel }) {
   return requestAdminConfirmation({
     eyebrow: 'Controlled import confirmation',
@@ -2712,6 +2893,11 @@ async function repairKnownBatchItems(batchId, estimatedCount = 0) {
 
 async function importSelectedDrafts() {
   const batchId = currentImportReport?.batch?.import_batch_id;
+  const pendingSourceAnomaly = currentImportReport?.items?.find(isConfirmablePrintedDuplicateOptions);
+  if (batchId && pendingSourceAnomaly) {
+    await confirmPrintedSourceOptionAnomaly(pendingSourceAnomaly.import_item_id);
+    return;
+  }
   if (!batchId) return toast.warning('Open an import report first.');
 
   elements.importValidDrafts.disabled = true;
@@ -2978,6 +3164,11 @@ function bindEvents() {
 
   elements.htmlImportForm?.addEventListener('submit', runImportDryRun);
   elements.importItemFilter?.addEventListener('change', () => { visibleImportItemLimit = IMPORT_ITEM_PAGE_SIZE; renderImportItems(); });
+  elements.importItemList?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-confirm-source-option-anomaly]');
+    if (!button) return;
+    confirmPrintedSourceOptionAnomaly(button.dataset.confirmSourceOptionAnomaly);
+  });
   elements.downloadImportReport?.addEventListener('click', downloadCurrentImportReport);
   elements.importValidDrafts?.addEventListener('click', importSelectedDrafts);
   elements.syncImportBatch?.addEventListener('click', syncCurrentImportBatch);
