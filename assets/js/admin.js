@@ -121,7 +121,16 @@ let imageRepairPage = 0;
 let imageRepairTotal = 0;
 let imageRepairHasMore = false;
 let imageRepairItems = [];
-let imageRepairSummary = { total_candidates: 0, needs_repair: 0, pending: 0, approved: 0, no_image_required: 0 };
+let imageRepairSummary = {
+  total_candidates: 0,
+  needs_repair: 0,
+  content_needs_repair: 0,
+  image_needs_repair: 0,
+  pending: 0,
+  approved: 0,
+  no_image_required: 0,
+  content_ready: 0,
+};
 let activeRepairObjectUrl = '';
 
 
@@ -393,9 +402,9 @@ function renderAdminDashboard() {
   if (elements.dashboardRepairCount) elements.dashboardRepairCount.textContent = String(needsRepair);
   if (elements.dashboardRepairLabel) {
     const edited = Number(imageRepairSummary?.content_edited || 0);
-    elements.dashboardRepairLabel.textContent = edited
-      ? `${Number(imageRepairSummary?.needs_repair || 0)} need repair · ${Number(imageRepairSummary?.pending || 0)} pending · ${edited} content edited`
-      : `${Number(imageRepairSummary?.needs_repair || 0)} need repair · ${Number(imageRepairSummary?.pending || 0)} pending`;
+    const contentNeeds = Number(imageRepairSummary?.content_needs_repair || 0);
+    const imageNeeds = Number(imageRepairSummary?.image_needs_repair || 0);
+    elements.dashboardRepairLabel.textContent = `${contentNeeds} content · ${imageNeeds} image · ${Number(imageRepairSummary?.pending || 0)} pending${edited ? ` · ${edited} edited` : ''}`;
   }
   if (elements.dashboardReviewCount) elements.dashboardReviewCount.textContent = String(reviewReadyLoaded);
   if (elements.dashboardReviewLabel) {
@@ -411,16 +420,29 @@ function draftHasSourceImages(draft) {
   return Array.isArray(draft?.image_refs) && draft.image_refs.length > 0;
 }
 
-function draftRepairReady(draft) {
+function draftContentRepairReady(draft) {
+  return !draft?.content_repair_status || draft.content_repair_status === 'READY';
+}
+
+function draftImageReady(draft) {
   if (!draftHasSourceImages(draft)) {
     return !draft?.student_image_review_status || draft.student_image_review_status === 'NOT_APPLICABLE';
   }
   return ['SAFE_CROP_APPROVED', 'NO_STUDENT_IMAGE_REQUIRED'].includes(draft?.student_image_review_status);
 }
 
+function draftRepairReady(draft) {
+  return draftContentRepairReady(draft) && draftImageReady(draft);
+}
+
 function draftReviewMatchesRepairRevision(draft) {
   if (draft?.reviewed_repair_revision === undefined || draft?.repair_revision === undefined) return true;
   return Number(draft.reviewed_repair_revision) === Number(draft.repair_revision);
+}
+
+function draftContentConfirmationMatchesRevision(draft) {
+  if (draft?.content_source_confirmed_revision === undefined || draft?.repair_revision === undefined) return false;
+  return Number(draft.content_source_confirmed_revision) === Number(draft.repair_revision);
 }
 
 function isDraftPublishReady(draft) {
@@ -435,6 +457,7 @@ function isDraftPublishReady(draft) {
     && (draft.source_option_anomaly !== 'DUPLICATE_OPTIONS_PRINTED' || draft.source_option_anomaly_note)
     && draftRepairReady(draft)
     && draftReviewMatchesRepairRevision(draft)
+    && draftContentConfirmationMatchesRevision(draft)
   );
 }
 
@@ -454,7 +477,6 @@ function renderDrafts() {
   const reviewable = reviewableDrafts();
   const repairBlocked = drafts.filter((draft) => (
     !['PUBLISHED', 'REJECTED'].includes(draft.review_status)
-    && draftHasSourceImages(draft)
     && !draftRepairReady(draft)
   ));
   if (elements.draftListMeta) {
@@ -472,10 +494,13 @@ function renderDrafts() {
 
   elements.draftList.innerHTML = drafts.map((draft, index) => {
     const ready = isDraftPublishReady(draft);
-    const repairBlocked = draftHasSourceImages(draft) && !draftRepairReady(draft);
-    const repairState = draftHasSourceImages(draft)
-      ? String(draft.student_image_review_status || 'NEEDS_REVIEW').replaceAll('_', ' ')
-      : 'No image';
+    const repairBlocked = !draftRepairReady(draft);
+    const contentRepairBlocked = !draftContentRepairReady(draft);
+    const repairState = contentRepairBlocked
+      ? `Content: ${String(draft.content_repair_status || 'NEEDS_REPAIR').replaceAll('_', ' ')}`
+      : draftHasSourceImages(draft)
+        ? `Image: ${String(draft.student_image_review_status || 'NEEDS_REVIEW').replaceAll('_', ' ')}`
+        : 'Image: not applicable';
     const statusText = ready
       ? 'Final review complete'
       : repairBlocked
@@ -498,8 +523,9 @@ function renderDrafts() {
         <div class="draft-quick-status">
           <span>${escapeHtml(statusText)}</span>
           <span>${escapeHtml(repairState)}</span>
-          <span>Answer ${escapeHtml(draft.correct_answer || '—')}</span>
-          <span>${escapeHtml(draft.topic_id || draft.suggested_topic_code || 'Topic unresolved')}</span>
+          <span>${draft.correct_answer ? `Answer ${escapeHtml(draft.correct_answer)}` : 'Answer missing'}</span>
+          <span>${escapeHtml(draft.topic_id || draft.suggested_topic_code || 'Topic missing')}</span>
+          ${contentRepairBlocked ? `<span class="warning-chip">${escapeHtml(String(draft.content_repair_reason_code || 'CONTENT_REPAIR').replaceAll('_', ' '))}</span>` : ''}
           ${Number(draft.content_repair_version || 0) > 0 ? '<span class="repair-edited-chip">Edited in repair</span>' : ''}
           ${draft.source_quality && draft.source_quality !== 'CLEAR' ? `<span class="warning-chip">${escapeHtml(draft.source_quality)}</span>` : ''}
           ${draft.is_supplemental ? '<span class="warning-chip">Supplemental</span>' : ''}
@@ -516,7 +542,10 @@ function renderDrafts() {
   }).join('');
 
   elements.draftList.querySelectorAll('[data-review]').forEach((button) => button.addEventListener('click', () => openReview(button.dataset.review)));
-  elements.draftList.querySelectorAll('[data-repair-draft]').forEach((button) => button.addEventListener('click', () => openImageRepair(button.dataset.repairDraft)));
+  elements.draftList.querySelectorAll('[data-repair-draft]').forEach((button) => button.addEventListener('click', () => {
+    const draft = drafts.find((item) => item.draft_id === button.dataset.repairDraft);
+    if (draft) focusDraftInRepair(draft);
+  }));
 }
 
 async function loadDrafts({ reset = true } = {}) {
@@ -593,6 +622,7 @@ function renderPublishQueue() {
           <span>${escapeHtml(draft.answer_source || 'No source')}</span>
           <span>${escapeHtml(String(draft.student_image_review_status || 'NOT_APPLICABLE').replaceAll('_', ' '))}</span>
           <span>Reviewed revision ${escapeHtml(draft.reviewed_repair_revision ?? '—')}</span>
+          <span>Source-confirmed revision ${escapeHtml(draft.content_source_confirmed_revision ?? '—')}</span>
           ${Number(draft.content_repair_version || 0) > 0 ? '<span class="repair-edited-chip">Repaired content</span>' : ''}
           ${draft.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED' ? '<span class="warning-chip">Printed duplicate options</span>' : ''}
           ${draft.is_supplemental ? '<span class="warning-chip">Supplemental</span>' : ''}
@@ -679,6 +709,10 @@ async function openPublishPreview(draftId) {
     <div class="review-content publish-preview">
       <span class="eyebrow">Final reviewed presentation · Publish Centre</span>
       <h2>${escapeHtml(draft.proposed_question_id || 'Verified draft')}</h2>
+      <section class="draft-provenance-card final-review-provenance">
+        <div><span class="eyebrow">Paper &amp; source identity</span><h3>Verified occurrence</h3></div>
+        ${draftProvenanceMarkup(draft)}
+      </section>
       ${draft.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED' ? `<div class="import-resolution resolution-warning"><strong>Printed duplicate options</strong><span>${escapeHtml(draft.source_option_anomaly_note || 'The source prints repeated values. The human-verified answer will be published exactly as reviewed.')}</span></div>` : ''}
       <div class="simple-question-text">${escapeHtml(draft.question_text)}</div>
       ${publishImageMarkup}
@@ -694,6 +728,7 @@ async function openPublishPreview(draftId) {
         <p><strong>Answer source:</strong> ${escapeHtml(draft.answer_source || '—')}</p>
         <p><strong>Topic:</strong> ${escapeHtml(draft.topic_id || '—')}</p>
         <p><strong>Explanation:</strong> ${escapeHtml(draft.explanation || '—')}</p>
+        <p><strong>Source-content confirmation:</strong> Revision ${escapeHtml(draft.content_source_confirmed_revision ?? '—')}</p>
       </div>
       ${sourceImages.length ? `<details class="source-review-panel"><summary>Private source / audit preview</summary><div class="source-review-images">${sourceImages.map((image) => `<img loading="lazy" src="${escapeHtml(image.ref)}" alt="${escapeHtml(image.alt)}" />`).join('')}</div></details>` : ''}
       <div class="simple-review-actions">
@@ -785,12 +820,14 @@ function imageRepairFilters() {
 function renderImageRepairStats() {
   if (!elements.imageRepairStats) return;
   const cards = [
-    ['Visual drafts', imageRepairSummary.total_candidates || 0, 'all'],
+    ['Repair candidates', imageRepairSummary.total_candidates || 0, 'all'],
     ['Needs repair', imageRepairSummary.needs_repair || 0, 'needs-repair'],
+    ['Content requested', imageRepairSummary.content_needs_repair || 0, 'content-repair'],
+    ['Image needs work', imageRepairSummary.image_needs_repair || 0, 'image-repair'],
     ['Pending crop', imageRepairSummary.pending || 0, 'pending'],
     ['Image approved', imageRepairSummary.approved || 0, 'approved'],
     ['No image needed', imageRepairSummary.no_image_required || 0, 'no-image-required'],
-    ['Content edited', imageRepairSummary.content_edited || 0, 'content-edited'],
+    ['Repaired content', imageRepairSummary.content_ready || imageRepairSummary.content_edited || 0, 'content-ready'],
   ];
   elements.imageRepairStats.innerHTML = cards.map(([label, value, status]) => `
     <button class="image-repair-stat" data-repair-stat="${status}" type="button">
@@ -801,16 +838,15 @@ function renderImageRepairStats() {
     button.addEventListener('click', () => {
       const mapping = {
         'needs-repair': 'NEEDS_REPAIR',
+        'content-repair': 'CONTENT_REPAIR',
+        'image-repair': 'IMAGE_REPAIR',
         pending: 'PENDING',
         approved: 'APPROVED',
         'no-image-required': 'NO_IMAGE_REQUIRED',
+        'content-ready': 'CONTENT_READY',
         all: 'ALL',
       };
-      if (button.dataset.repairStat === 'content-edited') {
-        elements.imageRepairStatus.value = 'ALL';
-      } else {
-        elements.imageRepairStatus.value = mapping[button.dataset.repairStat] || 'ALL';
-      }
+      elements.imageRepairStatus.value = mapping[button.dataset.repairStat] || 'ALL';
       loadImageRepairQueue({ reset: true });
     });
   });
@@ -825,16 +861,39 @@ function imageRepairPaperLabel(item) {
   return parts.join(' · ') || item.subject_name || item.subject_id || 'Draft';
 }
 
+function draftProvenanceMarkup(draft) {
+  const rows = [
+    ['Board', draft.board_id],
+    ['Exam', [draft.exam_id, draft.exam_year].filter(Boolean).join(' · ')],
+    ['Date', draft.exam_date],
+    ['Paper', draft.paper_code],
+    ['Shift', draft.shift_no ? `Shift ${draft.shift_no}` : ''],
+    ['Section', draft.section_code],
+    ['Original question', draft.original_question_no ? `Q${draft.original_question_no}` : ''],
+    ['Source page', draft.source_page ? `Page ${draft.source_page}` : ''],
+    ['Source question ID', draft.source_question_id],
+    ['Source file', draft.source_file_id],
+  ].filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '');
+
+  if (!rows.length) {
+    return '<div class="draft-provenance-empty">No paper/source metadata was supplied for this draft.</div>';
+  }
+
+  return `<dl class="draft-provenance-grid">${rows.map(([label, value]) => `
+    <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>
+  `).join('')}</dl>`;
+}
+
 function renderImageRepairQueue() {
   if (!elements.imageRepairList) return;
   renderAdminDashboard();
   const activeStatus = elements.imageRepairStatus?.value || 'NEEDS_REPAIR';
-  elements.imageRepairQueueMeta.textContent = `${imageRepairTotal} ${activeStatus.toLowerCase().replaceAll('_', ' ')} visual draft${imageRepairTotal === 1 ? '' : 's'} · ${imageRepairItems.length} loaded.`;
+  elements.imageRepairQueueMeta.textContent = `${imageRepairTotal} ${activeStatus.toLowerCase().replaceAll('_', ' ')} repair candidate${imageRepairTotal === 1 ? '' : 's'} · ${imageRepairItems.length} loaded.`;
   elements.loadMoreImageRepairs?.classList.toggle('hidden', !imageRepairHasMore);
   renderImageRepairStats();
 
   if (!imageRepairItems.length) {
-    elements.imageRepairList.innerHTML = '<div class="empty-state">No visual draft matches these repair filters.</div>';
+    elements.imageRepairList.innerHTML = '<div class="empty-state">No draft matches these repair filters.</div>';
     return;
   }
 
@@ -853,13 +912,20 @@ function renderImageRepairQueue() {
           <p>${escapeHtml(item.question_text || '')}</p>
           <div class="draft-quick-status">
             <span>${escapeHtml(item.subject_name || item.subject_id || 'No subject')}</span>
-            <span>${Number(item.source_image_count || 0)} source image${Number(item.source_image_count || 0) === 1 ? '' : 's'}</span>
+            <span>${Number(item.source_image_count || 0) ? `${Number(item.source_image_count)} source image${Number(item.source_image_count) === 1 ? '' : 's'}` : 'Non-visual draft'}</span>
+            ${item.content_repair_status === 'NEEDS_REPAIR' ? `<span class="warning-chip">${escapeHtml(String(item.content_repair_reason_code || 'CONTENT_REPAIR').replaceAll('_', ' '))}</span>` : ''}
             ${Number(item.content_repair_version || 0) > 0 ? '<span class="repair-edited-chip">Content edited</span>' : ''}
+            ${item.correct_answer ? `<span>Answer ${escapeHtml(item.correct_answer)}</span>` : '<span>Answer missing</span>'}
+            <span>${escapeHtml(item.topic_id || 'Topic missing')}</span>
             <span>Revision ${Number(item.repair_revision || 0)}</span>
           </div>
         </div>
         <button class="button ${['APPROVED', 'NO_IMAGE_REQUIRED'].includes(item.repair_status) ? 'button-secondary' : 'button-primary'}" data-open-image-repair="${escapeHtml(item.draft_id)}" type="button">
-          ${item.repair_status === 'APPROVED'
+          ${item.repair_status === 'CONTENT_REPAIR'
+            ? 'Repair content'
+            : item.repair_status === 'CONTENT_READY'
+              ? 'Inspect repaired content'
+              : item.repair_status === 'APPROVED'
             ? 'Inspect repaired draft'
             : item.repair_status === 'NO_IMAGE_REQUIRED'
               ? 'Inspect decision'
@@ -883,7 +949,7 @@ async function loadImageRepairQueue({ reset = true } = {}) {
     imageRepairItems = [];
     imageRepairTotal = 0;
     imageRepairHasMore = false;
-    elements.imageRepairList.innerHTML = '<div class="loading-state">Loading repair-first visual drafts…</div>';
+    elements.imageRepairList.innerHTML = '<div class="loading-state">Loading content and image repair candidates…</div>';
   } else if (elements.loadMoreImageRepairs) {
     elements.loadMoreImageRepairs.disabled = true;
   }
@@ -989,20 +1055,80 @@ function renderImageRepairDetail(detail) {
   const decisions = Array.isArray(detail.decisions) ? detail.decisions : [];
   const pending = repairs.find((repair) => repair.status === 'PENDING');
   const approved = repairs.find((repair) => repair.status === 'APPROVED');
-  const reviewStatus = question.student_image_review_status || 'NEEDS_REVIEW';
+  const visual = draftHasSourceImages(question);
+  const reviewStatus = question.student_image_review_status || (visual ? 'NEEDS_REVIEW' : 'NOT_APPLICABLE');
   const noImageRequired = reviewStatus === 'NO_STUDENT_IMAGE_REQUIRED';
+  const contentNeedsRepair = question.content_repair_status === 'NEEDS_REPAIR';
+  const contentReady = draftContentRepairReady(question);
   const options = question.options || {};
   const importedOptions = question.imported_options || {};
+  const importedBaselineAvailable = Boolean(String(question.imported_question_text || '').trim())
+    && ['A', 'B', 'C', 'D'].every((key) => String(importedOptions[key] || '').trim());
+  const differsFromImported = String(question.question_text || '').trim() !== String(question.imported_question_text || '').trim()
+    || ['A', 'B', 'C', 'D'].some((key) => String(options[key] || '').trim() !== String(importedOptions[key] || '').trim());
   const studentPreviewRefs = question.student_image_preview_refs || [];
-  const currentStudentImageMarkup = noImageRequired
+  const currentStudentImageMarkup = !visual
+    ? '<div class="student-no-image-decision"><strong>Student image not applicable</strong><span>This is a non-visual draft. Content repair remains fully available.</span></div>'
+    : noImageRequired
     ? `<div class="student-no-image-decision"><strong>No student image required</strong><span>${escapeHtml(question.student_image_review_note || 'Audited decision recorded.')}</span></div>`
     : repairImageMarkup(studentPreviewRefs, 'Approved student-safe image');
   const defaultAlt = pending?.alt_text || approved?.alt_text || `Diagram for ${question.question_id || question.proposed_question_id}`;
   const defaultNote = pending?.admin_note || question.student_image_review_note || question.content_repair_note || '';
-  const visibleStatus = pending ? 'PENDING CROP' : noImageRequired ? 'NO IMAGE REQUIRED' : approved ? 'IMAGE APPROVED' : 'NEEDS REPAIR';
-  const visibleStatusClass = pending ? 'pending' : noImageRequired ? 'no-image-required' : approved ? 'approved' : 'needs-repair';
+  const visibleStatus = contentNeedsRepair
+    ? 'CONTENT REPAIR REQUIRED'
+    : pending
+      ? 'PENDING CROP'
+      : !visual
+        ? 'CONTENT READY'
+        : noImageRequired
+          ? 'NO IMAGE REQUIRED'
+          : approved
+            ? 'IMAGE APPROVED'
+            : 'IMAGE REPAIR REQUIRED';
+  const visibleStatusClass = contentNeedsRepair
+    ? 'needs-repair'
+    : pending
+      ? 'pending'
+      : !visual
+        ? 'content-edited'
+        : noImageRequired
+          ? 'no-image-required'
+          : approved
+            ? 'approved'
+            : 'needs-repair';
   const contentEdited = Number(question.content_repair_version || 0) > 0;
-  const imageReady = ['SAFE_CROP_APPROVED', 'NO_STUDENT_IMAGE_REQUIRED'].includes(reviewStatus) && !pending;
+  const imageReady = visual
+    ? ['SAFE_CROP_APPROVED', 'NO_STUDENT_IMAGE_REQUIRED'].includes(reviewStatus) && !pending
+    : reviewStatus === 'NOT_APPLICABLE' && !pending;
+  const presentationReady = contentReady && imageReady;
+  const imageActionMarkup = visual ? `
+    <form id="studentImageUploadForm" class="student-image-upload-form" novalidate>
+      <label>Student-safe crop
+        <input id="studentImageFile" name="studentImageFile" type="file" accept="image/png,image/jpeg,image/webp" ${pending ? 'disabled' : ''} />
+      </label>
+      <label>Accessible image description
+        <input id="studentImageAltText" name="studentImageAltText" value="${escapeHtml(defaultAlt)}" placeholder="Describe only the diagram/table/graph students need" />
+      </label>
+      <label>Image repair note
+        <textarea id="studentImageAdminNote" name="studentImageAdminNote" rows="2" placeholder="Why this crop/decision is safe">${escapeHtml(defaultNote)}</textarea>
+      </label>
+      <div id="localStudentImagePreview" class="local-student-image-preview hidden"></div>
+      <div class="image-repair-action-row">
+        ${pending
+          ? `<button id="approveStudentImage" class="button button-primary" type="button" data-repair-id="${pending.repair_id}">Approve pending crop</button>
+             <button id="discardStudentImage" class="button button-danger" type="button" data-repair-id="${pending.repair_id}">Discard pending</button>`
+          : '<button id="uploadStudentImage" class="button button-secondary" type="submit">Upload candidate crop</button>'}
+        ${approved ? '<button id="removeApprovedStudentImage" class="button button-danger" type="button">Remove approved image</button>' : ''}
+        ${noImageRequired || approved ? '<button id="reopenStudentImageReview" class="button button-ghost" type="button">Reopen image decision</button>' : ''}
+        ${!pending && !noImageRequired ? '<button id="markStudentImageNotRequired" class="button button-ghost" type="button">No student image required</button>' : ''}
+      </div>
+    </form>
+  ` : `
+    <div class="student-no-image-decision nonvisual-repair-state">
+      <strong>No image action is required</strong>
+      <span>This draft has no source image. Complete the requested text/options repair, then send the new revision to Final Review.</span>
+    </div>
+  `;
 
   elements.imageRepairDialogContent.innerHTML = `
     <div class="review-content image-repair-detail draft-repair-workspace">
@@ -1024,6 +1150,18 @@ function renderImageRepairDetail(detail) {
         <span>Correct transcription/presentation issues here. Final Review remains responsible for the verified answer, explanation and topic. Raw source captures and imported text/options remain audit evidence.</span>
       </div>
 
+      ${contentNeedsRepair ? `
+        <div class="import-resolution resolution-warning content-repair-request">
+          <strong>${escapeHtml(String(question.content_repair_reason_code || 'CONTENT_REPAIR').replaceAll('_', ' '))}</strong>
+          <span>${escapeHtml(question.content_repair_reason_note || 'Final Review returned this draft for content repair.')}</span>
+        </div>
+      ` : ''}
+
+      <section class="draft-provenance-card">
+        <div><span class="eyebrow">Paper &amp; source identity</span><h3>Repair the exact draft</h3></div>
+        ${draftProvenanceMarkup(question)}
+      </section>
+
       <div class="draft-repair-layout">
         <section class="draft-repair-editor-card">
           <div class="repair-card-heading">
@@ -1041,16 +1179,16 @@ function renderImageRepairDetail(detail) {
                 </label>
               `).join('')}
             </div>
-            <label>Repair note
-              <textarea name="contentRepairNote" rows="2" placeholder="Optional: what was corrected and why">${escapeHtml(question.content_repair_note || '')}</textarea>
+            <label>Repair note (required when saving a change)
+              <textarea name="contentRepairNote" rows="2" minlength="5" placeholder="What was corrected and how it was verified">${escapeHtml(question.content_repair_note || '')}</textarea>
             </label>
             <div class="repair-editor-actions">
               <button class="button button-primary" type="submit">Save content repair</button>
-              <button id="resetDraftContent" class="button button-ghost" type="button" ${question.imported_question_text ? '' : 'disabled'}>Reset to imported</button>
+              <button id="resetDraftContent" class="button button-ghost" type="button" ${importedBaselineAvailable && (differsFromImported || contentNeedsRepair) ? '' : 'disabled'}>Reset to imported</button>
             </div>
           </form>
 
-          <details class="repair-imported-version">
+          <details class="repair-imported-version" ${contentNeedsRepair ? 'open' : ''}>
             <summary>View immutable imported version</summary>
             <div class="imported-version-body">
               <p>${escapeHtml(question.imported_question_text || 'Imported baseline unavailable.')}</p>
@@ -1093,36 +1231,20 @@ function renderImageRepairDetail(detail) {
             </div>
           </div>
 
-          <form id="studentImageUploadForm" class="student-image-upload-form" novalidate>
-            <label>Student-safe crop
-              <input id="studentImageFile" name="studentImageFile" type="file" accept="image/png,image/jpeg,image/webp" ${pending ? 'disabled' : ''} />
-            </label>
-            <label>Accessible image description
-              <input id="studentImageAltText" name="studentImageAltText" value="${escapeHtml(defaultAlt)}" placeholder="Describe only the diagram/table/graph students need" />
-            </label>
-            <label>Image repair note
-              <textarea id="studentImageAdminNote" name="studentImageAdminNote" rows="2" placeholder="Why this crop/decision is safe">${escapeHtml(defaultNote)}</textarea>
-            </label>
-            <div id="localStudentImagePreview" class="local-student-image-preview hidden"></div>
-            <div class="image-repair-action-row">
-              ${pending
-                ? `<button id="approveStudentImage" class="button button-primary" type="button" data-repair-id="${pending.repair_id}">Approve pending crop</button>
-                   <button id="discardStudentImage" class="button button-danger" type="button" data-repair-id="${pending.repair_id}">Discard pending</button>`
-                : `<button id="uploadStudentImage" class="button button-secondary" type="submit">Upload candidate crop</button>`}
-              ${approved ? '<button id="removeApprovedStudentImage" class="button button-danger" type="button">Remove approved image</button>' : ''}
-              ${noImageRequired || approved ? '<button id="reopenStudentImageReview" class="button button-ghost" type="button">Reopen image decision</button>' : ''}
-              ${!pending && !noImageRequired ? '<button id="markStudentImageNotRequired" class="button button-ghost" type="button">No student image required</button>' : ''}
-            </div>
-          </form>
+          ${imageActionMarkup}
         </section>
       </div>
 
       <div class="repair-workspace-footer">
         <div>
-          <strong>${imageReady ? 'Ready for Final Review' : 'Image decision still required'}</strong>
-          <span>${imageReady ? 'The reviewer will see this current text/options and the resolved student-safe image decision.' : 'Resolve the student-safe image state before this visual draft can enter Final Review.'}</span>
+          <strong>${presentationReady ? 'Ready for Final Review' : contentNeedsRepair ? 'Content repair still required' : 'Image decision still required'}</strong>
+          <span>${presentationReady
+            ? 'The reviewer will see this exact text/options and the resolved image state for the current revision.'
+            : contentNeedsRepair
+              ? 'Save complete text/options with an audit note to resolve the requested content repair.'
+              : 'Resolve the student-safe image state before this visual draft can enter Final Review.'}</span>
         </div>
-        ${imageReady ? '<button id="goToFinalReview" class="button button-primary" type="button">Open Final Review</button>' : ''}
+        ${presentationReady ? '<button id="goToFinalReview" class="button button-primary" type="button">Open Final Review</button>' : ''}
       </div>
 
       <details class="image-repair-history">
@@ -1145,11 +1267,20 @@ function renderImageRepairDetail(detail) {
     event.preventDefault();
     if (!contentForm.reportValidity()) return;
     const values = Object.fromEntries(new FormData(contentForm).entries());
+    if (String(values.contentRepairNote || '').trim().length < 5) {
+      return toast.warning('Add a repair note of at least 5 characters before saving.');
+    }
+    const contentChanged = String(values.questionText || '').trim() !== String(question.question_text || '').trim()
+      || ['A', 'B', 'C', 'D'].some((key) => String(values[`option${key}`] || '').trim() !== String(options[key] || '').trim());
+    if (!contentChanged && !contentNeedsRepair) {
+      return toast.info('No content change was detected. This repair revision remains unchanged.');
+    }
     setBusy(contentForm, true);
     const loading = toast.loading('Saving content repair and invalidating any older review…');
     try {
       await api.saveDraftRepairContent({
         draftId: question.draft_id,
+        expectedRepairRevision: question.repair_revision,
         questionText: values.questionText,
         options: {
           A: values.optionA,
@@ -1187,6 +1318,7 @@ function renderImageRepairDetail(detail) {
       successText: 'Draft reset to the imported content.',
       action: () => api.resetDraftRepairContent({
         draftId: question.draft_id,
+        expectedRepairRevision: question.repair_revision,
         adminNote: 'Admin reset from Image & Content Repair Centre',
       }),
     });
@@ -1836,6 +1968,16 @@ function draftStudentImages(draft) {
   return normalizedPreviewImages(draft?.student_image_preview_refs || draft?.student_image_refs || [], 'Student-safe question image');
 }
 
+async function focusDraftInRepair(draft, { status = '' } = {}) {
+  elements.imageRepairFilters?.reset();
+  const targetStatus = status || (draft?.content_repair_status === 'NEEDS_REPAIR' ? 'CONTENT_REPAIR' : 'ALL');
+  if (elements.imageRepairStatus) elements.imageRepairStatus.value = targetStatus;
+  if (elements.imageRepairSearch) elements.imageRepairSearch.value = draft?.proposed_question_id || '';
+  setAdminView('repair');
+  await loadImageRepairQueue({ reset: true });
+  await openImageRepair(draft.draft_id);
+}
+
 async function openReview(draftId) {
   const listDraft = drafts.find((item) => item.draft_id === draftId);
   elements.dialogContent.innerHTML = '<div class="review-content"><div class="loading-state">Loading the final repaired student presentation…</div></div>';
@@ -1852,34 +1994,39 @@ async function openReview(draftId) {
 
   const options = draft.options || {};
   const proposedSource = draft.answer_source || 'AI_PROPOSED';
-  const reviewSource = proposedSource === 'AI_PROPOSED' ? 'MANUALLY_VERIFIED' : proposedSource;
+  const reviewSource = ['OFFICIAL_FINAL_KEY', 'OFFICIAL_PROVISIONAL_KEY', 'MANUALLY_VERIFIED', 'SOURCE_BOOK', 'ADMIN_CORRECTED'].includes(proposedSource)
+    ? proposedSource
+    : '';
   const sourceImages = draftSourceImages(draft);
   const studentImages = draftStudentImages(draft);
   const visual = Array.isArray(draft.image_refs) && draft.image_refs.length > 0;
-  const imageReady = draftRepairReady(draft);
+  const imageReady = draftImageReady(draft);
+  const contentReady = draftContentRepairReady(draft);
   const studentImageStatus = draft.student_image_review_status || (visual ? 'NEEDS_REVIEW' : 'NOT_APPLICABLE');
   const queuePosition = Math.max(1, reviewableDrafts().findIndex((item) => item.draft_id === draftId) + 1);
   const queueTotal = Math.max(reviewableDrafts().length, 1);
 
-  if (visual && !imageReady) {
+  if (!contentReady || !imageReady) {
     elements.dialogContent.innerHTML = `
       <div class="review-content repair-gate-card">
         <span class="eyebrow">Final Review blocked</span>
         <h2>${escapeHtml(draft.proposed_question_id || 'Draft question')}</h2>
         <div class="import-resolution resolution-warning">
-          <strong>Image &amp; Content Repair must be completed first</strong>
-          <span>This visual draft is currently ${escapeHtml(String(studentImageStatus).replaceAll('_', ' ').toLowerCase())}. Final Review is intentionally unavailable until the student-safe image decision is resolved.</span>
+          <strong>${contentReady ? 'Image repair must be completed first' : 'Requested content repair must be completed first'}</strong>
+          <span>${contentReady
+            ? `The image state is ${escapeHtml(String(studentImageStatus).replaceAll('_', ' ').toLowerCase())}. Final Review is unavailable until the student presentation is resolved.`
+            : escapeHtml(draft.content_repair_reason_note || 'This draft was returned because its student-facing content is incomplete or does not match the source evidence.')}</span>
         </div>
         <div class="simple-question-text">${escapeHtml(draft.question_text || '')}</div>
         <div class="simple-review-actions">
-          <button id="reviewRepairFirst" class="button button-primary" type="button">Open Image &amp; Content Repair</button>
+          <button id="reviewRepairFirst" class="button button-primary" type="button">Open exact draft in Repair</button>
           <button id="reviewBlockedClose" class="button button-ghost" type="button">Close</button>
         </div>
       </div>
     `;
     elements.dialogContent.querySelector('#reviewRepairFirst')?.addEventListener('click', () => {
       elements.dialog.close();
-      openImageRepair(draftId);
+      focusDraftInRepair(draft);
     });
     elements.dialogContent.querySelector('#reviewBlockedClose')?.addEventListener('click', () => elements.dialog.close());
     return;
@@ -1902,7 +2049,7 @@ async function openReview(draftId) {
     `;
     elements.dialogContent.querySelector('#reviewRepairPreview')?.addEventListener('click', () => {
       elements.dialog.close();
-      openImageRepair(draftId);
+      focusDraftInRepair(draft);
     });
     elements.dialogContent.querySelector('#reviewPreviewClose')?.addEventListener('click', () => elements.dialog.close());
     return;
@@ -1913,6 +2060,9 @@ async function openReview(draftId) {
     : studentImageStatus === 'NO_STUDENT_IMAGE_REQUIRED'
       ? `<div class="final-review-image-state state-no-image"><strong>No student image required ✓</strong><span>${escapeHtml(draft.student_image_review_note || 'Audited decision recorded during repair.')}</span></div>`
       : `<div class="final-review-image-grid">${studentImages.map((image) => `<figure class="final-review-student-image"><img loading="lazy" src="${escapeHtml(image.ref)}" alt="${escapeHtml(image.alt)}" /></figure>`).join('')}</div>`;
+  const contentNoteRequired = Number(draft.content_repair_version || 0) > 0
+    || Boolean(draft.content_repair_reason_code)
+    || ['LOW_RESOLUTION', 'CROPPED', 'DIAGRAM_REVIEW'].includes(draft.source_quality);
 
   elements.dialogContent.innerHTML = `
     <div class="review-content simple-review final-review-workspace">
@@ -1932,6 +2082,11 @@ async function openReview(draftId) {
       ${draft.is_supplemental ? `<div class="import-resolution resolution-warning"><strong>Supplemental normal question</strong><span>${escapeHtml(draft.supplement_reason || 'Missing source question replacement')}</span></div>` : ''}
       ${draft.source_option_anomaly === 'DUPLICATE_OPTIONS_PRINTED' ? `<div class="import-resolution resolution-warning"><strong>Printed duplicate options</strong><span>${escapeHtml(draft.source_option_anomaly_note || 'The genuine source prints repeated option values. Preserve them exactly and verify the correct answer carefully.')}</span></div>` : ''}
 
+      <section class="draft-provenance-card final-review-provenance">
+        <div><span class="eyebrow">Paper &amp; source identity</span><h3>Verify the exact occurrence</h3></div>
+        ${draftProvenanceMarkup(draft)}
+      </section>
+
       <section class="final-student-presentation">
         <div class="repair-card-heading">
           <div><span class="eyebrow">What the student will see</span><h3>Final repaired presentation</h3></div>
@@ -1949,8 +2104,8 @@ async function openReview(draftId) {
         </div>
       </section>
 
-      <details class="source-review-panel final-review-source">
-        <summary>View source / imported version</summary>
+      <details class="source-review-panel final-review-source" open>
+        <summary>Source evidence and immutable imported version</summary>
         ${sourceImages.length ? `<div class="source-review-images">${sourceImages.map((image) => `<img loading="lazy" src="${escapeHtml(image.ref)}" alt="${escapeHtml(image.alt)}" />`).join('')}</div>` : '<p class="muted">No source image was attached.</p>'}
         <div class="final-review-imported-copy">
           <strong>Imported question</strong>
@@ -1960,6 +2115,21 @@ async function openReview(draftId) {
       </details>
 
       <form id="draftVerificationForm" class="simple-review-form" novalidate>
+        <section class="final-content-confirmation">
+          <div>
+            <span class="eyebrow">Mandatory content-integrity check</span>
+            <h3>Confirm the complete student presentation</h3>
+            <p>Compare the final stem, every referenced value/context item, and options A–D with the source image or immutable imported evidence above.</p>
+          </div>
+          <label class="final-content-confirmation-check">
+            <input type="checkbox" name="contentConfirmed" value="SOURCE_PRESENTATION_CONFIRMED" required />
+            <span><strong>I confirm this exact repair revision is complete and source-accurate.</strong><small>This confirmation is revision-bound and is invalidated by any later content or image change.</small></span>
+          </label>
+          <label>Content verification note${contentNoteRequired ? ' (required)' : ' (optional)'}
+            <textarea name="contentReviewNote" rows="2" ${contentNoteRequired ? 'required minlength="5"' : ''} placeholder="${contentNoteRequired ? 'Explain how the repaired/flagged content was checked' : 'Optional source-content verification detail'}">${escapeHtml(draft.content_source_review_note || '')}</textarea>
+          </label>
+        </section>
+
         <fieldset class="simple-answer-fieldset">
           <legend>Confirm the correct answer</legend>
           <div class="review-options">
@@ -1976,6 +2146,7 @@ async function openReview(draftId) {
         <div class="simple-review-selects">
           <label>Answer source
             <select name="answerSource" required>
+              <option value="" ${reviewSource ? '' : 'selected'}>Select verified answer source</option>
               <option value="MANUALLY_VERIFIED" ${reviewSource === 'MANUALLY_VERIFIED' ? 'selected' : ''}>Manually verified</option>
               <option value="OFFICIAL_FINAL_KEY" ${reviewSource === 'OFFICIAL_FINAL_KEY' ? 'selected' : ''}>Official final key</option>
               <option value="OFFICIAL_PROVISIONAL_KEY" ${reviewSource === 'OFFICIAL_PROVISIONAL_KEY' ? 'selected' : ''}>Official provisional key</option>
@@ -2004,10 +2175,33 @@ async function openReview(draftId) {
           </label>
         </details>
 
+        <div id="finalReviewBlockers" class="final-review-blockers" aria-live="polite"></div>
+
+        <section id="returnToRepairPanel" class="return-to-repair-panel hidden">
+          <div><span class="eyebrow">Audited workflow transition</span><h3>Return this exact draft to Content Repair</h3></div>
+          <label>Reason
+            <select id="returnRepairReason" required>
+              <option value="INCOMPLETE_QUESTION">Incomplete question</option>
+              <option value="MISSING_CONTEXT">Missing values or context</option>
+              <option value="TRANSCRIPTION_ERROR">Transcription error</option>
+              <option value="OPTION_ERROR">Option error</option>
+              <option value="SOURCE_MISMATCH">Source mismatch</option>
+              <option value="OTHER">Other content problem</option>
+            </select>
+          </label>
+          <label>Repair instruction
+            <textarea id="returnRepairNote" rows="3" minlength="10" placeholder="Describe exactly what is incomplete or inaccurate" required></textarea>
+          </label>
+          <div class="button-row">
+            <button id="confirmReturnToRepair" class="button button-primary" type="button">Send exact draft to Repair</button>
+            <button id="cancelReturnToRepair" class="button button-ghost" type="button">Cancel</button>
+          </div>
+        </section>
+
         <div class="simple-review-actions final-review-sticky-actions">
-          <button class="button button-primary" type="submit" name="reviewAction" value="SAVE_NEXT">Approve &amp; Next</button>
-          <button class="button button-secondary" type="submit" name="reviewAction" value="SAVE">Save Draft Review</button>
-          <button id="dialogBackToRepair" class="button button-ghost" type="button">Back to repair</button>
+          <button class="button button-primary" type="submit" name="reviewAction" value="SAVE_NEXT" disabled>Approve &amp; Next</button>
+          <button class="button button-secondary" type="submit" name="reviewAction" value="SAVE" disabled>Approve Final Review</button>
+          <button id="dialogBackToRepair" class="button button-ghost" type="button">Return for content repair</button>
           <button id="dialogReject" class="button button-danger button-small" type="button">Reject</button>
         </div>
         <p class="review-publish-handoff">This saves approval for repair revision ${Number(draft.repair_revision || 0)}. Any later content/image change invalidates this review and removes the draft from Publish Centre.</p>
@@ -2018,8 +2212,46 @@ async function openReview(draftId) {
   `;
 
   const form = elements.dialogContent.querySelector('#draftVerificationForm');
+  const reviewBlockers = () => {
+    if (!form) return ['Final Review form is unavailable.'];
+    const values = Object.fromEntries(new FormData(form).entries());
+    const blockers = [];
+    if (!String(draft.question_text || '').trim()) blockers.push('Question text is missing.');
+    ['A', 'B', 'C', 'D'].forEach((key) => {
+      if (!String(options[key] || '').trim()) blockers.push(`Option ${key} is missing.`);
+    });
+    if (!form.querySelector('input[name="reviewCorrectAnswer"]:checked')) blockers.push('Select the verified correct answer.');
+    if (!String(values.answerSource || '').trim()) blockers.push('Select a human-verifiable answer source.');
+    if (draft.question_type === 'PYQ' && !String(values.topicId || '').trim()) blockers.push('Select the required primary topic.');
+    if (!String(values.explanation || '').trim()) blockers.push('Add the reviewed explanation.');
+    if (values.contentConfirmed !== 'SOURCE_PRESENTATION_CONFIRMED') blockers.push('Confirm the complete final presentation against source evidence.');
+    if (contentNoteRequired && String(values.contentReviewNote || '').trim().length < 5) blockers.push('Add a content-verification note for the repaired or flagged source.');
+    return blockers;
+  };
+
+  const updateFinalReviewReadiness = () => {
+    const blockers = reviewBlockers();
+    const blockerPanel = elements.dialogContent.querySelector('#finalReviewBlockers');
+    if (blockerPanel) {
+      blockerPanel.innerHTML = blockers.length
+        ? `<strong>Approval blocked (${blockers.length})</strong><ul>${blockers.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+        : '<strong class="review-ready-message">All mandatory checks are complete. This revision can be approved.</strong>';
+      blockerPanel.classList.toggle('is-ready', blockers.length === 0);
+    }
+    form?.querySelectorAll('button[type="submit"]').forEach((button) => {
+      button.disabled = blockers.length > 0;
+    });
+    return blockers;
+  };
+
+  form?.addEventListener('input', updateFinalReviewReadiness);
+  form?.addEventListener('change', updateFinalReviewReadiness);
+  updateFinalReviewReadiness();
+
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const blockers = updateFinalReviewReadiness();
+    if (blockers.length) return toast.warning(blockers[0]);
     if (!form.reportValidity()) return;
     const selected = elements.dialogContent.querySelector('input[name="reviewCorrectAnswer"]:checked')?.value;
     if (!selected) return toast.warning('Select the verified correct answer.');
@@ -2033,10 +2265,13 @@ async function openReview(draftId) {
     try {
       const saved = await api.reviewDraftAnswerTopic({
         draftId,
+        expectedRepairRevision: draft.repair_revision,
         correctAnswer: selected,
         answerSource: values.answerSource,
         explanation: values.explanation,
         topicId: values.topicId,
+        contentConfirmed: values.contentConfirmed === 'SOURCE_PRESENTATION_CONFIRMED',
+        contentReviewNote: values.contentReviewNote,
         answerReviewNote: values.answerReviewNote,
         adminNotes: values.adminNotes,
       });
@@ -2069,10 +2304,40 @@ async function openReview(draftId) {
     }
   });
 
+  const returnPanel = elements.dialogContent.querySelector('#returnToRepairPanel');
   elements.dialogContent.querySelector('#dialogBackToRepair')?.addEventListener('click', () => {
-    elements.dialog.close();
-    if (visual) openImageRepair(draftId);
-    else setAdminView('repair');
+    returnPanel?.classList.remove('hidden');
+    returnPanel?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    elements.dialogContent.querySelector('#returnRepairNote')?.focus();
+  });
+  elements.dialogContent.querySelector('#cancelReturnToRepair')?.addEventListener('click', () => {
+    returnPanel?.classList.add('hidden');
+  });
+  elements.dialogContent.querySelector('#confirmReturnToRepair')?.addEventListener('click', async () => {
+    const reasonCode = elements.dialogContent.querySelector('#returnRepairReason')?.value;
+    const reasonNote = elements.dialogContent.querySelector('#returnRepairNote')?.value.trim();
+    if (!reasonCode) return toast.warning('Choose why this draft needs content repair.');
+    if (String(reasonNote || '').length < 10) return toast.warning('Describe the content problem in at least 10 characters.');
+
+    setBusy(returnPanel, true);
+    const loading = toast.loading('Recording the repair request for this exact draft…');
+    try {
+      const returned = await api.returnDraftToContentRepair({
+        draftId,
+        reasonCode,
+        reasonNote,
+        expectedRepairRevision: draft.repair_revision,
+      });
+      loading.close();
+      elements.dialog.close();
+      await Promise.all([loadDrafts({ reset: true }), loadPublishQueue({ reset: true })]);
+      toast.success('Draft returned to Content Repair with an audited reason.');
+      await focusDraftInRepair(returned || { ...draft, content_repair_status: 'NEEDS_REPAIR' }, { status: 'CONTENT_REPAIR' });
+    } catch (error) {
+      loading.close();
+      toast.error(error.message);
+      setBusy(returnPanel, false);
+    }
   });
   elements.dialogContent.querySelector('#dialogReject')?.addEventListener('click', () => openRejectDialog(draftId));
 

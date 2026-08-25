@@ -25,6 +25,8 @@ Apply migrations in timestamp order through the controlled GitHub Actions databa
 20260811020000_public_catalogue_baseline.sql
 20260814010000_draft_first_image_content_repair_workflow.sql
 20260816010000_phase4a_safety_efficiency_v1.sql
+20260817010000_phase4a_facet_performance_fix.sql
+20260825010000_content_repair_integrity_gate.sql
 ```
 
 Do not edit an already-applied migration. Add a new timestamped migration for every production schema change.
@@ -70,3 +72,7 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260814010000_draft_first_image_content_repair_workflow.sql` moves student-safe image/content repair before Final Review, preserves imported audit content and invalidates review after later repair changes.
 
 - `20260816010000_phase4a_safety_efficiency_v1.sql` adds the guarded Phase 4A v1.5 preview/save wrappers, mode-aware publish blockers, neutral multi-package sectional identity enforcement and explicit source-package provenance.
+
+- `20260817010000_phase4a_facet_performance_fix.sql` keeps Phase 4A facet loading within the locked performance boundary.
+
+- `20260825010000_content_repair_integrity_gate.sql` adds an independent content-repair state for visual and non-visual drafts, exact audited Final Review-to-Repair routing, optimistic repair revisions, mandatory source/presentation confirmation and a server-side publication gate.

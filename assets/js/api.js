@@ -38,6 +38,14 @@ function clean(value) {
   return typeof value === 'string' ? value.trim() : value;
 }
 
+function normalizeRepairRevision(value) {
+  const revision = Number(value);
+  if (!Number.isInteger(revision) || revision < 0) {
+    throw new Error('The draft repair revision is missing. Reload the draft before saving.');
+  }
+  return revision;
+}
+
 const STUDENT_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const STUDENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -939,7 +947,19 @@ export const api = Object.freeze({
     };
   },
 
-  async saveDraftRepairContent({ draftId, questionText, options, adminNote = '' }) {
+  async returnDraftToContentRepair({ draftId, reasonCode, reasonNote, expectedRepairRevision }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('return_draft_to_content_repair', {
+        p_draft_id: draftId,
+        p_reason_code: clean(reasonCode)?.toUpperCase(),
+        p_reason_note: clean(reasonNote),
+        p_expected_repair_revision: normalizeRepairRevision(expectedRepairRevision),
+      }),
+    ), 'Unable to return this draft to Content Repair.');
+  },
+
+  async saveDraftRepairContent({ draftId, expectedRepairRevision, questionText, options, adminNote = '' }) {
     const client = requireSupabase();
     const normalized = {
       A: clean(options?.A),
@@ -948,8 +968,9 @@ export const api = Object.freeze({
       D: clean(options?.D),
     };
     return unwrap(await withTimeout(
-      client.rpc('save_draft_repair_content', {
+      client.rpc('save_draft_repair_content_v2', {
         p_draft_id: draftId,
+        p_expected_repair_revision: normalizeRepairRevision(expectedRepairRevision),
         p_question_text: clean(questionText),
         p_options: normalized,
         p_admin_note: clean(adminNote) || null,
@@ -957,11 +978,12 @@ export const api = Object.freeze({
     ), 'Unable to save repaired draft content.');
   },
 
-  async resetDraftRepairContent({ draftId, adminNote = '' }) {
+  async resetDraftRepairContent({ draftId, expectedRepairRevision, adminNote = '' }) {
     const client = requireSupabase();
     return unwrap(await withTimeout(
-      client.rpc('reset_draft_repair_content', {
+      client.rpc('reset_draft_repair_content_v2', {
         p_draft_id: draftId,
+        p_expected_repair_revision: normalizeRepairRevision(expectedRepairRevision),
         p_admin_note: clean(adminNote) || null,
         p_confirmation: 'RESET_TO_IMPORTED_CONTENT',
       }),
@@ -1200,9 +1222,14 @@ export const api = Object.freeze({
       'image_refs',
       'student_image_review_status',
       'student_image_review_note',
+      'content_repair_status',
+      'content_repair_reason_code',
+      'content_repair_reason_note',
       'content_repair_version',
       'repair_revision',
       'reviewed_repair_revision',
+      'content_source_confirmed_revision',
+      'content_source_review_note',
       'created_at',
       'updated_at',
     ].join(',');
@@ -1274,15 +1301,29 @@ export const api = Object.freeze({
     ), 'Unable to save the draft.');
   },
 
-  async reviewDraftAnswerTopic({ draftId, correctAnswer, answerSource, explanation, topicId, answerReviewNote, adminNotes }) {
+  async reviewDraftAnswerTopic({
+    draftId,
+    expectedRepairRevision,
+    correctAnswer,
+    answerSource,
+    explanation,
+    topicId,
+    contentConfirmed,
+    contentReviewNote,
+    answerReviewNote,
+    adminNotes,
+  }) {
     const client = requireSupabase();
     return unwrap(await withTimeout(
-      client.rpc('review_draft_answer_topic', {
+      client.rpc('review_draft_answer_topic_v2', {
         p_draft_id: draftId,
+        p_expected_repair_revision: normalizeRepairRevision(expectedRepairRevision),
         p_correct_answer: clean(correctAnswer)?.toUpperCase(),
         p_answer_source: clean(answerSource)?.toUpperCase(),
         p_explanation: clean(explanation),
         p_topic_id: clean(topicId)?.toUpperCase() || null,
+        p_content_confirmation: contentConfirmed ? 'SOURCE_PRESENTATION_CONFIRMED' : null,
+        p_content_review_note: clean(contentReviewNote) || null,
         p_answer_review_note: clean(answerReviewNote) || null,
         p_admin_notes: clean(adminNotes) || null,
       }),

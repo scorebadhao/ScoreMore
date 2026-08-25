@@ -261,13 +261,13 @@
 <div>
 <span class="eyebrow">Stage 2 · final student presentation</span>
 <h2>Image &amp; Content Repair Centre</h2>
-<p class="muted">Visual drafts are repaired here before human review. Correct question text or options when needed, then resolve the student-safe image decision.</p>
+<p class="muted">Repair incomplete text, options or context for any draft. When source images exist, also resolve the student-safe image decision before Final Review.</p>
 </div>
 <button class="button button-secondary" id="refreshImageRepairs" type="button">Refresh queue</button>
 </div>
 <div class="import-safety-note image-repair-safety">
 <strong>Repair-first safety boundary</strong>
-<span>The immutable imported text/options and raw <code>image_refs</code> remain audit evidence. Any repair edit invalidates an older review; unresolved visual drafts cannot enter Final Review or Publish.</span>
+<span>The immutable imported text/options and raw <code>image_refs</code> remain audit evidence. Content readiness and image readiness are checked independently. Any repair creates a new revision that must pass Final Review again.</span>
 </div>
 <div aria-live="polite" class="image-repair-stats" id="imageRepairStats"></div>
 <form class="image-repair-filters" id="imageRepairFilters" novalidate="">
@@ -275,12 +275,15 @@
               <input autocomplete="off" id="imageRepairSearch" name="search" placeholder="GSSSB-CCE… or question words" type="search"/>
 </label>
 <label>Status
-              <select id="imageRepairStatus" name="status">
+<select id="imageRepairStatus" name="status">
 <option selected="" value="NEEDS_REPAIR">Needs repair</option>
+<option value="CONTENT_REPAIR">Content repair requested</option>
+<option value="IMAGE_REPAIR">Image repair active</option>
+<option value="CONTENT_READY">Repaired content</option>
 <option value="PENDING">Pending approval</option>
 <option value="APPROVED">Approved</option>
 <option value="NO_IMAGE_REQUIRED">No student image required</option>
-<option value="ALL">All visual drafts</option>
+<option value="ALL">All repair candidates</option>
 </select>
 </label>
 <label>Paper code<input id="imageRepairPaperCode" name="paperCode" placeholder="0401S1"/></label>
@@ -292,7 +295,7 @@
 <button class="button button-ghost" id="clearImageRepairFilters" type="button">Clear</button>
 </div>
 </form>
-<p class="muted image-repair-queue-meta" id="imageRepairQueueMeta">Loading visual drafts…</p>
+<p class="muted image-repair-queue-meta" id="imageRepairQueueMeta">Loading repair candidates…</p>
 <div aria-live="polite" class="image-repair-list" id="imageRepairList">
 <div class="empty-state">Loading repair-first draft queue…</div>
 </div>
@@ -302,7 +305,7 @@
 <div>
 <span class="eyebrow">Stage 3 · human approval of final presentation</span>
 <h2>Final Review Centre</h2>
-<p class="muted" id="draftListMeta">Review exactly what the student will see. Visual drafts must finish Image &amp; Content Repair first; verified drafts then move to Publish.</p>
+<p class="muted" id="draftListMeta">Review exactly what the student will see and explicitly compare it with the source/import evidence. Any incomplete visual or non-visual draft must return to Repair first.</p>
 </div>
 <div class="draft-review-tools"><button class="button button-secondary" id="refreshDrafts" type="button">Refresh</button>
 <select aria-label="Draft status filter" id="draftStatusFilter">

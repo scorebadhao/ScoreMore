@@ -24,6 +24,7 @@
     "verify:ranktiger-prod-db-init": "node scripts/verify-ranktiger-prod-database-init.mjs",
     "verify:patch5": "npm run verify:patch4 && npm run verify:ranktiger-prod-db-init",
     "verify:dependency-lock": "node scripts/verify-dependency-lock.mjs",
+    "verify:content-repair-integrity": "node scripts/verify-content-repair-integrity.mjs",
     "verify:ranktiger-rc": "node scripts/verify-ranktiger-release-candidate.mjs",
     "verify:patch6": "npm run verify:patch5 && npm run verify:ranktiger-rc && npm run verify:dependency-lock"
   },
