@@ -1403,6 +1403,53 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 .catalogue-tab.active { color: #fff; border-color: var(--primary); background: var(--primary); }
 .catalogue-tab.active b { color: var(--primary-dark); background: #fff; }
 .catalogue-toolbar { padding: 12px; display: grid; gap: 10px; }
+
+.catalogue-filter-disclosure {
+  margin: 0;
+}
+
+.catalogue-filter-disclosure > summary {
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text);
+  background: var(--surface);
+  list-style: none;
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+.catalogue-filter-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.catalogue-filter-disclosure > summary::after {
+  content: '⌄';
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: transform .18s ease;
+}
+
+.catalogue-filter-disclosure[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.catalogue-filter-disclosure > summary:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, .16);
+  outline-offset: 2px;
+}
+
+.catalogue-filter-fields {
+  padding-top: 12px;
+  display: grid;
+  gap: 16px;
+}
 .catalogue-search { min-height: 46px; padding: 0 12px; border: 1px solid var(--border); border-radius: 13px; display: flex; align-items: center; gap: 9px; background: #fff; }
 .catalogue-search:focus-within { border-color: #6fbdb5; box-shadow: 0 0 0 3px rgba(15, 118, 110, .1); }
 .catalogue-search .icon { flex: 0 0 20px; color: var(--muted); }
