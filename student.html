@@ -87,17 +87,22 @@
           <div id="testTabs" class="scroll-tabs" role="tablist" aria-label="Test types"></div>
           <div class="catalogue-toolbar card hub-filter-card">
             <label class="catalogue-search"><svg class="icon"><use href="#i-search"></use></svg><span class="sr-only">Search tests</span><input id="testSearch" type="search" placeholder="Search test, exam, subject or paper" autocomplete="off" /></label>
-            <div class="hub-filter-grid">
-              <label><span>Subject</span><select id="testSubjectFilter"><option value="">All subjects</option></select></label>
-              <label><span>Topic</span><select id="testTopicFilter"><option value="">All topics</option></select></label>
-              <label><span>Year</span><select id="testYearFilter"><option value="">All years</option></select></label>
-              <label><span>Date</span><select id="testDateFilter"><option value="">All dates</option></select></label>
-              <label><span>Shift</span><select id="testShiftFilter"><option value="">All shifts</option></select></label>
-              <label><span>Access</span><select id="testAccessFilter"><option value="ALL">All access</option><option value="FREE">Free</option><option value="UNLOCKED">Unlocked</option><option value="PREMIUM">Premium</option></select></label>
-              <label><span>Progress</span><select id="testProgressFilter"><option value="ALL">All progress</option><option value="NOT_STARTED">Not started</option><option value="IN_PROGRESS">In progress</option><option value="COMPLETED">Completed</option></select></label>
-              <label><span>Sort</span><select id="testSort"><option value="RECOMMENDED">Recommended</option><option value="NEWEST">Newest</option><option value="OLDEST">Oldest</option><option value="PERFORMANCE">Best performance</option><option value="NAME">Name</option></select></label>
-            </div>
-            <div class="button-row"><button id="refreshStudentTests" class="button button-ghost" type="button"><svg class="icon"><use href="#i-refresh"></use></svg><span>Refresh</span></button><button id="clearCatalogueFilters" class="text-button hidden" type="button">Clear filters</button></div>
+            <details class="catalogue-filter-disclosure">
+              <summary>Filters</summary>
+              <div class="catalogue-filter-fields">
+                <div class="hub-filter-grid">
+                  <label><span>Subject</span><select id="testSubjectFilter"><option value="">All subjects</option></select></label>
+                  <label><span>Topic</span><select id="testTopicFilter"><option value="">All topics</option></select></label>
+                  <label><span>Year</span><select id="testYearFilter"><option value="">All years</option></select></label>
+                  <label><span>Date</span><select id="testDateFilter"><option value="">All dates</option></select></label>
+                  <label><span>Shift</span><select id="testShiftFilter"><option value="">All shifts</option></select></label>
+                  <label><span>Access</span><select id="testAccessFilter"><option value="ALL">All access</option><option value="FREE">Free</option><option value="UNLOCKED">Unlocked</option><option value="PREMIUM">Premium</option></select></label>
+                  <label><span>Progress</span><select id="testProgressFilter"><option value="ALL">All progress</option><option value="NOT_STARTED">Not started</option><option value="IN_PROGRESS">In progress</option><option value="COMPLETED">Completed</option></select></label>
+                  <label><span>Sort</span><select id="testSort"><option value="RECOMMENDED">Recommended</option><option value="NEWEST">Newest</option><option value="OLDEST">Oldest</option><option value="PERFORMANCE">Best performance</option><option value="NAME">Name</option></select></label>
+                </div>
+                <div class="button-row"><button id="refreshStudentTests" class="button button-ghost" type="button"><svg class="icon"><use href="#i-refresh"></use></svg><span>Refresh</span></button><button id="clearCatalogueFilters" class="text-button hidden" type="button">Clear filters</button></div>
+              </div>
+            </details>
           </div>
           <div class="catalogue-result-bar"><div><strong id="catalogueResultText">Loading tests…</strong><span id="catalogueScopeText">Published __APP_NAME__ catalogue</span></div></div>
           <div id="studentTestList" class="catalogue-grid" aria-live="polite"></div>
