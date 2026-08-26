@@ -48,6 +48,8 @@ pass(admin.includes('SOURCE_PRESENTATION_CONFIRMED'), 'Final Review source-conte
 pass(admin.includes('Select verified answer source'), 'Final Review must start with an explicit answer-source choice.');
 pass(!admin.includes("proposedSource === 'AI_PROPOSED' ? 'MANUALLY_VERIFIED'"), 'AI/missing answer source is still silently displayed as manually verified.');
 pass(admin.includes('Approval blocked ('), 'Final Review blocker summary is missing.');
+pass(admin.includes('id="returnRepairNote"') && admin.includes('required disabled'), 'Hidden return-to-repair controls can silently block Final Review submission.');
+pass(admin.includes('setReturnPanelActive'), 'Return-to-repair controls are not enabled and disabled with their panel.');
 pass(admin.includes('expectedRepairRevision: draft.repair_revision'), 'Final Review does not submit the exact loaded revision.');
 pass(admin.includes('content_repair_reason_note'), 'Repair UI does not show the recorded content problem.');
 pass(admin.includes('draftProvenanceMarkup'), 'Final Review/Repair does not show paper and source identity.');

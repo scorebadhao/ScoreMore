@@ -2180,7 +2180,7 @@ async function openReview(draftId) {
         <section id="returnToRepairPanel" class="return-to-repair-panel hidden">
           <div><span class="eyebrow">Audited workflow transition</span><h3>Return this exact draft to Content Repair</h3></div>
           <label>Reason
-            <select id="returnRepairReason" required>
+            <select id="returnRepairReason" required disabled>
               <option value="INCOMPLETE_QUESTION">Incomplete question</option>
               <option value="MISSING_CONTEXT">Missing values or context</option>
               <option value="TRANSCRIPTION_ERROR">Transcription error</option>
@@ -2190,7 +2190,7 @@ async function openReview(draftId) {
             </select>
           </label>
           <label>Repair instruction
-            <textarea id="returnRepairNote" rows="3" minlength="10" placeholder="Describe exactly what is incomplete or inaccurate" required></textarea>
+            <textarea id="returnRepairNote" rows="3" minlength="10" placeholder="Describe exactly what is incomplete or inaccurate" required disabled></textarea>
           </label>
           <div class="button-row">
             <button id="confirmReturnToRepair" class="button button-primary" type="button">Send exact draft to Repair</button>
@@ -2305,13 +2305,19 @@ async function openReview(draftId) {
   });
 
   const returnPanel = elements.dialogContent.querySelector('#returnToRepairPanel');
+  const setReturnPanelActive = (active) => {
+    returnPanel?.classList.toggle('hidden', !active);
+    returnPanel?.querySelectorAll('select, textarea, button').forEach((control) => {
+      control.disabled = !active;
+    });
+  };
   elements.dialogContent.querySelector('#dialogBackToRepair')?.addEventListener('click', () => {
-    returnPanel?.classList.remove('hidden');
+    setReturnPanelActive(true);
     returnPanel?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     elements.dialogContent.querySelector('#returnRepairNote')?.focus();
   });
   elements.dialogContent.querySelector('#cancelReturnToRepair')?.addEventListener('click', () => {
-    returnPanel?.classList.add('hidden');
+    setReturnPanelActive(false);
   });
   elements.dialogContent.querySelector('#confirmReturnToRepair')?.addEventListener('click', async () => {
     const reasonCode = elements.dialogContent.querySelector('#returnRepairReason')?.value;
