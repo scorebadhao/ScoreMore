@@ -27,6 +27,7 @@ Apply migrations in timestamp order through the controlled GitHub Actions databa
 20260816010000_phase4a_safety_efficiency_v1.sql
 20260817010000_phase4a_facet_performance_fix.sql
 20260825010000_content_repair_integrity_gate.sql
+20260826212517_admin_task_inbox_published_image_queue.sql
 ```
 
 Do not edit an already-applied migration. Add a new timestamped migration for every production schema change.
@@ -76,3 +77,5 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260817010000_phase4a_facet_performance_fix.sql` keeps Phase 4A facet loading within the locked performance boundary.
 
 - `20260825010000_content_repair_integrity_gate.sql` adds an independent content-repair state for visual and non-visual drafts, exact audited Final Review-to-Repair routing, optimistic repair revisions, mandatory source/presentation confirmation and a server-side publication gate.
+
+- `20260826212517_admin_task_inbox_published_image_queue.sql` adds an admin-only, server-owned Task Inbox read model with exact full-database counts and exact next-record routing for draft repair, published image safety, Final Review and Publish.

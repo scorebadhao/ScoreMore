@@ -78,40 +78,51 @@
 </div>
 </aside><button aria-label="Close admin navigation" class="admin-sidebar-backdrop" id="adminSidebarBackdrop" tabindex="-1" type="button"></button><div class="admin-workspace-main"><div class="dashboard-header admin-page-header">
 <div>
-<span class="eyebrow" id="adminPageEyebrow">Question workflow · Stage 1</span>
-<h1 id="adminPageTitle">Import Centre</h1>
-<p id="adminPageDescription">Bring source material into controlled drafts. Validate packages before any database write.</p>
+<span class="eyebrow" id="adminPageEyebrow">Operations overview</span>
+<h1 id="adminPageTitle">Admin Dashboard</h1>
+<p id="adminPageDescription">See exact work queues, continue the next safe task, and move between protected admin functions.</p>
 </div>
 <div aria-label="Current environment" class="admin-page-context">
 <span aria-hidden="true" class="admin-env-dot"></span>
 <span><strong>ScoreMore DEV</strong><small>Admin-only workspace</small></span>
 </div>
 </div><div aria-label="Admin Dashboard" class="admin-view-panel" data-admin-view-panel="dashboard">
-<section class="admin-dashboard-grid">
-<article class="admin-dashboard-card admin-dashboard-card-primary">
-<span class="eyebrow">Image &amp; content repair</span>
+<section class="panel-card admin-task-inbox" aria-labelledby="adminTaskInboxTitle">
+<div class="section-heading compact admin-task-inbox-heading">
+<div><span class="eyebrow">Server-owned work queue</span><h2 id="adminTaskInboxTitle">Task Inbox</h2><p class="muted">Counts cover the complete database. Every Continue button opens the exact next record.</p></div>
+<button class="button button-secondary" id="refreshAdminTasks" type="button">Refresh tasks</button>
+</div>
+<p aria-live="polite" class="muted admin-task-inbox-meta" id="adminTaskInboxMeta">Loading exact workflow counts…</p>
+<div class="admin-dashboard-grid">
+<article class="admin-dashboard-card admin-dashboard-card-primary" data-task-bucket="DRAFT_REPAIR">
+<span class="eyebrow">Priority 1 · Draft repair</span>
 <strong id="adminDashboardRepairCount">—</strong>
-<span id="adminDashboardRepairLabel">Loading repair queue…</span>
-<button class="button button-secondary" data-admin-view="repair" type="button">Continue repair</button>
+<span id="adminDashboardRepairLabel">Loading draft repair tasks…</span>
+<small id="adminDashboardRepairNext">Checking the next exact draft…</small>
+<button class="button button-secondary" disabled="" id="continueDraftRepairTask" type="button">Continue next repair</button>
 </article>
-<article class="admin-dashboard-card">
-<span class="eyebrow">Final review</span>
+<article class="admin-dashboard-card" data-task-bucket="PUBLISHED_IMAGE_SAFETY">
+<span class="eyebrow">Priority 2 · Published safety</span>
+<strong id="adminDashboardPublishedImageCount">—</strong>
+<span id="adminDashboardPublishedImageLabel">Loading published image tasks…</span>
+<small id="adminDashboardPublishedImageNext">Checking the next exact question…</small>
+<button class="button button-ghost" disabled="" id="continuePublishedImageTask" type="button">Resolve next image</button>
+</article>
+<article class="admin-dashboard-card" data-task-bucket="FINAL_REVIEW">
+<span class="eyebrow">Priority 3 · Final review</span>
 <strong id="adminDashboardReviewCount">—</strong>
-<span id="adminDashboardReviewLabel">Loading review queue…</span>
-<button class="button button-ghost" data-admin-view="review" type="button">Review next</button>
+<span id="adminDashboardReviewLabel">Loading final-review tasks…</span>
+<small id="adminDashboardReviewNext">Checking the next exact draft…</small>
+<button class="button button-ghost" disabled="" id="continueFinalReviewTask" type="button">Review next</button>
 </article>
-<article class="admin-dashboard-card">
-<span class="eyebrow">Publish</span>
+<article class="admin-dashboard-card" data-task-bucket="PUBLISH">
+<span class="eyebrow">Priority 4 · Publish</span>
 <strong id="adminDashboardPublishCount">—</strong>
-<span>Verified drafts ready now</span>
-<button class="button button-ghost" data-admin-view="publish" type="button">Open publish queue</button>
+<span id="adminDashboardPublishLabel">Loading publish-ready tasks…</span>
+<small id="adminDashboardPublishNext">Checking the next exact draft…</small>
+<button class="button button-ghost" disabled="" id="continuePublishTask" type="button">Open next publish item</button>
 </article>
-<article class="admin-dashboard-card">
-<span class="eyebrow">Tests</span>
-<strong id="adminDashboardTestCount">—</strong>
-<span>Configured fixed-question tests</span>
-<button class="button button-ghost" data-admin-view="catalogue" type="button">Open catalogue</button>
-</article>
+</div>
 </section>
 <section class="panel-card admin-dashboard-actions">
 <div class="section-heading compact"><div><span class="eyebrow">Quick actions</span><h2>Continue operations</h2><p class="muted">Use the next safe action without hunting through the full admin page.</p></div></div>
@@ -256,7 +267,15 @@
 </div>
 <div class="import-history-list" id="recentImportList"></div>
 </div>
-</section></div><div aria-label="Image and Content Repair Centre" class="admin-view-panel" data-admin-view-panel="repair" hidden=""><section class="section panel-card image-repair-centre" id="imageRepairSection">
+</section></div><div aria-label="Image and Content Repair Centre" class="admin-view-panel" data-admin-view-panel="repair" hidden="">
+<section class="section panel-card repair-queue-switcher" aria-labelledby="repairQueueSwitcherTitle">
+<div class="section-heading compact"><div><span class="eyebrow">Separate safety queues</span><h2 id="repairQueueSwitcherTitle">Choose repair workspace</h2><p class="muted">Draft presentation work and already-published image safety remain separate and keep independent counts.</p></div></div>
+<div aria-label="Repair workspace" class="repair-queue-tabs" role="tablist">
+<button aria-controls="imageRepairSection" aria-selected="true" class="repair-queue-tab is-active" data-repair-queue-tab="draft" id="draftRepairQueueTab" role="tab" type="button"><span>Draft repair</span><strong id="draftRepairTabCount">—</strong></button>
+<button aria-controls="publishedImageRepairSection" aria-selected="false" class="repair-queue-tab" data-repair-queue-tab="published" id="publishedImageRepairQueueTab" role="tab" type="button"><span>Published image safety</span><strong id="publishedImageRepairTabCount">—</strong></button>
+</div>
+</section>
+<section aria-labelledby="draftRepairQueueTab" class="section panel-card image-repair-centre" data-repair-queue-panel="draft" id="imageRepairSection" role="tabpanel" tabindex="0">
 <div class="section-heading image-repair-heading">
 <div>
 <span class="eyebrow">Stage 2 · final student presentation</span>
@@ -300,7 +319,48 @@
 <div class="empty-state">Loading repair-first draft queue…</div>
 </div>
 <button class="button button-ghost image-repair-load-more hidden" id="loadMoreImageRepairs" type="button">Load more drafts</button>
-</section></div><div aria-label="Final Review Centre" class="admin-view-panel" data-admin-view-panel="review" hidden=""><section class="section panel-card" id="reviewSection">
+</section>
+<section aria-labelledby="publishedImageRepairQueueTab publishedImageRepairTitle" class="section panel-card image-repair-centre" data-repair-queue-panel="published" hidden="" id="publishedImageRepairSection" role="tabpanel" tabindex="0">
+<div class="section-heading image-repair-heading">
+<div>
+<span class="eyebrow">Published master questions · image safety only</span>
+<h2 id="publishedImageRepairTitle">Published Image Safety</h2>
+<p class="muted">Resolve student-safe crops or record an audited no-image-required decision for published visual questions. Published question text and answers are read-only here.</p>
+</div>
+<button class="button button-secondary" id="refreshPublishedImageRepairs" type="button">Refresh queue</button>
+</div>
+<div class="import-safety-note image-repair-safety">
+<strong>Master-question safety boundary</strong>
+<span>Raw source captures stay private. Existing tests remain protected by <code>question_is_student_ready(question_id)</code> until the current image decision is safe.</span>
+</div>
+<div aria-live="polite" class="image-repair-stats" id="publishedImageRepairStats"></div>
+<form class="image-repair-filters" id="publishedImageRepairFilters" novalidate="">
+<label class="image-repair-search">Question ID or text
+<input autocomplete="off" id="publishedImageRepairSearch" name="search" placeholder="GSSSB-CCE… or question words" type="search"/>
+</label>
+<label>Status
+<select id="publishedImageRepairStatus" name="status">
+<option selected="" value="NEEDS_REPAIR">Needs image decision</option>
+<option value="PENDING">Pending crop</option>
+<option value="APPROVED">Image approved</option>
+<option value="NO_IMAGE_REQUIRED">No student image required</option>
+<option value="ALL">All published visual questions</option>
+</select>
+</label>
+<label>Paper code<input id="publishedImageRepairPaperCode" name="paperCode" placeholder="0401S1"/></label>
+<label>Shift<input id="publishedImageRepairShiftNo" min="1" name="shiftNo" placeholder="1" step="1" type="number"/></label>
+<label>Section<input id="publishedImageRepairSectionCode" name="sectionCode" placeholder="REASONING"/></label>
+<label>Original Q. no.<input id="publishedImageRepairQuestionNo" min="1" name="originalQuestionNo" placeholder="3" step="1" type="number"/></label>
+<div class="image-repair-filter-actions">
+<button class="button button-primary" type="submit">Apply filters</button>
+<button class="button button-ghost" id="clearPublishedImageRepairFilters" type="button">Clear</button>
+</div>
+</form>
+<p class="muted image-repair-queue-meta" id="publishedImageRepairQueueMeta">Loading published image-safety tasks…</p>
+<div aria-live="polite" class="image-repair-list" id="publishedImageRepairList"><div class="empty-state">Loading published visual questions…</div></div>
+<button class="button button-ghost image-repair-load-more hidden" id="loadMorePublishedImageRepairs" type="button">Load more published questions</button>
+</section>
+</div><div aria-label="Final Review Centre" class="admin-view-panel" data-admin-view-panel="review" hidden=""><section class="section panel-card" id="reviewSection">
 <div class="section-heading draft-review-heading">
 <div>
 <span class="eyebrow">Stage 3 · human approval of final presentation</span>

@@ -255,6 +255,13 @@ export const api = Object.freeze({
   getUser,
   getAdminContext,
 
+  async getAdminTaskInbox() {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_admin_task_inbox'),
+    ), 'Unable to load the admin task inbox.') || {};
+  },
+
   onAuthStateChange(callback) {
     const client = requireSupabase();
     return client.auth.onAuthStateChange((event, session) => callback(event, session));

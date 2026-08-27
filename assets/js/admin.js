@@ -37,10 +37,22 @@ const elements = {
   clearTestCatalogueFilters: document.getElementById('clearTestCatalogueFilters'),
   dashboardRepairCount: document.getElementById('adminDashboardRepairCount'),
   dashboardRepairLabel: document.getElementById('adminDashboardRepairLabel'),
+  dashboardRepairNext: document.getElementById('adminDashboardRepairNext'),
+  dashboardPublishedImageCount: document.getElementById('adminDashboardPublishedImageCount'),
+  dashboardPublishedImageLabel: document.getElementById('adminDashboardPublishedImageLabel'),
+  dashboardPublishedImageNext: document.getElementById('adminDashboardPublishedImageNext'),
   dashboardReviewCount: document.getElementById('adminDashboardReviewCount'),
   dashboardReviewLabel: document.getElementById('adminDashboardReviewLabel'),
+  dashboardReviewNext: document.getElementById('adminDashboardReviewNext'),
   dashboardPublishCount: document.getElementById('adminDashboardPublishCount'),
-  dashboardTestCount: document.getElementById('adminDashboardTestCount'),
+  dashboardPublishLabel: document.getElementById('adminDashboardPublishLabel'),
+  dashboardPublishNext: document.getElementById('adminDashboardPublishNext'),
+  taskInboxMeta: document.getElementById('adminTaskInboxMeta'),
+  refreshAdminTasks: document.getElementById('refreshAdminTasks'),
+  continueDraftRepairTask: document.getElementById('continueDraftRepairTask'),
+  continuePublishedImageTask: document.getElementById('continuePublishedImageTask'),
+  continueFinalReviewTask: document.getElementById('continueFinalReviewTask'),
+  continuePublishTask: document.getElementById('continuePublishTask'),
   testQuestionSearch: document.getElementById('testQuestionSearch'),
   questionSelectionMeta: document.getElementById('questionSelectionMeta'),
   testPaperFields: document.getElementById('testPaperFields'),
@@ -80,11 +92,25 @@ const elements = {
   imageRepairQueueMeta: document.getElementById('imageRepairQueueMeta'),
   imageRepairList: document.getElementById('imageRepairList'),
   imageRepairStatus: document.getElementById('imageRepairStatus'),
+  imageRepairSearch: document.getElementById('imageRepairSearch'),
   refreshImageRepairs: document.getElementById('refreshImageRepairs'),
   clearImageRepairFilters: document.getElementById('clearImageRepairFilters'),
   loadMoreImageRepairs: document.getElementById('loadMoreImageRepairs'),
   imageRepairDialog: document.getElementById('imageRepairDialog'),
   imageRepairDialogContent: document.getElementById('imageRepairDialogContent'),
+  draftRepairQueueTab: document.getElementById('draftRepairQueueTab'),
+  publishedImageRepairQueueTab: document.getElementById('publishedImageRepairQueueTab'),
+  draftRepairTabCount: document.getElementById('draftRepairTabCount'),
+  publishedImageRepairTabCount: document.getElementById('publishedImageRepairTabCount'),
+  publishedImageRepairFilters: document.getElementById('publishedImageRepairFilters'),
+  publishedImageRepairStats: document.getElementById('publishedImageRepairStats'),
+  publishedImageRepairQueueMeta: document.getElementById('publishedImageRepairQueueMeta'),
+  publishedImageRepairList: document.getElementById('publishedImageRepairList'),
+  publishedImageRepairStatus: document.getElementById('publishedImageRepairStatus'),
+  publishedImageRepairSearch: document.getElementById('publishedImageRepairSearch'),
+  refreshPublishedImageRepairs: document.getElementById('refreshPublishedImageRepairs'),
+  clearPublishedImageRepairFilters: document.getElementById('clearPublishedImageRepairFilters'),
+  loadMorePublishedImageRepairs: document.getElementById('loadMorePublishedImageRepairs'),
 };
 
 let profile = null;
@@ -131,6 +157,19 @@ let imageRepairSummary = {
   no_image_required: 0,
   content_ready: 0,
 };
+let adminTaskInbox = null;
+let activeRepairQueue = 'draft';
+let publishedImageRepairPage = 0;
+let publishedImageRepairTotal = 0;
+let publishedImageRepairHasMore = false;
+let publishedImageRepairItems = [];
+let publishedImageRepairSummary = {
+  total_candidates: 0,
+  needs_repair: 0,
+  pending: 0,
+  approved: 0,
+  no_image_required: 0,
+};
 let activeRepairObjectUrl = '';
 
 
@@ -148,7 +187,7 @@ const ADMIN_VIEW_META = Object.freeze({
   repair: {
     eyebrow: 'Question workflow · Stage 2',
     title: 'Image & Content Repair',
-    description: 'Correct draft presentation and resolve student-safe imagery before academic review.',
+    description: 'Correct draft presentation and resolve the separate published image-safety backlog.',
   },
   review: {
     eyebrow: 'Question workflow · Stage 3',
@@ -337,11 +376,13 @@ async function showAdmin({ reloadData = true, announceSessionError = true } = {}
       try {
         await loadReferenceData();
         await Promise.all([
+          loadAdminTaskInbox(),
           loadDrafts(),
           loadPublishQueue(),
           loadConfiguredTests(),
           loadRecentImportBatches(),
           loadImageRepairQueue(),
+          loadPublishedImageRepairQueue(),
         ]);
         renderAdminDashboard();
       } catch (error) {
@@ -396,24 +437,98 @@ function bindAdminAuthLifecycle() {
   });
 }
 
+function taskBucket(name) {
+  const value = adminTaskInbox?.[name];
+  return value && typeof value === 'object' ? value : { count: 0, next: null };
+}
+
+function taskDisplayId(task) {
+  return task?.display_id || task?.proposed_question_id || task?.question_id || '';
+}
+
+function renderTaskCard({ bucket, countElement, labelElement, nextElement, buttonElement, emptyLabel, openLabel }) {
+  const task = taskBucket(bucket);
+  const count = Number(task.count || 0);
+  const nextId = taskDisplayId(task.next);
+  if (countElement) countElement.textContent = String(count);
+  if (labelElement) labelElement.textContent = count ? openLabel(count) : emptyLabel;
+  if (nextElement) nextElement.textContent = nextId ? `Next: ${nextId}` : 'No task is waiting in this queue.';
+  if (buttonElement) {
+    buttonElement.disabled = !task.next;
+    buttonElement.setAttribute('aria-disabled', task.next ? 'false' : 'true');
+  }
+}
+
 function renderAdminDashboard() {
-  const needsRepair = Number(imageRepairSummary?.needs_repair || 0) + Number(imageRepairSummary?.pending || 0);
-  const reviewReadyLoaded = reviewableDrafts().length;
-  if (elements.dashboardRepairCount) elements.dashboardRepairCount.textContent = String(needsRepair);
-  if (elements.dashboardRepairLabel) {
-    const edited = Number(imageRepairSummary?.content_edited || 0);
-    const contentNeeds = Number(imageRepairSummary?.content_needs_repair || 0);
-    const imageNeeds = Number(imageRepairSummary?.image_needs_repair || 0);
-    elements.dashboardRepairLabel.textContent = `${contentNeeds} content · ${imageNeeds} image · ${Number(imageRepairSummary?.pending || 0)} pending${edited ? ` · ${edited} edited` : ''}`;
+  renderTaskCard({
+    bucket: 'draft_repairs',
+    countElement: elements.dashboardRepairCount,
+    labelElement: elements.dashboardRepairLabel,
+    nextElement: elements.dashboardRepairNext,
+    buttonElement: elements.continueDraftRepairTask,
+    emptyLabel: 'No draft presentation is blocked.',
+    openLabel: (count) => `${count} draft repair task${count === 1 ? '' : 's'} need action`,
+  });
+  renderTaskCard({
+    bucket: 'published_image_safety',
+    countElement: elements.dashboardPublishedImageCount,
+    labelElement: elements.dashboardPublishedImageLabel,
+    nextElement: elements.dashboardPublishedImageNext,
+    buttonElement: elements.continuePublishedImageTask,
+    emptyLabel: 'All published visual questions are resolved.',
+    openLabel: (count) => `${count} published image-safety task${count === 1 ? '' : 's'} need action`,
+  });
+  renderTaskCard({
+    bucket: 'final_reviews',
+    countElement: elements.dashboardReviewCount,
+    labelElement: elements.dashboardReviewLabel,
+    nextElement: elements.dashboardReviewNext,
+    buttonElement: elements.continueFinalReviewTask,
+    emptyLabel: 'No repair-ready draft awaits Final Review.',
+    openLabel: (count) => `${count} repair-ready draft${count === 1 ? '' : 's'} await Final Review`,
+  });
+  renderTaskCard({
+    bucket: 'ready_to_publish',
+    countElement: elements.dashboardPublishCount,
+    labelElement: elements.dashboardPublishLabel,
+    nextElement: elements.dashboardPublishNext,
+    buttonElement: elements.continuePublishTask,
+    emptyLabel: 'No verified draft is ready to publish.',
+    openLabel: (count) => `${count} verified draft${count === 1 ? '' : 's'} ready to publish`,
+  });
+
+  const generatedAt = adminTaskInbox?.generated_at ? new Date(adminTaskInbox.generated_at) : null;
+  if (elements.taskInboxMeta) {
+    elements.taskInboxMeta.textContent = generatedAt && !Number.isNaN(generatedAt.getTime())
+      ? `Exact database snapshot refreshed ${generatedAt.toLocaleString()}.`
+      : 'Exact workflow counts are not available yet.';
   }
-  if (elements.dashboardReviewCount) elements.dashboardReviewCount.textContent = String(reviewReadyLoaded);
-  if (elements.dashboardReviewLabel) {
-    elements.dashboardReviewLabel.textContent = draftHasMore
-      ? `${reviewReadyLoaded} ready in the currently loaded draft page`
-      : `${reviewReadyLoaded} draft${reviewReadyLoaded === 1 ? '' : 's'} ready for final review`;
+  if (elements.draftRepairTabCount) {
+    elements.draftRepairTabCount.textContent = String(Number(taskBucket('draft_repairs').count || 0));
   }
-  if (elements.dashboardPublishCount) elements.dashboardPublishCount.textContent = String(publishQueueTotal || 0);
-  if (elements.dashboardTestCount) elements.dashboardTestCount.textContent = String(configuredTests.length || 0);
+  if (elements.publishedImageRepairTabCount) {
+    elements.publishedImageRepairTabCount.textContent = String(Number(taskBucket('published_image_safety').count || 0));
+  }
+
+  document.querySelectorAll('[data-task-bucket]').forEach((card) => {
+    card.classList.toggle('is-recommended-task', card.dataset.taskBucket === adminTaskInbox?.recommended_bucket);
+  });
+}
+
+async function loadAdminTaskInbox({ announce = false } = {}) {
+  if (elements.refreshAdminTasks) elements.refreshAdminTasks.disabled = true;
+  try {
+    adminTaskInbox = await api.getAdminTaskInbox();
+    renderAdminDashboard();
+    if (announce) toast.success('Task Inbox refreshed from the database.');
+    return adminTaskInbox;
+  } catch (error) {
+    if (elements.taskInboxMeta) elements.taskInboxMeta.textContent = error.message;
+    if (announce) toast.error(error.message);
+    return null;
+  } finally {
+    if (elements.refreshAdminTasks) elements.refreshAdminTasks.disabled = false;
+  }
 }
 
 function draftHasSourceImages(draft) {
@@ -790,7 +905,7 @@ async function publishSelectedQueue(draftIds) {
     }
 
     selectedPublishDraftIds.clear();
-    await Promise.all([loadPublishQueue({ reset: true }), loadDrafts({ reset: true })]);
+    await Promise.all([loadPublishQueue({ reset: true }), loadDrafts({ reset: true }), loadAdminTaskInbox()]);
     loading.close();
 
     if (failures.length) {
@@ -801,7 +916,7 @@ async function publishSelectedQueue(draftIds) {
   } catch (error) {
     loading.close();
     toast.error(error.message);
-    await loadPublishQueue({ reset: true });
+    await Promise.all([loadPublishQueue({ reset: true }), loadAdminTaskInbox()]);
   }
 }
 
@@ -976,6 +1091,142 @@ async function loadImageRepairQueue({ reset = true } = {}) {
   }
 }
 
+function setRepairQueueMode(mode, { focus = false } = {}) {
+  activeRepairQueue = mode === 'published' ? 'published' : 'draft';
+  document.querySelectorAll('[data-repair-queue-tab]').forEach((tab) => {
+    const active = tab.dataset.repairQueueTab === activeRepairQueue;
+    tab.classList.toggle('is-active', active);
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+    tab.tabIndex = active ? 0 : -1;
+  });
+  document.querySelectorAll('[data-repair-queue-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.repairQueuePanel !== activeRepairQueue;
+  });
+  if (focus) document.querySelector(`[data-repair-queue-panel="${activeRepairQueue}"]`)?.focus();
+}
+
+function publishedImageRepairFilters() {
+  if (!elements.publishedImageRepairFilters) return {};
+  const values = Object.fromEntries(new FormData(elements.publishedImageRepairFilters).entries());
+  return {
+    status: values.status || 'NEEDS_REPAIR',
+    search: values.search || '',
+    paperCode: values.paperCode || '',
+    shiftNo: values.shiftNo || '',
+    sectionCode: values.sectionCode || '',
+    originalQuestionNo: values.originalQuestionNo || '',
+  };
+}
+
+function renderPublishedImageRepairStats() {
+  if (!elements.publishedImageRepairStats) return;
+  const cards = [
+    ['Published visual', publishedImageRepairSummary.total_candidates || 0, 'ALL'],
+    ['Needs decision', publishedImageRepairSummary.needs_repair || 0, 'NEEDS_REPAIR'],
+    ['Pending crop', publishedImageRepairSummary.pending || 0, 'PENDING'],
+    ['Image approved', publishedImageRepairSummary.approved || 0, 'APPROVED'],
+    ['No image needed', publishedImageRepairSummary.no_image_required || 0, 'NO_IMAGE_REQUIRED'],
+  ];
+  elements.publishedImageRepairStats.innerHTML = cards.map(([label, value, status]) => `
+    <button class="image-repair-stat" data-published-repair-stat="${status}" type="button">
+      <strong>${Number(value)}</strong><span>${escapeHtml(label)}</span>
+    </button>
+  `).join('');
+  elements.publishedImageRepairStats.querySelectorAll('[data-published-repair-stat]').forEach((button) => {
+    button.addEventListener('click', () => {
+      elements.publishedImageRepairStatus.value = button.dataset.publishedRepairStat || 'ALL';
+      loadPublishedImageRepairQueue({ reset: true });
+    });
+  });
+}
+
+function renderPublishedImageRepairQueue() {
+  if (!elements.publishedImageRepairList) return;
+  const activeStatus = elements.publishedImageRepairStatus?.value || 'NEEDS_REPAIR';
+  if (elements.publishedImageRepairQueueMeta) {
+    elements.publishedImageRepairQueueMeta.textContent = `${publishedImageRepairTotal} ${activeStatus.toLowerCase().replaceAll('_', ' ')} published question${publishedImageRepairTotal === 1 ? '' : 's'} · ${publishedImageRepairItems.length} loaded.`;
+  }
+  elements.loadMorePublishedImageRepairs?.classList.toggle('hidden', !publishedImageRepairHasMore);
+  renderPublishedImageRepairStats();
+
+  if (!publishedImageRepairItems.length) {
+    elements.publishedImageRepairList.innerHTML = '<div class="empty-state">No published visual question matches these filters.</div>';
+    return;
+  }
+
+  elements.publishedImageRepairList.innerHTML = publishedImageRepairItems.map((item) => {
+    const status = String(item.repair_status || 'NEEDS_REPAIR').toLowerCase().replaceAll('_', '-');
+    return `
+      <article class="image-repair-item published-image-repair-item">
+        <div class="image-repair-item-main">
+          <div class="image-repair-item-head">
+            <div>
+              <span class="eyebrow">${escapeHtml(imageRepairPaperLabel(item))}</span>
+              <h3>${escapeHtml(item.question_id || 'Published question')}</h3>
+            </div>
+            <span class="image-repair-status status-${status}">${escapeHtml(String(item.repair_status || '').replaceAll('_', ' '))}</span>
+          </div>
+          <p>${escapeHtml(item.question_text || '')}</p>
+          <div class="draft-quick-status">
+            <span>${escapeHtml(item.subject_name || item.subject_id || 'No subject')}</span>
+            <span>${Number(item.source_image_count || 0)} private source image${Number(item.source_image_count || 0) === 1 ? '' : 's'}</span>
+            <span>${Number(item.student_image_count || 0)} approved student image${Number(item.student_image_count || 0) === 1 ? '' : 's'}</span>
+          </div>
+        </div>
+        <button class="button ${['APPROVED', 'NO_IMAGE_REQUIRED'].includes(item.repair_status) ? 'button-secondary' : 'button-primary'}" data-open-published-image-repair="${escapeHtml(item.question_id)}" type="button">
+          ${item.repair_status === 'PENDING'
+            ? 'Review pending crop'
+            : item.repair_status === 'APPROVED'
+              ? 'Inspect approved image'
+              : item.repair_status === 'NO_IMAGE_REQUIRED'
+                ? 'Inspect decision'
+                : 'Resolve image safety'}
+        </button>
+      </article>
+    `;
+  }).join('');
+
+  elements.publishedImageRepairList.querySelectorAll('[data-open-published-image-repair]').forEach((button) => {
+    button.addEventListener('click', () => openPublishedImageRepair(button.dataset.openPublishedImageRepair));
+  });
+}
+
+async function loadPublishedImageRepairQueue({ reset = true } = {}) {
+  if (!elements.publishedImageRepairList) return;
+  if (reset) {
+    publishedImageRepairPage = 0;
+    publishedImageRepairItems = [];
+    publishedImageRepairTotal = 0;
+    publishedImageRepairHasMore = false;
+    elements.publishedImageRepairList.innerHTML = '<div class="loading-state">Loading published image-safety tasks…</div>';
+  } else if (elements.loadMorePublishedImageRepairs) {
+    elements.loadMorePublishedImageRepairs.disabled = true;
+  }
+
+  try {
+    const result = await api.listStudentImageRepairQueue({
+      ...publishedImageRepairFilters(),
+      page: publishedImageRepairPage,
+      pageSize: IMAGE_REPAIR_PAGE_SIZE,
+    });
+    const rows = Array.isArray(result?.items) ? result.items : [];
+    const existing = new Set(publishedImageRepairItems.map((item) => item.question_id));
+    publishedImageRepairItems = [...publishedImageRepairItems, ...rows.filter((item) => !existing.has(item.question_id))];
+    publishedImageRepairTotal = Number(result?.total || publishedImageRepairItems.length);
+    publishedImageRepairSummary = result?.summary || publishedImageRepairSummary;
+    publishedImageRepairHasMore = publishedImageRepairItems.length < publishedImageRepairTotal;
+    if (rows.length) publishedImageRepairPage += 1;
+    renderPublishedImageRepairQueue();
+  } catch (error) {
+    if (!publishedImageRepairItems.length) {
+      elements.publishedImageRepairList.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    }
+    toast.error(error.message);
+  } finally {
+    if (elements.loadMorePublishedImageRepairs) elements.loadMorePublishedImageRepairs.disabled = false;
+  }
+}
+
 function repairImageMarkup(items, label) {
   const images = (Array.isArray(items) ? items : []).map((item) => {
     if (item?.blocked) return null;
@@ -1015,6 +1266,274 @@ function decisionHistoryMarkup(decisions) {
   `).join('');
 }
 
+async function completePublishedImageRepairAction({ questionId, loadingText, successText, action }) {
+  const loading = toast.loading(loadingText);
+  try {
+    const result = await action();
+    loading.close();
+    if (result?.cleanup_warning) {
+      toast.warning(`${successText} Old private storage cleanup needs a retry, but it is no longer student-ready.`);
+    } else {
+      toast.success(successText);
+    }
+    await Promise.all([
+      loadPublishedImageRepairQueue({ reset: true }),
+      loadAdminTaskInbox(),
+    ]);
+    await openPublishedImageRepair(questionId);
+  } catch (error) {
+    loading.close();
+    toast.error(error.message);
+    await openPublishedImageRepair(questionId);
+  }
+}
+
+async function confirmPublishedImageRepairAction({ questionId, title, message, buttonLabel, action, loadingText, successText }) {
+  elements.imageRepairDialog.close();
+  const confirmed = await requestAdminConfirmation({
+    eyebrow: 'Published image-safety confirmation',
+    title,
+    message,
+    safetyTitle: 'Published master question remains protected',
+    safetyMessage: 'This audited image decision never edits the published question text or answer. Student tests use the master question only when its current image state is student-ready.',
+    buttonLabel,
+  });
+  if (!confirmed) return openPublishedImageRepair(questionId);
+  return completePublishedImageRepairAction({ questionId, loadingText, successText, action });
+}
+
+function renderPublishedImageRepairDetail(detail) {
+  const question = detail.question || {};
+  const repairs = Array.isArray(detail.repairs) ? detail.repairs : [];
+  const decisions = Array.isArray(detail.decisions) ? detail.decisions : [];
+  const pending = repairs.find((repair) => repair.status === 'PENDING');
+  const approved = repairs.find((repair) => repair.status === 'APPROVED');
+  const reviewStatus = question.student_image_review_status || 'NEEDS_REVIEW';
+  const noImageRequired = reviewStatus === 'NO_STUDENT_IMAGE_REQUIRED';
+  const visibleStatus = pending
+    ? 'PENDING CROP'
+    : noImageRequired
+      ? 'NO IMAGE REQUIRED'
+      : reviewStatus === 'SAFE_CROP_APPROVED'
+        ? 'IMAGE APPROVED'
+        : 'IMAGE DECISION REQUIRED';
+  const visibleStatusClass = pending
+    ? 'pending'
+    : noImageRequired
+      ? 'no-image-required'
+      : reviewStatus === 'SAFE_CROP_APPROVED'
+        ? 'approved'
+        : 'needs-repair';
+  const approvedPreview = safePreviewUrl(approved?.preview_url);
+  const currentStudentImageMarkup = noImageRequired
+    ? `<div class="student-no-image-decision"><strong>No student image required</strong><span>${escapeHtml(question.student_image_review_note || 'Audited decision recorded.')}</span></div>`
+    : approvedPreview
+      ? `<figure class="image-repair-preview-frame student-crop"><img src="${escapeHtml(approvedPreview)}" alt="${escapeHtml(approved.alt_text || 'Approved student-safe question image')}" loading="lazy" /></figure>`
+      : '<div class="empty-state compact">Students currently receive no image from this question.</div>';
+  const defaultAlt = pending?.alt_text || approved?.alt_text || `Diagram for ${question.question_id || 'published question'}`;
+  const defaultNote = pending?.admin_note || question.student_image_review_note || '';
+  const options = question.options || {};
+
+  elements.imageRepairDialogContent.innerHTML = `
+    <div class="review-content image-repair-detail published-image-repair-workspace">
+      <div class="image-repair-detail-head">
+        <div>
+          <span class="eyebrow">${escapeHtml(imageRepairPaperLabel(question))}</span>
+          <h2>${escapeHtml(question.question_id || 'Published image safety')}</h2>
+          <div class="draft-quick-status"><span>${escapeHtml(question.subject_name || question.subject_id || 'No subject')}</span><span>Published master question</span></div>
+        </div>
+        <span class="image-repair-status status-${visibleStatusClass}">${visibleStatus}</span>
+      </div>
+
+      <div class="image-repair-source-warning">
+        <strong>Image safety only</strong>
+        <span>The published stem and options are read-only. This workspace resolves only the private-source → student-safe image decision.</span>
+      </div>
+
+      <section class="draft-provenance-card">
+        <div><span class="eyebrow">Paper &amp; source identity</span><h3>Published master record</h3></div>
+        ${draftProvenanceMarkup(question)}
+      </section>
+
+      <div class="draft-repair-layout published-image-safety-layout">
+        <section class="draft-repair-editor-card published-question-readonly">
+          <div class="repair-card-heading"><div><span class="eyebrow">Read-only content</span><h3>Published student question</h3></div><span class="chip">Locked</span></div>
+          <div class="simple-question-text">${escapeHtml(question.question_text || '')}</div>
+          <div class="student-preview-options">
+            ${['A','B','C','D'].map((key) => `<div><strong>${key}</strong><span>${escapeHtml(options[key] || '')}</span></div>`).join('')}
+          </div>
+        </section>
+
+        <section class="draft-repair-media-card">
+          <div class="repair-card-heading"><div><span class="eyebrow">Image safety</span><h3>Source → student-safe presentation</h3></div></div>
+          <div class="repair-media-tabs" role="tablist" aria-label="Published image views">
+            <button class="repair-media-tab is-active" type="button" data-repair-media-tab="source">Private source</button>
+            <button class="repair-media-tab" type="button" data-repair-media-tab="student">Student-safe</button>
+          </div>
+          <div class="repair-media-panels">
+            <div class="repair-media-panel is-active" data-repair-media-panel="source"><strong>Private source capture</strong><div class="repair-media-images">${repairImageMarkup(question.source_image_refs || [], 'Original source capture')}</div></div>
+            <div class="repair-media-panel" data-repair-media-panel="student"><strong>Current student result</strong><div class="repair-media-images">${currentStudentImageMarkup}</div></div>
+          </div>
+
+          <form id="publishedStudentImageForm" class="student-image-upload-form" novalidate>
+            <label>Student-safe crop
+              <input id="publishedStudentImageFile" name="studentImageFile" type="file" accept="image/png,image/jpeg,image/webp" ${pending ? 'disabled' : ''} />
+            </label>
+            <label>Accessible image description
+              <input id="publishedStudentImageAltText" name="studentImageAltText" value="${escapeHtml(defaultAlt)}" placeholder="Describe only the diagram/table/graph students need" />
+            </label>
+            <label>Image-safety note
+              <textarea id="publishedStudentImageAdminNote" name="studentImageAdminNote" rows="2" placeholder="Why this crop/decision is safe">${escapeHtml(defaultNote)}</textarea>
+            </label>
+            <div id="localPublishedStudentImagePreview" class="local-student-image-preview hidden"></div>
+            <div class="image-repair-action-row">
+              ${pending
+                ? `<button id="approvePublishedStudentImage" class="button button-primary" type="button">Approve pending crop</button>
+                   <button id="discardPublishedStudentImage" class="button button-danger" type="button">Discard pending</button>`
+                : '<button class="button button-secondary" type="submit">Upload candidate crop</button>'}
+              ${approved ? '<button id="removePublishedStudentImage" class="button button-danger" type="button">Remove approved image</button>' : ''}
+              ${noImageRequired ? '<button id="reopenPublishedImageDecision" class="button button-ghost" type="button">Reopen image decision</button>' : ''}
+              ${!pending && !noImageRequired ? '<button id="markPublishedImageNotRequired" class="button button-ghost" type="button">No student image required</button>' : ''}
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <details class="image-repair-history">
+        <summary>Published image audit history (${repairs.length + decisions.length})</summary>
+        <div>${decisionHistoryMarkup(decisions)}${repairHistoryMarkup(repairs)}</div>
+      </details>
+    </div>
+  `;
+
+  elements.imageRepairDialogContent.querySelectorAll('[data-repair-media-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const target = button.dataset.repairMediaTab;
+      elements.imageRepairDialogContent.querySelectorAll('[data-repair-media-tab]').forEach((tab) => tab.classList.toggle('is-active', tab === button));
+      elements.imageRepairDialogContent.querySelectorAll('[data-repair-media-panel]').forEach((panel) => panel.classList.toggle('is-active', panel.dataset.repairMediaPanel === target));
+    });
+  });
+
+  const imageForm = elements.imageRepairDialogContent.querySelector('#publishedStudentImageForm');
+  const fileInput = elements.imageRepairDialogContent.querySelector('#publishedStudentImageFile');
+  const localPreview = elements.imageRepairDialogContent.querySelector('#localPublishedStudentImagePreview');
+  const noteValue = () => elements.imageRepairDialogContent.querySelector('#publishedStudentImageAdminNote')?.value;
+  const altValue = () => elements.imageRepairDialogContent.querySelector('#publishedStudentImageAltText')?.value;
+
+  fileInput?.addEventListener('change', () => {
+    if (activeRepairObjectUrl) URL.revokeObjectURL(activeRepairObjectUrl);
+    activeRepairObjectUrl = '';
+    const file = fileInput.files?.[0];
+    if (!file) {
+      localPreview?.classList.add('hidden');
+      if (localPreview) localPreview.innerHTML = '';
+      return;
+    }
+    activeRepairObjectUrl = URL.createObjectURL(file);
+    if (localPreview) {
+      localPreview.classList.remove('hidden');
+      localPreview.innerHTML = `<strong>Local candidate preview</strong><img src="${escapeHtml(activeRepairObjectUrl)}" alt="Local student-safe crop preview" />`;
+    }
+  });
+
+  imageForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (pending) return toast.warning('Approve or discard the pending crop before uploading another one.');
+    const file = fileInput?.files?.[0];
+    if (!file) return toast.warning('Choose a diagram/table/graph crop first.');
+    setBusy(imageForm, true);
+    const loading = toast.loading('Uploading private student-safe candidate…');
+    try {
+      const result = await api.uploadStudentImageRepair({ questionId: question.question_id, file, altText: altValue(), adminNote: noteValue() });
+      loading.close();
+      if (result?.cleanup_warning) toast.warning('Candidate uploaded. Previous private candidate cleanup needs a retry.');
+      else toast.success('Candidate crop uploaded. Approve it to complete the published image task.');
+      await Promise.all([loadPublishedImageRepairQueue({ reset: true }), loadAdminTaskInbox()]);
+      await openPublishedImageRepair(question.question_id);
+    } catch (error) {
+      loading.close();
+      toast.error(error.message);
+      setBusy(imageForm, false);
+    }
+  });
+
+  elements.imageRepairDialogContent.querySelector('#approvePublishedStudentImage')?.addEventListener('click', () => confirmPublishedImageRepairAction({
+    questionId: question.question_id,
+    title: 'Approve this published student-safe crop?',
+    message: 'The approved crop becomes the only student-facing image for this published master question.',
+    buttonLabel: 'Approve crop',
+    loadingText: 'Approving student-safe crop…',
+    successText: 'Published question image approved.',
+    action: () => api.approveStudentImageRepair({ repairId: pending.repair_id, altText: altValue(), adminNote: noteValue() }),
+  }));
+
+  elements.imageRepairDialogContent.querySelector('#discardPublishedStudentImage')?.addEventListener('click', () => confirmPublishedImageRepairAction({
+    questionId: question.question_id,
+    title: 'Discard this pending published crop?',
+    message: 'The candidate is removed and the master question remains blocked from new student material until another image decision is completed.',
+    buttonLabel: 'Discard crop',
+    loadingText: 'Discarding pending crop…',
+    successText: 'Pending crop discarded.',
+    action: () => api.discardStudentImageUpload({ repairId: pending.repair_id, adminNote: noteValue() }),
+  }));
+
+  elements.imageRepairDialogContent.querySelector('#removePublishedStudentImage')?.addEventListener('click', () => {
+    const adminNote = String(noteValue() || '').trim();
+    if (adminNote.length < 5) return toast.warning('Add a short reason before removing the approved image.');
+    return confirmPublishedImageRepairAction({
+      questionId: question.question_id,
+      title: 'Remove this approved published image?',
+      message: 'The master question returns to Needs Image Decision and is blocked from new student test material.',
+      buttonLabel: 'Remove image',
+      loadingText: 'Removing approved image…',
+      successText: 'Approved image removed. A new image decision is required.',
+      action: () => api.removeApprovedStudentImage({ questionId: question.question_id, adminNote }),
+    });
+  });
+
+  elements.imageRepairDialogContent.querySelector('#markPublishedImageNotRequired')?.addEventListener('click', () => {
+    const adminNote = String(noteValue() || '').trim();
+    if (adminNote.length < 10) return toast.warning('Explain in at least 10 characters why students do not need this source image.');
+    return confirmPublishedImageRepairAction({
+      questionId: question.question_id,
+      title: 'Confirm no student image is required?',
+      message: 'Use this only when the private source image is audit evidence and the published text/options are fully understandable without it.',
+      buttonLabel: 'Confirm no image needed',
+      loadingText: 'Recording audited no-image decision…',
+      successText: 'Published no-image-required decision recorded.',
+      action: () => api.markStudentImageNotRequired({ questionId: question.question_id, adminNote }),
+    });
+  });
+
+  elements.imageRepairDialogContent.querySelector('#reopenPublishedImageDecision')?.addEventListener('click', () => {
+    const adminNote = String(noteValue() || '').trim();
+    if (adminNote.length < 5) return toast.warning('Add a short reason before reopening image review.');
+    return confirmPublishedImageRepairAction({
+      questionId: question.question_id,
+      title: 'Reopen this published image decision?',
+      message: 'The no-image decision is revoked and the master question is blocked until a new image decision is completed.',
+      buttonLabel: 'Reopen image review',
+      loadingText: 'Reopening published image review…',
+      successText: 'Published image decision reopened.',
+      action: () => api.reopenStudentImageReview({ questionId: question.question_id, adminNote }),
+    });
+  });
+}
+
+async function openPublishedImageRepair(questionId) {
+  if (activeRepairObjectUrl) URL.revokeObjectURL(activeRepairObjectUrl);
+  activeRepairObjectUrl = '';
+  elements.imageRepairDialogContent.innerHTML = '<div class="review-content"><div class="loading-state">Loading published source and student-safe image state…</div></div>';
+  if (!elements.imageRepairDialog.open) elements.imageRepairDialog.showModal();
+  try {
+    const detail = await api.getStudentImageRepairDetail(questionId);
+    renderPublishedImageRepairDetail(detail);
+  } catch (error) {
+    elements.imageRepairDialogContent.innerHTML = `<div class="review-content"><div class="empty-state">${escapeHtml(error.message)}</div></div>`;
+    toast.error(error.message);
+  }
+}
+
 async function completeImageRepairAction({ draftId, loadingText, successText, action }) {
   const loading = toast.loading(loadingText);
   try {
@@ -1026,6 +1545,7 @@ async function completeImageRepairAction({ draftId, loadingText, successText, ac
       loadImageRepairQueue({ reset: true }),
       loadDrafts({ reset: true }),
       loadPublishQueue({ reset: true }),
+      loadAdminTaskInbox(),
     ]);
     await openImageRepair(draftId);
   } catch (error) {
@@ -1292,7 +1812,7 @@ function renderImageRepairDetail(detail) {
       });
       loading.close();
       toast.success('Content repair saved. Final human review is required again.');
-      await Promise.all([loadImageRepairQueue({ reset: true }), loadDrafts({ reset: true }), loadPublishQueue({ reset: true })]);
+      await Promise.all([loadImageRepairQueue({ reset: true }), loadDrafts({ reset: true }), loadPublishQueue({ reset: true }), loadAdminTaskInbox()]);
       await openImageRepair(question.draft_id);
     } catch (error) {
       loading.close();
@@ -1363,7 +1883,7 @@ function renderImageRepairDetail(detail) {
       loading.close();
       if (result?.cleanup_warning) toast.warning('Candidate uploaded. Previous private candidate cleanup needs a retry.');
       else toast.success('Candidate crop uploaded. Approve it before Final Review.');
-      await Promise.all([loadImageRepairQueue({ reset: true }), loadDrafts({ reset: true }), loadPublishQueue({ reset: true })]);
+      await Promise.all([loadImageRepairQueue({ reset: true }), loadDrafts({ reset: true }), loadPublishQueue({ reset: true }), loadAdminTaskInbox()]);
       await openImageRepair(question.draft_id);
     } catch (error) {
       loading.close();
@@ -1972,10 +2492,46 @@ async function focusDraftInRepair(draft, { status = '' } = {}) {
   elements.imageRepairFilters?.reset();
   const targetStatus = status || (draft?.content_repair_status === 'NEEDS_REPAIR' ? 'CONTENT_REPAIR' : 'ALL');
   if (elements.imageRepairStatus) elements.imageRepairStatus.value = targetStatus;
-  if (elements.imageRepairSearch) elements.imageRepairSearch.value = draft?.proposed_question_id || '';
+  if (elements.imageRepairSearch) elements.imageRepairSearch.value = draft?.proposed_question_id || draft?.display_id || '';
+  setRepairQueueMode('draft');
   setAdminView('repair');
   await loadImageRepairQueue({ reset: true });
   await openImageRepair(draft.draft_id);
+}
+
+async function focusPublishedImageInRepair(task, { status = '' } = {}) {
+  const questionId = task?.question_id || task?.display_id;
+  if (!questionId) return toast.warning('The next published image-safety question is unavailable. Refresh Task Inbox.');
+  elements.publishedImageRepairFilters?.reset();
+  if (elements.publishedImageRepairStatus) {
+    elements.publishedImageRepairStatus.value = status || (task?.task_status === 'PENDING' ? 'PENDING' : 'NEEDS_REPAIR');
+  }
+  if (elements.publishedImageRepairSearch) elements.publishedImageRepairSearch.value = questionId;
+  setRepairQueueMode('published');
+  setAdminView('repair');
+  await loadPublishedImageRepairQueue({ reset: true });
+  await openPublishedImageRepair(questionId);
+}
+
+async function openAdminTask(bucket) {
+  const task = taskBucket(bucket).next;
+  if (!task) return toast.info('No task is currently waiting in this queue.');
+
+  if (bucket === 'draft_repairs') {
+    return focusDraftInRepair(task, { status: task.task_status === 'CONTENT_REPAIR' ? 'CONTENT_REPAIR' : 'ALL' });
+  }
+  if (bucket === 'published_image_safety') {
+    return focusPublishedImageInRepair(task);
+  }
+  if (bucket === 'final_reviews') {
+    setAdminView('review');
+    return openReview(task.draft_id);
+  }
+  if (bucket === 'ready_to_publish') {
+    setAdminView('publish');
+    await loadPublishQueue({ reset: true });
+    return openPublishPreview(task.draft_id);
+  }
 }
 
 async function openReview(draftId) {
@@ -2283,7 +2839,7 @@ async function openReview(draftId) {
       }
       renderDrafts();
 
-      await loadPublishQueue({ reset: true });
+      await Promise.all([loadPublishQueue({ reset: true }), loadAdminTaskInbox()]);
       loading.close();
       toast.success('Final Review saved. The current repaired revision is now eligible for Publish Centre.');
       elements.dialog.close();
@@ -2336,7 +2892,7 @@ async function openReview(draftId) {
       });
       loading.close();
       elements.dialog.close();
-      await Promise.all([loadDrafts({ reset: true }), loadPublishQueue({ reset: true })]);
+      await Promise.all([loadDrafts({ reset: true }), loadPublishQueue({ reset: true }), loadAdminTaskInbox()]);
       toast.success('Draft returned to Content Repair with an audited reason.');
       await focusDraftInRepair(returned || { ...draft, content_repair_status: 'NEEDS_REPAIR' }, { status: 'CONTENT_REPAIR' });
     } catch (error) {
@@ -2385,7 +2941,7 @@ async function reject(draftId, notes) {
     await api.rejectDraft(draftId, notes);
     loading.close();
     toast.success('Draft rejected with review notes.');
-    await Promise.all([loadDrafts(), loadPublishQueue({ reset: true })]);
+    await Promise.all([loadDrafts(), loadPublishQueue({ reset: true }), loadAdminTaskInbox()]);
   } catch (error) {
     loading.close();
     toast.error(error.message);
@@ -3110,6 +3666,7 @@ async function confirmPrintedSourceOptionAnomaly(importItemId) {
     await Promise.all([
       loadDrafts({ reset: true }),
       loadRecentImportBatches(),
+      loadAdminTaskInbox(),
     ]);
     renderAdminDashboard();
 
@@ -3254,7 +3811,7 @@ async function importSelectedDrafts() {
     await api.reconcileImportBatchState(batchId);
     report = await api.getImportBatchReport(batchId);
     renderImportReport(report);
-    await Promise.all([loadDrafts(), loadRecentImportBatches()]);
+    await Promise.all([loadDrafts(), loadRecentImportBatches(), loadAdminTaskInbox()]);
     hideImportProgress();
     loading.close();
     const finalLinked = Number(report?.summary?.linked_to_existing || 0);
@@ -3288,7 +3845,7 @@ async function syncCurrentImportBatch() {
     const result = await api.reconcileImportBatchState(batchId);
     const report = await api.getImportBatchReport(batchId);
     renderImportReport(report);
-    await Promise.all([loadDrafts(), loadRecentImportBatches()]);
+    await Promise.all([loadDrafts(), loadRecentImportBatches(), loadAdminTaskInbox()]);
     loading.close();
     toast.success(`Synchronized: ${Number(result?.drafts_found || 0)} actual drafts found; ${Number(result?.stale_items_released || 0)} stale records released.`);
   } catch (error) {
@@ -3343,7 +3900,7 @@ async function resetCurrentImportDrafts() {
     const result = await api.resetUnreviewedImportDrafts(batchId);
     const report = await api.getImportBatchReport(batchId);
     renderImportReport(report);
-    await Promise.all([loadDrafts(), loadRecentImportBatches()]);
+    await Promise.all([loadDrafts(), loadRecentImportBatches(), loadAdminTaskInbox()]);
     loading.close();
     toast.success(`${Number(result?.deleted_unreviewed_drafts || 0)} untouched draft${Number(result?.deleted_unreviewed_drafts || 0) === 1 ? '' : 's'} reset. Protected drafts were not changed.`);
   } catch (error) {
@@ -3400,6 +3957,29 @@ function downloadCurrentImportReport() {
 
 function bindEvents() {
   initializeAdminWorkspaceNavigation();
+  setRepairQueueMode('draft');
+  elements.refreshAdminTasks?.addEventListener('click', () => loadAdminTaskInbox({ announce: true }));
+  elements.continueDraftRepairTask?.addEventListener('click', () => openAdminTask('draft_repairs'));
+  elements.continuePublishedImageTask?.addEventListener('click', () => openAdminTask('published_image_safety'));
+  elements.continueFinalReviewTask?.addEventListener('click', () => openAdminTask('final_reviews'));
+  elements.continuePublishTask?.addEventListener('click', () => openAdminTask('ready_to_publish'));
+  document.querySelectorAll('[data-repair-queue-tab]').forEach((tab) => {
+    tab.addEventListener('click', () => setRepairQueueMode(tab.dataset.repairQueueTab, { focus: true }));
+    tab.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const tabs = [...document.querySelectorAll('[data-repair-queue-tab]')];
+      const currentIndex = tabs.indexOf(tab);
+      const nextIndex = event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : (currentIndex + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
+      const nextTab = tabs[nextIndex];
+      setRepairQueueMode(nextTab.dataset.repairQueueTab);
+      nextTab.focus();
+    });
+  });
   elements.loginForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -3497,6 +4077,22 @@ function bindEvents() {
     if (activeRepairObjectUrl) URL.revokeObjectURL(activeRepairObjectUrl);
     activeRepairObjectUrl = '';
   });
+  elements.publishedImageRepairFilters?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    loadPublishedImageRepairQueue({ reset: true });
+  });
+  elements.refreshPublishedImageRepairs?.addEventListener('click', () => loadPublishedImageRepairQueue({ reset: true }));
+  elements.loadMorePublishedImageRepairs?.addEventListener('click', () => loadPublishedImageRepairQueue({ reset: false }));
+  elements.clearPublishedImageRepairFilters?.addEventListener('click', () => {
+    elements.publishedImageRepairFilters.reset();
+    elements.publishedImageRepairStatus.value = 'NEEDS_REPAIR';
+    loadPublishedImageRepairQueue({ reset: true });
+  });
+  ['publishedImageRepairPaperCode', 'publishedImageRepairSectionCode'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', (event) => {
+      event.target.value = event.target.value.toUpperCase().replace(/\s+/g, '_');
+    });
+  });
   document.getElementById('draftBoardId')?.addEventListener('change', refreshDraftReferenceSelects);
   document.getElementById('draftExamId')?.addEventListener('change', refreshDraftReferenceSelects);
   document.getElementById('draftSubjectId')?.addEventListener('change', refreshDraftReferenceSelects);
@@ -3581,7 +4177,7 @@ function bindEvents() {
       form.reset();
       form.elements.sourceFileId.value = retainedSource;
       form.elements.language.value = 'GUJARATI';
-      await loadDrafts();
+      await Promise.all([loadDrafts(), loadAdminTaskInbox()]);
     } catch (error) {
       loading.close();
       toast.error(error.message);
