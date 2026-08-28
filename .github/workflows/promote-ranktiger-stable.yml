@@ -207,6 +207,7 @@ jobs:
             const body = fs.readFileSync(file, 'utf8');
             if (!body.includes('RankTiger')) fail(`${required} is not branded RankTiger.`);
             if (body.includes('/ScoreMore/')) fail(`${required} contains the ScoreMore DEV base path.`);
+            if (body.includes('ScoreMore')) fail(`${required} contains the ScoreMore display brand.`);
           }
 
           for (const file of distFiles) {

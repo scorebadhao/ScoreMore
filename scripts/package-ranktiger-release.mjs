@@ -117,6 +117,7 @@ async function assertRankTigerDist() {
     if (!html.includes('RankTiger')) fail(`dist/${name} does not identify the RankTiger build.`);
     if (html.includes('__APP_NAME__') || html.includes('__APP_MARK__')) fail(`dist/${name} still contains unresolved build placeholders.`);
     if (html.includes('/ScoreMore/')) fail(`dist/${name} still contains the ScoreMore GitHub Pages base path.`);
+    if (html.includes('ScoreMore')) fail(`dist/${name} contains the ScoreMore display brand.`);
   }
 
   const files = await listFiles(DIST);

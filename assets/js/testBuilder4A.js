@@ -449,7 +449,7 @@ function updateIdentityHint() {
   if (!elements.identityHint) return;
   const packages = selectedValues('package_ids');
   if (state.mode === 'PYQ_SECTIONAL' && packages.length > 1) {
-    elements.identityHint.textContent = `Multi-package sectional test: use a neutral test ID. ScoreMore will preserve all ${packages.length} source package IDs in test provenance.`;
+    elements.identityHint.textContent = `Multi-package sectional test: use a neutral test ID. ${APP_CONFIG.name} will preserve all ${packages.length} source package IDs in test provenance.`;
     elements.identityHint.classList.add('is-important');
   } else {
     elements.identityHint.textContent = 'Use a clear test identity. Multi-package sectional tests use a neutral generated ID while preserving every source package in provenance.';

@@ -35,6 +35,9 @@ for (const file of htmlFiles) {
       .replaceAll('__APP_ENVIRONMENT__', target.environment);
     assert(!rendered.includes('__APP_'), `${file} leaves an unresolved build placeholder for ${target.id}.`);
     assert(rendered.includes(target.appName), `${file} does not render ${target.appName}.`);
+    if (target.id === 'ranktiger') {
+      assert(!rendered.includes('ScoreMore'), `${file} leaks the ScoreMore display brand into the RankTiger build.`);
+    }
   }
 }
 

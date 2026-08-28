@@ -32,6 +32,20 @@ for (const [file, source] of [['public.js', publicJs], ['student.js', studentJs]
 const apiJs = await readFile(new URL('../assets/js/api.js', import.meta.url), 'utf8');
 assert(apiJs.includes('brandRuntimeText(message, fallback)'), 'Backend display errors must be normalized to the active build brand.');
 
+const adminHtml = await readFile(new URL('../admin.html', import.meta.url), 'utf8');
+const testBuilderHtml = await readFile(new URL('../test-builder.html', import.meta.url), 'utf8');
+for (const [file, source] of [['admin.html', adminHtml], ['test-builder.html', testBuilderHtml]]) {
+  assert(!source.includes('ScoreMore DEV'), `${file} must not hardcode the DEV brand in a shared production page.`);
+  assert(
+    source.includes('<strong>__APP_NAME__</strong><small>__APP_ENVIRONMENT__ · Admin-only workspace</small>'),
+    `${file} must render its admin environment label from build-target placeholders.`,
+  );
+}
+
+const testBuilderJs = await readFile(new URL('../assets/js/testBuilder4A.js', import.meta.url), 'utf8');
+assert(!testBuilderJs.includes('ScoreMore will preserve'), 'Dynamic Builder must not hardcode ScoreMore in user-visible guidance.');
+assert(testBuilderJs.includes('${APP_CONFIG.name} will preserve'), 'Dynamic Builder guidance must use the active build identity.');
+
 const seed = await readFile(new URL('../supabase/seed.sql', import.meta.url), 'utf8');
 assert(!seed.includes("('app_name'"), 'Shared seed must not seed app_name.');
 assert(!seed.includes("('app_mark'"), 'Shared seed must not seed app_mark.');
