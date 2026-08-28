@@ -42,7 +42,7 @@ jobs:
       - name: Checkout approved ScoreMore release source
         uses: actions/checkout@v6
 
-      - name: Verify Patch 5.2 workflow and locked migrations locally
+      - name: Verify guarded workflow and all 25 locked migrations locally
         run: node scripts/verify-ranktiger-prod-database-init.mjs
 
       - name: Require all RankTiger PROD credentials
@@ -111,7 +111,33 @@ jobs:
 
       - name: Show current RankTiger migration status before write
         shell: bash
-        run: supabase migration list --linked
+        run: supabase migration list --linked | tee /tmp/ranktiger-migrations-before.txt
+
+      - name: Verify current remote history is an approved subset — NO WRITE
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const policy = JSON.parse(fs.readFileSync('ranktiger-release.config.json', 'utf8'));
+          const locked = JSON.parse(fs.readFileSync(policy.requiredMigrationLockFile, 'utf8'));
+          const output = fs.readFileSync('/tmp/ranktiger-migrations-before.txt', 'utf8');
+          const names = Object.keys(locked.migrations || {});
+          const lockedVersions = new Set(names.map((name) => name.split('_', 1)[0]));
+          const remoteVersions = new Set(output
+            .split(/\r?\n/)
+            .map((line) => line.split('|')[1]?.trim())
+            .filter((version) => /^\d{14}$/.test(version)));
+          const unknown = [...remoteVersions].filter((version) => !lockedVersions.has(version));
+          if (locked.migration_count !== policy.requiredMigrationCount || names.length !== policy.requiredMigrationCount) {
+            console.error('Migration lock metadata does not match the release policy.');
+            process.exit(1);
+          }
+          if (unknown.length) {
+            console.error(`Unapproved remote migration versions detected before deploy: ${unknown.join(', ')}`);
+            process.exit(1);
+          }
+          console.log(`Verified ${remoteVersions.size} existing remote migration versions are an approved subset.`);
+          NODE
 
       - name: Preview pending RankTiger PROD migrations — NO WRITE
         shell: bash
@@ -125,23 +151,35 @@ jobs:
         shell: bash
         run: supabase migration list --linked | tee /tmp/ranktiger-migrations-after.txt
 
-      - name: Verify all 20 Patch 5.2 locked migrations are applied remotely
+      - name: Verify all 25 approved migrations are applied remotely
         shell: bash
         run: |
           node - <<'NODE'
           const fs = require('fs');
-          const locked = JSON.parse(fs.readFileSync('docs/LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json', 'utf8'));
+          const policy = JSON.parse(fs.readFileSync('ranktiger-release.config.json', 'utf8'));
+          const locked = JSON.parse(fs.readFileSync(policy.requiredMigrationLockFile, 'utf8'));
           const output = fs.readFileSync('/tmp/ranktiger-migrations-after.txt', 'utf8');
-          const missing = [];
-          for (const name of Object.keys(locked.migrations)) {
-            const version = name.split('_', 1)[0];
-            if (!output.includes(version)) missing.push(version);
+          const names = Object.keys(locked.migrations || {});
+          const lockedVersions = new Set(names.map((name) => name.split('_', 1)[0]));
+          const remoteVersions = new Set(output
+            .split(/\r?\n/)
+            .map((line) => line.split('|')[1]?.trim())
+            .filter((version) => /^\d{14}$/.test(version)));
+          if (locked.migration_count !== policy.requiredMigrationCount || names.length !== policy.requiredMigrationCount) {
+            console.error('Migration lock metadata does not match the release policy.');
+            process.exit(1);
           }
+          const missing = [...lockedVersions].filter((version) => !remoteVersions.has(version));
+          const unknown = [...remoteVersions].filter((version) => !lockedVersions.has(version));
           if (missing.length) {
             console.error(`Missing remote migration versions after deploy: ${missing.join(', ')}`);
             process.exit(1);
           }
-          console.log(`Verified ${Object.keys(locked.migrations).length} locked migrations in RankTiger PROD migration history.`);
+          if (unknown.length) {
+            console.error(`Unapproved remote migration versions detected after deploy: ${unknown.join(', ')}`);
+            process.exit(1);
+          }
+          console.log(`Verified ${names.length} locked migrations in RankTiger PROD migration history.`);
           NODE
 
       - name: Verify versioned public catalogue baseline through RankTiger Data API
@@ -180,7 +218,7 @@ jobs:
         run: |
           echo "RankTiger PROD versioned migration deployment PASSED."
           echo "Target: RankTiger PROD only"
-          echo "Locked migrations verified: 20"
+          echo "Locked migrations verified: 25"
           echo "Production catalogue baseline source: VERSIONED MIGRATION"
           echo "Supabase seed executed on PROD: NO"
           echo "RankTiger frontend deployed by this workflow: NO"

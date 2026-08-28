@@ -1,22 +1,42 @@
-import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
+const EXPECTED_MIGRATION_LOCK_FILE = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json';
+const EXPECTED_MIGRATION_COUNT = 25;
 const problems = [];
 const pass = (condition, message) => { if (!condition) problems.push(message); };
+const sha256 = (body) => createHash('sha256').update(body).digest('hex');
 
 const policy = JSON.parse(await readFile(resolve(ROOT, 'ranktiger-release.config.json'), 'utf8'));
-pass(policy.schemaVersion === 2, 'Patch 6 release policy schemaVersion must be 2.');
+pass(policy.schemaVersion === 2, 'RankTiger release policy schemaVersion must be 2.');
 pass(policy.product === 'RankTiger', 'Release policy product must be RankTiger.');
 pass(policy.sourceRepository === 'ScoreMore', 'Release policy source repository must remain ScoreMore.');
 pass(policy.productionRepository === 'RankTiger', 'Release policy production repository must remain RankTiger.');
 pass(policy.buildTarget === 'ranktiger', 'Release build target must be ranktiger.');
 pass(policy.basePath === '/', 'RankTiger production base path must be /.');
-pass(policy.dependencyLockRequired === true, 'Patch 6 must require a committed dependency lock.');
-pass(policy.requiredMigrationCount === 20, 'Patch 6 must recognize the 20-migration RankTiger PROD baseline.');
-pass(policy.requiredMigrationLockFile === 'docs/LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json', 'Patch 6 must use the Patch 5.2 migration lock.');
-pass(policy.productionDeployEnabled === false, 'Patch 6 release candidate must not enable production deployment.');
-pass(policy.productionDatabaseMigrationEnabled === false, 'Patch 6 release candidate must not migrate production database.');
+pass(policy.dependencyLockRequired === true, 'RankTiger release candidate must require a committed dependency lock.');
+pass(policy.requiredMigrationCount === EXPECTED_MIGRATION_COUNT, 'RankTiger release policy must recognize the approved 25-migration PROD baseline.');
+pass(policy.requiredMigrationLockFile === EXPECTED_MIGRATION_LOCK_FILE, 'RankTiger release policy must use the immutable 25-migration lock.');
+pass(policy.productionDeployEnabled === false, 'RankTiger release candidate must not enable production deployment.');
+pass(policy.productionDatabaseMigrationEnabled === false, 'RankTiger release candidate must not migrate production database.');
+
+const migrationLock = JSON.parse(await readFile(resolve(ROOT, EXPECTED_MIGRATION_LOCK_FILE), 'utf8'));
+const lockedMigrations = migrationLock?.migrations ?? {};
+const lockedMigrationNames = Object.keys(lockedMigrations).sort();
+const sourceMigrationNames = (await readdir(resolve(ROOT, 'supabase/migrations')))
+  .filter((name) => name.endsWith('.sql'))
+  .sort();
+pass(migrationLock.lock_version === 'RANKTIGER_25', 'RankTiger migration lock version must be RANKTIGER_25.');
+pass(migrationLock.migration_count === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock metadata must declare 25 migrations.');
+pass(lockedMigrationNames.length === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock must contain exactly 25 checksum entries.');
+pass(JSON.stringify(sourceMigrationNames) === JSON.stringify(lockedMigrationNames), 'Source migration files must exactly match the approved RankTiger lock.');
+for (const name of lockedMigrationNames) {
+  const expected = lockedMigrations[name];
+  const body = await readFile(resolve(ROOT, 'supabase/migrations', name));
+  pass(/^[0-9a-f]{64}$/.test(expected) && sha256(body) === expected, `RankTiger migration checksum mismatch: ${name}`);
+}
 
 
 const devPagesWorkflow = await readFile(resolve(ROOT, '.github/workflows/deploy-pages.yml'), 'utf8');
@@ -64,6 +84,10 @@ pass(!/wrangler|cloudflare\/wrangler-action|cloudflare\/pages-action/i.test(work
 const packager = await readFile(resolve(ROOT, 'scripts/package-ranktiger-release.mjs'), 'utf8');
 pass(packager.includes('package_lock_sha256'), 'Release metadata must record package-lock SHA-256.');
 pass(packager.includes('required_migration_lock_file'), 'Release metadata must record the required migration lock file.');
+pass(packager.includes('required_migration_lock_version'), 'Release metadata must record the required migration lock version.');
+pass(packager.includes('required_migration_lock_sha256'), 'Release metadata must record the required migration lock checksum.');
+pass(packager.includes('Source migration files do not exactly match'), 'Release packager must reject migration-file set drift.');
+pass(packager.includes('Approved RankTiger migration checksum mismatch'), 'Release packager must verify every approved migration checksum.');
 pass(packager.includes('production_project_id'), 'Release metadata must record the RankTiger PROD project ID used for the candidate.');
 pass(packager.includes('hostMatch') && packager.includes('supabase\\.co'), 'Release packager must derive the RankTiger project reference from the validated Supabase URL.');
 pass(packager.includes('suppliedProductionProjectId') && packager.includes('does not match the RankTiger Supabase URL'), 'Release packager must cross-check an explicit project ID when supplied.');
@@ -91,7 +115,7 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log('PASS: Patch 6 RankTiger release-candidate machinery is candidate-only and production-safe.');
+console.log('PASS: RankTiger 25-migration release-candidate machinery is candidate-only and production-safe.');
 console.log('RankTiger repository push: DISABLED');
 console.log('RankTiger PROD database migration: DISABLED');
 console.log('Cloudflare deployment: DISABLED');

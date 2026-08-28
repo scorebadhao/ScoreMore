@@ -7,6 +7,9 @@ const ROOT = resolve(import.meta.dirname, '..');
 const DIST = resolve(ROOT, 'dist');
 const POLICY_FILE = resolve(ROOT, 'ranktiger-release.config.json');
 const PACKAGE_LOCK = resolve(ROOT, 'package-lock.json');
+const MIGRATIONS_DIR = resolve(ROOT, 'supabase/migrations');
+const EXPECTED_MIGRATION_LOCK_FILE = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json';
+const EXPECTED_MIGRATION_COUNT = 25;
 
 function fail(message) {
   console.error(`\nERROR: ${message}`);
@@ -143,11 +146,48 @@ if (
   policy.schemaVersion !== 2
   || policy.product !== 'RankTiger'
   || policy.dependencyLockRequired !== true
-  || policy.requiredMigrationCount !== 20
+  || policy.requiredMigrationLockFile !== EXPECTED_MIGRATION_LOCK_FILE
+  || policy.requiredMigrationCount !== EXPECTED_MIGRATION_COUNT
   || policy.productionDeployEnabled !== false
   || policy.productionDatabaseMigrationEnabled !== false
 ) {
-  fail('Patch 6 release policy is not in the expected candidate-only safe mode.');
+  fail('RankTiger release policy is not in the approved 25-migration candidate-only safe mode.');
+}
+
+const migrationLockPath = resolve(ROOT, policy.requiredMigrationLockFile);
+const docsRoot = `${resolve(ROOT, 'docs')}${sep}`;
+if (!migrationLockPath.startsWith(docsRoot)) {
+  fail('RankTiger migration lock must resolve inside docs/.');
+}
+
+let migrationLock;
+try {
+  migrationLock = JSON.parse(await readFile(migrationLockPath, 'utf8'));
+} catch {
+  fail(`Approved RankTiger migration lock is missing or invalid: ${policy.requiredMigrationLockFile}`);
+}
+
+const lockedMigrations = migrationLock?.migrations ?? {};
+const lockedMigrationNames = Object.keys(lockedMigrations).sort();
+const migrationFiles = (await readdir(MIGRATIONS_DIR))
+  .filter((name) => name.endsWith('.sql'))
+  .sort();
+
+if (
+  migrationLock.lock_version !== 'RANKTIGER_25'
+  || migrationLock.migration_count !== policy.requiredMigrationCount
+  || lockedMigrationNames.length !== policy.requiredMigrationCount
+) {
+  fail('RankTiger migration lock metadata does not match the approved 25-migration baseline.');
+}
+if (JSON.stringify(migrationFiles) !== JSON.stringify(lockedMigrationNames)) {
+  fail('Source migration files do not exactly match the approved RankTiger migration lock.');
+}
+for (const name of lockedMigrationNames) {
+  const expected = lockedMigrations[name];
+  if (!/^[0-9a-f]{64}$/.test(expected) || await sha256File(resolve(MIGRATIONS_DIR, name)) !== expected) {
+    fail(`Approved RankTiger migration checksum mismatch: ${name}`);
+  }
 }
 
 let packageLock;
@@ -205,13 +245,6 @@ await rm(outputRoot, { recursive: true, force: true });
 await mkdir(outputRoot, { recursive: true });
 await cp(DIST, outputDist, { recursive: true });
 
-const migrationFiles = (await readdir(resolve(ROOT, 'supabase/migrations')))
-  .filter((name) => name.endsWith('.sql'))
-  .sort();
-if (migrationFiles.length !== policy.requiredMigrationCount) {
-  fail(`Expected ${policy.requiredMigrationCount} approved migrations, found ${migrationFiles.length}.`);
-}
-
 const metadata = {
   schema_version: 2,
   product: 'RankTiger',
@@ -236,6 +269,8 @@ const metadata = {
     migrations_in_source: migrationFiles.length,
     latest_source_migration: migrationFiles.at(-1) || null,
     required_migration_lock_file: policy.requiredMigrationLockFile,
+    required_migration_lock_version: migrationLock.lock_version,
+    required_migration_lock_sha256: await sha256File(migrationLockPath),
     required_migration_count: policy.requiredMigrationCount,
     production_project_id: productionProjectId,
     production_public_baseline_verified_before_build: true,
@@ -245,7 +280,7 @@ const metadata = {
     ranktiger_repository_updated: false,
     cloudflare_deployed: false,
     student_domain_deployed: false,
-    note: 'Patch 6 release-candidate artifact only. Stable promotion remains intentionally disabled.',
+    note: 'RankTiger release-candidate artifact only. Stable promotion remains intentionally disabled.',
   },
 };
 

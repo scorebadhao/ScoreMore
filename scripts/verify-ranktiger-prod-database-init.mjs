@@ -4,8 +4,11 @@ import crypto from 'node:crypto';
 
 const root = process.cwd();
 const workflowPath = path.join(root, '.github', 'workflows', 'initialize-ranktiger-prod-db.yml');
+const releasePolicyPath = path.join(root, 'ranktiger-release.config.json');
 const patch3LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH3.json');
 const patch52LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json');
+const expectedActiveLockFile = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json';
+const expectedActiveMigrationCount = 25;
 const prerequisiteName = '20260805000050_catalogue_parent_prerequisites.sql';
 const prerequisitePath = path.join(root, 'supabase', 'migrations', prerequisiteName);
 const phase3eName = '20260805000100_phase3e_compatibility.sql';
@@ -21,9 +24,20 @@ function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-for (const required of [workflowPath, patch3LockPath, patch52LockPath, prerequisitePath, catalogueMigrationPath]) {
-  if (!fs.existsSync(required)) fail(`Missing required Patch 5.2 file: ${path.relative(root, required)}`);
+for (const required of [workflowPath, releasePolicyPath, patch3LockPath, patch52LockPath, prerequisitePath, catalogueMigrationPath]) {
+  if (!fs.existsSync(required)) fail(`Missing required RankTiger promotion-safety file: ${path.relative(root, required)}`);
 }
+if (process.exitCode) process.exit();
+
+const releasePolicy = JSON.parse(fs.readFileSync(releasePolicyPath, 'utf8'));
+if (releasePolicy.requiredMigrationLockFile !== expectedActiveLockFile) {
+  fail(`RankTiger release policy must use ${expectedActiveLockFile}.`);
+}
+if (releasePolicy.requiredMigrationCount !== expectedActiveMigrationCount) {
+  fail(`RankTiger release policy must require exactly ${expectedActiveMigrationCount} migrations.`);
+}
+const activeLockPath = path.join(root, releasePolicy.requiredMigrationLockFile);
+if (!fs.existsSync(activeLockPath)) fail(`Missing active RankTiger migration lock: ${releasePolicy.requiredMigrationLockFile}`);
 if (process.exitCode) process.exit();
 
 const workflow = fs.readFileSync(workflowPath, 'utf8');
@@ -31,6 +45,7 @@ const prerequisite = fs.readFileSync(prerequisitePath, 'utf8');
 const catalogue = fs.readFileSync(catalogueMigrationPath, 'utf8');
 const patch3Locked = JSON.parse(fs.readFileSync(patch3LockPath, 'utf8'));
 const patch52Locked = JSON.parse(fs.readFileSync(patch52LockPath, 'utf8'));
+const activeLocked = JSON.parse(fs.readFileSync(activeLockPath, 'utf8'));
 
 const requiredWorkflowFragments = [
   'INITIALIZE_RANKTIGER_PROD',
@@ -41,12 +56,18 @@ const requiredWorkflowFragments = [
   'SUPABASE_ACCESS_TOKEN',
   'supabase db push --dry-run --include-all',
   'supabase db push --yes --include-all',
-  'supabase migration list --linked',
-  'LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json',
+  'supabase migration list --linked | tee /tmp/ranktiger-migrations-before.txt',
+  'supabase migration list --linked | tee /tmp/ranktiger-migrations-after.txt',
+  'ranktiger-release.config.json',
+  'requiredMigrationLockFile',
+  "line.split('|')[1]",
+  'Unapproved remote migration versions detected before deploy',
+  'Missing remote migration versions after deploy',
+  'Unapproved remote migration versions detected after deploy',
   'verify-ranktiger-prod-database-init.mjs',
 ];
 for (const fragment of requiredWorkflowFragments) {
-  if (!workflow.includes(fragment)) fail(`Patch 5.2 workflow is missing required safety/apply fragment: ${fragment}`);
+  if (!workflow.includes(fragment)) fail(`RankTiger workflow is missing required safety/apply fragment: ${fragment}`);
 }
 
 const forbiddenWorkflowPatterns = [
@@ -60,7 +81,7 @@ const forbiddenWorkflowPatterns = [
   /sb_secret_/i,
 ];
 for (const pattern of forbiddenWorkflowPatterns) {
-  if (pattern.test(workflow)) fail(`Patch 5.2 workflow contains forbidden operation/pattern: ${pattern}`);
+  if (pattern.test(workflow)) fail(`RankTiger workflow contains forbidden operation/pattern: ${pattern}`);
 }
 
 const forbiddenDevSecrets = [
@@ -70,7 +91,7 @@ const forbiddenDevSecrets = [
   'secrets.VITE_SUPABASE_PUBLISHABLE_KEY',
 ];
 for (const secret of forbiddenDevSecrets) {
-  if (workflow.includes(secret)) fail(`Patch 5.2 workflow must not reference ScoreMore DEV secret: ${secret}`);
+  if (workflow.includes(secret)) fail(`RankTiger workflow must not reference ScoreMore DEV secret: ${secret}`);
 }
 
 // Patch 3's original 18 migrations are immutable.
@@ -86,15 +107,52 @@ for (const [name, expected] of Object.entries(original)) {
 }
 
 // Patch 5.2 locks 18 historical migrations + prerequisite + catalogue baseline.
-const approved = patch52Locked?.migrations ?? {};
-if (Object.keys(approved).length !== 20) fail(`Expected 20 Patch 5.2 approved migrations, found ${Object.keys(approved).length}.`);
+const patch52Approved = patch52Locked?.migrations ?? {};
+if (Object.keys(patch52Approved).length !== 20) fail(`Expected 20 Patch 5.2 historical migrations, found ${Object.keys(patch52Approved).length}.`);
+for (const [name, expected] of Object.entries(patch52Approved)) {
+  const filePath = path.join(root, 'supabase', 'migrations', name);
+  if (!fs.existsSync(filePath)) {
+    fail(`Patch 5.2 historical migration is missing: ${name}`);
+    continue;
+  }
+  if (sha256(filePath) !== expected) fail(`Patch 5.2 historical migration checksum mismatch: ${name}`);
+}
+
+// The active promotion lock must be an exact immutable snapshot of every source migration.
+const approved = activeLocked?.migrations ?? {};
+const approvedNames = Object.keys(approved).sort();
+const sourceMigrationNames = fs.readdirSync(path.join(root, 'supabase', 'migrations'))
+  .filter((name) => name.endsWith('.sql'))
+  .sort();
+if (activeLocked.lock_version !== 'RANKTIGER_25') fail('Active RankTiger migration lock version must be RANKTIGER_25.');
+if (activeLocked.migration_count !== expectedActiveMigrationCount) fail('Active RankTiger migration lock metadata must declare 25 migrations.');
+if (approvedNames.length !== expectedActiveMigrationCount) fail(`Expected 25 active RankTiger migration checksums, found ${approvedNames.length}.`);
+if (JSON.stringify(approvedNames) !== JSON.stringify(sourceMigrationNames)) {
+  fail('Source migration files do not exactly match the active RankTiger migration lock.');
+}
 for (const [name, expected] of Object.entries(approved)) {
   const filePath = path.join(root, 'supabase', 'migrations', name);
   if (!fs.existsSync(filePath)) {
-    fail(`Patch 5.2 approved migration is missing: ${name}`);
+    fail(`Active RankTiger migration is missing: ${name}`);
     continue;
   }
-  if (sha256(filePath) !== expected) fail(`Patch 5.2 migration checksum mismatch: ${name}`);
+  if (!/^[0-9a-f]{64}$/.test(expected) || sha256(filePath) !== expected) {
+    fail(`Active RankTiger migration checksum mismatch: ${name}`);
+  }
+}
+for (const [name, expected] of Object.entries(patch52Approved)) {
+  if (approved[name] !== expected) fail(`Active RankTiger lock does not preserve Patch 5.2 checksum: ${name}`);
+}
+const expectedNewMigrations = [
+  '20260814010000_draft_first_image_content_repair_workflow.sql',
+  '20260816010000_phase4a_safety_efficiency_v1.sql',
+  '20260817010000_phase4a_facet_performance_fix.sql',
+  '20260825010000_content_repair_integrity_gate.sql',
+  '20260826212517_admin_task_inbox_published_image_queue.sql',
+];
+const addedMigrations = approvedNames.filter((name) => !(name in patch52Approved));
+if (JSON.stringify(addedMigrations) !== JSON.stringify(expectedNewMigrations)) {
+  fail(`Active RankTiger lock must add exactly the five reviewed migrations; found: ${addedMigrations.join(', ')}`);
 }
 
 // The prerequisite must run immediately before the locked Phase 3E topic migration.
@@ -148,9 +206,12 @@ for (const pattern of forbiddenCatalogueTerms) {
 }
 
 if (process.exitCode) process.exit();
-console.log('PASS: Patch 5.2 RankTiger PROD database initialization is migration-only; production seed execution is forbidden.');
+console.log('PASS: RankTiger PROD database initialization is migration-only; production seed execution is forbidden.');
+console.log('PASS: Remote migration history is parsed from the remote column, must be an approved subset before write, and must exactly match after write.');
 console.log('PASS: 18 historical migrations remain unchanged.');
+console.log('PASS: 20-migration Patch 5.2 historical lock remains unchanged and is preserved by the active lock.');
 console.log('PASS: Fresh-environment catalogue parent prerequisite sorts immediately before the locked Phase 3E topic migration.');
-console.log('PASS: 20 approved migrations are checksum-locked for RankTiger PROD.');
+console.log('PASS: 25 approved migrations exactly match the source set and are checksum-locked for RankTiger PROD.');
+console.log(`PASS: reviewed promotion additions: ${addedMigrations.join(', ')}`);
 console.log(`PASS: prerequisite targets only: ${[...new Set(prereqTargets)].sort().join(', ')}`);
 console.log(`PASS: versioned catalogue baseline targets only: ${[...new Set(insertTargets)].sort().join(', ')}`);
