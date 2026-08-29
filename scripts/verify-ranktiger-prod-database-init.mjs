@@ -60,7 +60,7 @@ const requiredWorkflowFragments = [
   'supabase migration list --linked | tee /tmp/ranktiger-migrations-after.txt',
   'ranktiger-release.config.json',
   'requiredMigrationLockFile',
-  "line.split('|')[1]",
+  "line.split(/[|│]/)[1]?.match(/\\d{14}/)?.[0]",
   'Unapproved remote migration versions detected before deploy',
   'Missing remote migration versions after deploy',
   'Unapproved remote migration versions detected after deploy',

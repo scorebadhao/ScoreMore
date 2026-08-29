@@ -125,7 +125,7 @@ jobs:
           const lockedVersions = new Set(names.map((name) => name.split('_', 1)[0]));
           const remoteVersions = new Set(output
             .split(/\r?\n/)
-            .map((line) => line.split('|')[1]?.trim())
+            .map((line) => line.split(/[|│]/)[1]?.match(/\d{14}/)?.[0])
             .filter((version) => /^\d{14}$/.test(version)));
           const unknown = [...remoteVersions].filter((version) => !lockedVersions.has(version));
           if (locked.migration_count !== policy.requiredMigrationCount || names.length !== policy.requiredMigrationCount) {
@@ -163,7 +163,7 @@ jobs:
           const lockedVersions = new Set(names.map((name) => name.split('_', 1)[0]));
           const remoteVersions = new Set(output
             .split(/\r?\n/)
-            .map((line) => line.split('|')[1]?.trim())
+            .map((line) => line.split(/[|│]/)[1]?.match(/\d{14}/)?.[0])
             .filter((version) => /^\d{14}$/.test(version)));
           if (locked.migration_count !== policy.requiredMigrationCount || names.length !== policy.requiredMigrationCount) {
             console.error('Migration lock metadata does not match the release policy.');
