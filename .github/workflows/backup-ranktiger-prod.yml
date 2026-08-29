@@ -25,7 +25,6 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.RANKTIGER_SUPABASE_DB_PASSWORD }}
       RANKTIGER_SUPABASE_PROJECT_ID: ${{ secrets.RANKTIGER_SUPABASE_PROJECT_ID }}
       RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
-      BACKUP_ROOT: ${{ runner.temp }}/ranktiger-prod-backup
 
     steps:
       - name: Read-only production safety gate
@@ -138,6 +137,8 @@ jobs:
 
       - name: Export official Supabase logical backup — READ ONLY
         shell: bash
+        env:
+          BACKUP_ROOT: ${{ runner.temp }}/ranktiger-prod-backup
         run: |
           umask 077
           PLAIN_DIR="$BACKUP_ROOT/plain"
@@ -150,6 +151,8 @@ jobs:
 
       - name: Validate and package plaintext backup
         shell: bash
+        env:
+          BACKUP_ROOT: ${{ runner.temp }}/ranktiger-prod-backup
         run: |
           umask 077
           PLAIN_DIR="$BACKUP_ROOT/plain"
@@ -185,6 +188,8 @@ jobs:
 
       - name: Encrypt backup before artifact creation
         shell: bash
+        env:
+          BACKUP_ROOT: ${{ runner.temp }}/ranktiger-prod-backup
         run: |
           umask 077
           ENCRYPTED_DIR="$BACKUP_ROOT/encrypted"
@@ -207,6 +212,8 @@ jobs:
 
       - name: Remove plaintext before artifact upload
         shell: bash
+        env:
+          BACKUP_ROOT: ${{ runner.temp }}/ranktiger-prod-backup
         run: |
           if [ "$BACKUP_ROOT" != "$RUNNER_TEMP/ranktiger-prod-backup" ]; then
             echo "Blocked: unexpected backup work directory."
@@ -231,6 +238,8 @@ jobs:
       - name: Clean runner backup workspace
         if: always()
         shell: bash
+        env:
+          BACKUP_ROOT: ${{ runner.temp }}/ranktiger-prod-backup
         run: |
           if [ "$BACKUP_ROOT" = "$RUNNER_TEMP/ranktiger-prod-backup" ] && [ -d "$BACKUP_ROOT" ]; then
             find "$BACKUP_ROOT" -type f -exec shred -u {} + 2>/dev/null || true

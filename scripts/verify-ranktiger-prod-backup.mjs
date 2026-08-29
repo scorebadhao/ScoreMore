@@ -67,6 +67,12 @@ const requiredWorkflowFragments = [
 for (const fragment of requiredWorkflowFragments) {
   if (!workflow.includes(fragment)) fail(`Backup workflow is missing required safety fragment: ${fragment}`);
 }
+if (/^      BACKUP_ROOT:/m.test(workflow)) {
+  fail('runner.temp cannot be referenced from job-level env; BACKUP_ROOT must be step-scoped.');
+}
+if ((workflow.match(/BACKUP_ROOT: \$\{\{ runner\.temp \}\}\/ranktiger-prod-backup/g) || []).length !== 5) {
+  fail('Exactly five plaintext/encryption/cleanup steps must receive the guarded runner temp path.');
+}
 
 const forbiddenWorkflowPatterns = [
   /supabase\s+db\s+(push|reset|pull)/i,
