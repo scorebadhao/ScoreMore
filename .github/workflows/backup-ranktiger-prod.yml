@@ -120,7 +120,7 @@ jobs:
           const expected = new Set(Object.keys(locked.migrations || {}).map((name) => name.split('_', 1)[0]));
           const remote = new Set(output
             .split(/\r?\n/)
-            .map((line) => line.split(/[|│]/)[1]?.trim())
+            .map((line) => line.split(/[|│]/)[1]?.match(/\d{14}/)?.[0])
             .filter((version) => /^\d{14}$/.test(version)));
           const missing = [...expected].filter((version) => !remote.has(version));
           const unexpected = [...remote].filter((version) => !expected.has(version));

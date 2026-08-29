@@ -48,6 +48,7 @@ const requiredWorkflowFragments = [
   'version: 2.111.0',
   'supabase migration list --linked',
   'docs/LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json',
+  'match(/\d{14}/)?.[0]',
   'remote.size !== 20',
   'supabase db dump --linked --file "$PLAIN_DIR/roles.sql" --role-only',
   'supabase db dump --linked --file "$PLAIN_DIR/schema.sql"',
