@@ -116,7 +116,10 @@ for (const workflowName of ['promote-ranktiger-rc.yml', 'promote-ranktiger-stabl
 const pkg = JSON.parse(await readFile(resolve(ROOT, 'package.json'), 'utf8'));
 pass(pkg.scripts?.['verify:dependency-lock'] === 'node scripts/verify-dependency-lock.mjs', 'verify:dependency-lock script is missing.');
 pass(pkg.scripts?.['verify:ranktiger-rc'] === 'node scripts/verify-ranktiger-release-candidate.mjs', 'verify:ranktiger-rc script is missing.');
-pass(pkg.scripts?.['verify:patch6'] === 'npm run verify:patch5 && npm run verify:ranktiger-rc && npm run verify:dependency-lock', 'verify:patch6 must include Patch 5 + RC structure + dependency lock.');
+pass(
+  pkg.scripts?.['verify:patch6'] === 'npm run verify:patch5 && npm run verify:ranktiger-rc && npm run verify:dependency-lock && npm run verify:ranktiger-backup',
+  'verify:patch6 must include Patch 5 + RC structure + dependency lock + RankTiger backup safety.',
+);
 
 if (problems.length) {
   console.error('PATCH 6 RELEASE-CANDIDATE VERIFICATION FAILED');

@@ -1,0 +1,249 @@
+name: Backup RankTiger PROD Database — READ ONLY
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type BACKUP_RANKTIGER_PROD exactly. This reads RankTiger PROD and uploads only an encrypted logical backup. It applies no migrations and deploys nothing.'
+        required: true
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ranktiger-prod-database-deploy
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.RANKTIGER_SUPABASE_DB_PASSWORD }}
+      RANKTIGER_SUPABASE_PROJECT_ID: ${{ secrets.RANKTIGER_SUPABASE_PROJECT_ID }}
+      RANKTIGER_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
+      BACKUP_ROOT: ${{ runner.temp }}/ranktiger-prod-backup
+
+    steps:
+      - name: Read-only production safety gate
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$CONFIRMATION" != "BACKUP_RANKTIGER_PROD" ]; then
+            echo "Blocked: confirmation must be BACKUP_RANKTIGER_PROD"
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Blocked: the backup workflow must run from ScoreMore main."
+            exit 1
+          fi
+          echo "Explicit RankTiger PROD read-only backup confirmation accepted."
+
+      - name: Checkout approved ScoreMore source
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js for authenticated encryption
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify backup workflow, certificate, and encryption code
+        run: node scripts/verify-ranktiger-prod-backup.mjs
+
+      - name: Require RankTiger PROD read credentials
+        shell: bash
+        run: |
+          missing=0
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD RANKTIGER_SUPABASE_PROJECT_ID RANKTIGER_SUPABASE_URL; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required GitHub secret/environment value: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Guard against ScoreMore DEV target
+        shell: bash
+        run: |
+          SCOREMORE_DEV_PROJECT_ID="stejewkuikvqpqotjnnt"
+          if [ "$RANKTIGER_SUPABASE_PROJECT_ID" = "$SCOREMORE_DEV_PROJECT_ID" ]; then
+            echo "Blocked: RankTiger PROD project ID matches ScoreMore DEV."
+            exit 1
+          fi
+
+      - name: Cross-check RankTiger URL and project ID
+        shell: bash
+        run: |
+          EXPECTED_URL="https://${RANKTIGER_SUPABASE_PROJECT_ID}.supabase.co"
+          ACTUAL_URL="${RANKTIGER_SUPABASE_URL%/}"
+          if [ "$ACTUAL_URL" != "$EXPECTED_URL" ]; then
+            echo "Blocked: RankTiger project URL does not match the RankTiger project ID."
+            exit 1
+          fi
+          echo "RankTiger project URL and project ID match."
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.111.0
+          github-token: ${{ github.token }}
+
+      - name: Verify access token can see RankTiger PROD
+        shell: bash
+        run: |
+          supabase projects list > "$RUNNER_TEMP/ranktiger-projects.txt"
+          if ! grep -Fq "$RANKTIGER_SUPABASE_PROJECT_ID" "$RUNNER_TEMP/ranktiger-projects.txt"; then
+            echo "Blocked: configured Supabase access token cannot see RankTiger PROD."
+            exit 1
+          fi
+
+      - name: Link only RankTiger PROD
+        shell: bash
+        run: supabase link --project-ref "$RANKTIGER_SUPABASE_PROJECT_ID"
+
+      - name: Capture current migration status — NO WRITE
+        shell: bash
+        run: supabase migration list --linked | tee "$RUNNER_TEMP/ranktiger-migrations-before-backup.txt"
+
+      - name: Require exact 20-migration pre-promotion baseline — NO WRITE
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const locked = JSON.parse(fs.readFileSync('docs/LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json', 'utf8'));
+          const output = fs.readFileSync(process.env.RUNNER_TEMP + '/ranktiger-migrations-before-backup.txt', 'utf8');
+          const expected = new Set(Object.keys(locked.migrations || {}).map((name) => name.split('_', 1)[0]));
+          const remote = new Set(output
+            .split(/\r?\n/)
+            .map((line) => line.split(/[|│]/)[1]?.trim())
+            .filter((version) => /^\d{14}$/.test(version)));
+          const missing = [...expected].filter((version) => !remote.has(version));
+          const unexpected = [...remote].filter((version) => !expected.has(version));
+          if (locked.migration_count !== 20 || expected.size !== 20) {
+            console.error('The immutable pre-promotion migration lock must contain exactly 20 migrations.');
+            process.exit(1);
+          }
+          if (missing.length || unexpected.length || remote.size !== 20) {
+            console.error(`Blocked: RankTiger PROD is not at the exact 20-migration pre-promotion baseline. Missing: ${missing.join(', ') || 'none'}. Unexpected: ${unexpected.join(', ') || 'none'}.`);
+            process.exit(1);
+          }
+          console.log('Verified exact 20-migration RankTiger PROD pre-promotion baseline.');
+          NODE
+
+      - name: Export official Supabase logical backup — READ ONLY
+        shell: bash
+        run: |
+          umask 077
+          PLAIN_DIR="$BACKUP_ROOT/plain"
+          mkdir -p "$PLAIN_DIR"
+          supabase db dump --linked --file "$PLAIN_DIR/roles.sql" --role-only
+          supabase db dump --linked --file "$PLAIN_DIR/schema.sql"
+          supabase db dump --linked --file "$PLAIN_DIR/data.sql" --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+          supabase db dump --linked --file "$PLAIN_DIR/migration-history-schema.sql" --schema supabase_migrations
+          supabase db dump --linked --file "$PLAIN_DIR/migration-history-data.sql" --use-copy --data-only --schema supabase_migrations
+
+      - name: Validate and package plaintext backup
+        shell: bash
+        run: |
+          umask 077
+          PLAIN_DIR="$BACKUP_ROOT/plain"
+          for file in roles.sql schema.sql data.sql migration-history-schema.sql migration-history-data.sql; do
+            if [ ! -s "$PLAIN_DIR/$file" ]; then
+              echo "Backup validation failed: $file is missing or empty."
+              exit 1
+            fi
+          done
+          cp docs/RANKTIGER_PROD_ENCRYPTED_BACKUP.md "$PLAIN_DIR/RESTORE_GUIDE.md"
+          (
+            cd "$PLAIN_DIR"
+            sha256sum roles.sql schema.sql data.sql migration-history-schema.sql migration-history-data.sql RESTORE_GUIDE.md > checksums.sha256
+          )
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const plainDir = path.join(process.env.BACKUP_ROOT, 'plain');
+          const files = ['roles.sql', 'schema.sql', 'data.sql', 'migration-history-schema.sql', 'migration-history-data.sql'];
+          const manifest = {
+            format: 'ranktiger-prod-supabase-logical-backup-v1',
+            target: 'RankTiger PROD',
+            baseline: '20 locked migrations before 25-migration promotion',
+            source_commit: process.env.GITHUB_SHA,
+            workflow_run_id: process.env.GITHUB_RUN_ID,
+            created_at_utc: new Date().toISOString(),
+            files: Object.fromEntries(files.map((name) => [name, fs.statSync(path.join(plainDir, name)).size])),
+            exclusions: ['storage object bytes', 'Vault secrets', 'Edge Function source', 'project Auth configuration'],
+          };
+          fs.writeFileSync(path.join(plainDir, 'backup-manifest.json'), JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+          NODE
+          tar -C "$PLAIN_DIR" -czf "$BACKUP_ROOT/ranktiger-prod-logical-backup.tar.gz" .
+
+      - name: Encrypt backup before artifact creation
+        shell: bash
+        run: |
+          umask 077
+          ENCRYPTED_DIR="$BACKUP_ROOT/encrypted"
+          mkdir -p "$ENCRYPTED_DIR"
+          node scripts/encrypt-ranktiger-backup.mjs \
+            --input "$BACKUP_ROOT/ranktiger-prod-logical-backup.tar.gz" \
+            --certificate .github/backup-keys/ranktiger-prod-backup-recovery.crt \
+            --ciphertext "$ENCRYPTED_DIR/ranktiger-prod-backup.enc" \
+            --manifest "$ENCRYPTED_DIR/encryption-manifest.json"
+          printf '%s\n' \
+            'RankTiger PROD encrypted logical database backup.' \
+            'Decrypt only with the separately stored private recovery kit.' \
+            'The GitHub artifact intentionally contains no plaintext SQL and no private key.' \
+            'See docs/RANKTIGER_PROD_ENCRYPTED_BACKUP.md in ScoreMore for recovery instructions.' \
+            > "$ENCRYPTED_DIR/README.txt"
+          (
+            cd "$ENCRYPTED_DIR"
+            sha256sum ranktiger-prod-backup.enc encryption-manifest.json README.txt > encrypted-checksums.sha256
+          )
+
+      - name: Remove plaintext before artifact upload
+        shell: bash
+        run: |
+          if [ "$BACKUP_ROOT" != "$RUNNER_TEMP/ranktiger-prod-backup" ]; then
+            echo "Blocked: unexpected backup work directory."
+            exit 1
+          fi
+          find "$BACKUP_ROOT/plain" -type f -exec shred -u {} + 2>/dev/null || true
+          rm -rf "$BACKUP_ROOT/plain"
+          shred -u "$BACKUP_ROOT/ranktiger-prod-logical-backup.tar.gz" 2>/dev/null || rm -f "$BACKUP_ROOT/ranktiger-prod-logical-backup.tar.gz"
+          if find "$BACKUP_ROOT/encrypted" -type f ! -name 'ranktiger-prod-backup.enc' ! -name 'encryption-manifest.json' ! -name 'README.txt' ! -name 'encrypted-checksums.sha256' | grep -q .; then
+            echo "Blocked: unexpected file in encrypted artifact directory."
+            exit 1
+          fi
+
+      - name: Upload encrypted backup artifact only
+        uses: actions/upload-artifact@v4
+        with:
+          name: ranktiger-prod-encrypted-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/ranktiger-prod-backup/encrypted/
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Clean runner backup workspace
+        if: always()
+        shell: bash
+        run: |
+          if [ "$BACKUP_ROOT" = "$RUNNER_TEMP/ranktiger-prod-backup" ] && [ -d "$BACKUP_ROOT" ]; then
+            find "$BACKUP_ROOT" -type f -exec shred -u {} + 2>/dev/null || true
+            rm -rf "$BACKUP_ROOT"
+          fi
+
+      - name: Backup completed without production changes
+        shell: bash
+        run: |
+          echo "RankTiger PROD encrypted logical backup PASSED."
+          echo "Database migrations applied: NO"
+          echo "Seed executed: NO"
+          echo "RankTiger frontend deployed: NO"
+          echo "RankTiger GitHub repository updated: NO"
+          echo "Cloudflare deployment triggered: NO"
+          echo "Artifact retention: 1 day"
