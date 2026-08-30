@@ -1,5 +1,6 @@
 import { APP_CONFIG, isConfigured, resolvePublicSettings } from './config.js';
 import { api } from './api.js';
+import { assertPasswordPolicy, PASSWORD_POLICY_MESSAGE } from './passwordPolicy.js';
 import { navigate, startRouter, subscribeRoute } from './router.js';
 import { mountTestEngine } from './testEngine.js';
 import { toast } from './toast.js';
@@ -28,6 +29,8 @@ let testFacets = null;
 let unmountTestEngine = null;
 let routeSequence = 0;
 let searchTimer = null;
+let requiresOnboarding = false;
+let onboardingNoticeShown = false;
 
 const testFilters = {
   testType: '', search: '', subjectId: '', topicId: '', examYear: '', examDate: '',
@@ -325,6 +328,11 @@ function clearTestFilters() {
 }
 
 async function startAttempt(testId) {
+  if (requiresOnboarding) {
+    toast.info('Complete your student profile before starting a test.');
+    navigate('profile');
+    return;
+  }
   const loading = toast.loading('Preparing your test…');
   try {
     const attempt = await api.createOrResumeAttempt(testId);
@@ -498,20 +506,31 @@ function renderProfile(data) {
   const stats = data.stats || {};
   const boards = data.boards || [];
   const exams = data.exams || [];
+  requiresOnboarding = !profile.mobile;
   const language = profile.language || 'GUJARATI';
   const languageOptions = [...new Set(['GUJARATI', 'ENGLISH', language])];
+  const identityProviders = Array.isArray(currentUser?.app_metadata?.providers)
+    ? currentUser.app_metadata.providers
+    : [currentUser?.app_metadata?.provider].filter(Boolean);
+  const hasPasswordIdentity = identityProviders.includes('email');
+  const onboardingNotice = requiresOnboarding ? `<div class="notice notice-warning onboarding-notice" role="status"><strong>Finish student setup</strong><span>Google sign in is connected. Add your mobile number and learning preferences before using tests or saved progress.</span></div>` : '';
+  const mobileField = requiresOnboarding
+    ? '<label><span>Mobile number (+91)</span><input id="profileMobile" type="tel" inputmode="numeric" autocomplete="tel-national" pattern="[6-9][0-9]{9}" minlength="10" maxlength="10" placeholder="10-digit mobile number" required /></label>'
+    : '';
+  const passwordCard = hasPasswordIdentity ? `<form id="passwordForm" class="profile-form card" autocomplete="off"><div class="section-heading compact"><div><span class="eyebrow">Account security</span><h2>Change password</h2><p>Use a unique password that you do not reuse on other sites.</p></div><svg class="icon"><use href="#i-lock"></use></svg></div>
+      <div class="form-grid"><label><span>Current password</span><input id="currentPassword" type="password" autocomplete="current-password" required /></label><label><span>New password</span><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required /></label><label><span>Confirm new password</span><input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required /></label></div>
+      <div class="protected-fields"><p><svg class="icon"><use href="#i-lock"></use></svg>${PASSWORD_POLICY_MESSAGE}</p></div>
+      <div class="button-row"><button class="button button-primary" type="submit">Change password</button></div>
+    </form>` : `<article class="profile-form card"><div class="section-heading compact"><div><span class="eyebrow">Account security</span><h2>Google sign in</h2><p>Your Google account is your current sign-in method.</p></div><svg class="icon"><use href="#i-lock"></use></svg></div><div class="protected-fields"><p>To add an email-password fallback, sign out and use <strong>Forgot password</strong> with this verified email.</p></div></article>`;
   elements.profileContent.innerHTML = `<article class="profile-card card"><div class="profile-avatar">${escapeHtml((profile.full_name || 'S').trim().charAt(0).toUpperCase())}</div><div><span class="eyebrow">Student account</span><h2>${escapeHtml(profile.full_name || 'Student')}</h2><p>${escapeHtml(profile.target_exam_name || 'Choose your target exam')}</p><span class="profile-status">${escapeHtml(profile.status || 'ACTIVE')}</span></div></article>
     <div class="profile-stat-grid"><article><strong>${stats.completed_attempts || 0}</strong><span>Completed</span></article><article><strong>${formatNumber(stats.average_accuracy)}%</strong><span>Accuracy</span></article><article><strong>${stats.bookmarks || 0}</strong><span>Bookmarks</span></article><article><strong>${stats.open_mistakes || 0}</strong><span>Open mistakes</span></article></div>
-    <form id="profileForm" class="profile-form card"><div class="section-heading compact"><div><span class="eyebrow">Learning preferences</span><h2>Edit profile</h2></div><svg class="icon"><use href="#i-edit"></use></svg></div>
-      <div class="form-grid"><label><span>Full name</span><input id="profileFullName" name="full_name" value="${escapeHtml(profile.full_name || '')}" minlength="2" maxlength="100" required /></label><label><span>Preferred language</span><select id="profileLanguage" name="language">${languageOptions.map((value) => `<option value="${escapeHtml(value)}" ${value === language ? 'selected' : ''}>${escapeHtml(value[0] + value.slice(1).toLowerCase())}</option>`).join('')}</select></label><label><span>Target board</span><select id="profileBoard" name="target_board_id"><option value="">Choose board</option>${boards.map((board) => `<option value="${escapeHtml(board.board_id)}" ${board.board_id === profile.target_board_id ? 'selected' : ''}>${escapeHtml(board.board_name)}</option>`).join('')}</select></label><label><span>Target exam</span><select id="profileExam" name="target_exam_id"></select></label></div>
-      <div class="protected-fields"><label><span>Verified email</span><input value="${escapeHtml(profile.email || '')}" readonly /></label><label><span>Registered mobile</span><input value="${escapeHtml(profile.mobile || '')}" readonly /></label><p><svg class="icon"><use href="#i-lock"></use></svg>Email, mobile, role and account authorization cannot be changed here.</p></div>
-      <div class="button-row"><button class="button button-primary" type="submit">Save profile</button><button id="profileSignOut" class="button button-ghost" type="button">Sign out</button></div>
+    ${onboardingNotice}
+    <form id="profileForm" class="profile-form card"><div class="section-heading compact"><div><span class="eyebrow">Learning preferences</span><h2>${requiresOnboarding ? 'Complete profile' : 'Edit profile'}</h2></div><svg class="icon"><use href="#i-edit"></use></svg></div>
+      <div class="form-grid"><label><span>Full name</span><input id="profileFullName" name="full_name" value="${escapeHtml(profile.full_name || '')}" minlength="2" maxlength="100" required /></label>${mobileField}<label><span>Preferred language</span><select id="profileLanguage" name="language">${languageOptions.map((value) => `<option value="${escapeHtml(value)}" ${value === language ? 'selected' : ''}>${escapeHtml(value[0] + value.slice(1).toLowerCase())}</option>`).join('')}</select></label><label><span>Target board</span><select id="profileBoard" name="target_board_id" ${requiresOnboarding ? 'required' : ''}><option value="">Choose board</option>${boards.map((board) => `<option value="${escapeHtml(board.board_id)}" ${board.board_id === profile.target_board_id ? 'selected' : ''}>${escapeHtml(board.board_name)}</option>`).join('')}</select></label><label><span>Target exam</span><select id="profileExam" name="target_exam_id" ${requiresOnboarding ? 'required' : ''}></select></label></div>
+      <div class="protected-fields"><label><span>Verified email</span><input value="${escapeHtml(profile.email || '')}" readonly /></label>${requiresOnboarding ? '' : `<label><span>Registered mobile</span><input value="${escapeHtml(profile.mobile || '')}" readonly /></label>`}<p><svg class="icon"><use href="#i-lock"></use></svg>Email, role and account authorization cannot be changed here.${requiresOnboarding ? ' Your mobile becomes read-only after setup.' : ''}</p></div>
+      <div class="button-row"><button class="button button-primary" type="submit">${requiresOnboarding ? 'Finish setup' : 'Save profile'}</button><button id="profileSignOut" class="button button-ghost" type="button">Sign out</button></div>
     </form>
-    <form id="passwordForm" class="profile-form card" autocomplete="off"><div class="section-heading compact"><div><span class="eyebrow">Account security</span><h2>Change password</h2><p>Use a unique password that you do not reuse on other sites.</p></div><svg class="icon"><use href="#i-lock"></use></svg></div>
-      <div class="form-grid"><label><span>Current password</span><input id="currentPassword" type="password" autocomplete="current-password" required /></label><label><span>New password</span><input id="newPassword" type="password" autocomplete="new-password" minlength="12" required /></label><label><span>Confirm new password</span><input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" required /></label></div>
-      <div class="protected-fields"><p><svg class="icon"><use href="#i-lock"></use></svg>Use at least 12 characters. A password manager-generated password is recommended.</p></div>
-      <div class="button-row"><button class="button button-primary" type="submit">Change password</button></div>
-    </form>`;
+    ${passwordCard}`;
   const boardSelect = input('profileBoard');
   const examSelect = input('profileExam');
   const syncExamOptions = () => {
@@ -522,32 +541,33 @@ function renderProfile(data) {
   boardSelect.addEventListener('change', () => { profile.target_exam_id = ''; syncExamOptions(); });
   input('profileForm').addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!event.currentTarget.reportValidity()) return;
     const submit = event.currentTarget.querySelector('[type="submit"]');
     submit.disabled = true;
     try {
-      const updated = await api.updateStudentProfile({ fullName: input('profileFullName').value, language: input('profileLanguage').value, targetBoardId: boardSelect.value, targetExamId: examSelect.value });
-      toast.success('Profile updated.');
+      const payload = { fullName: input('profileFullName').value, language: input('profileLanguage').value, targetBoardId: boardSelect.value, targetExamId: examSelect.value };
+      const updated = requiresOnboarding
+        ? await api.completeStudentOnboarding({ ...payload, mobile: input('profileMobile').value })
+        : await api.updateStudentProfile(payload);
+      requiresOnboarding = !updated?.profile?.mobile;
+      toast.success(requiresOnboarding ? 'Profile updated.' : 'Student profile saved.');
       renderProfile(updated);
       await loadHome({ refresh: true });
     } catch (error) { submit.disabled = false; toast.error(error.message); }
   });
-  input('passwordForm').addEventListener('submit', async (event) => {
+  input('passwordForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const submit = event.currentTarget.querySelector('[type="submit"]');
     const currentPassword = input('currentPassword').value;
     const newPassword = input('newPassword').value;
     const confirmPassword = input('confirmPassword').value;
 
-    if (newPassword !== confirmPassword) {
-      toast.error('New password and confirmation do not match.');
-      return;
-    }
-    if (newPassword.length < 12) {
-      toast.error('Use at least 12 characters for the new password.');
-      return;
-    }
-    if (newPassword === currentPassword) {
-      toast.error('Choose a new password different from your current password.');
+    try {
+      assertPasswordPolicy(newPassword);
+      if (newPassword !== confirmPassword) throw new Error('New password and confirmation do not match.');
+      if (newPassword === currentPassword) throw new Error('Choose a new password different from your current password.');
+    } catch (error) {
+      toast.error(error.message);
       return;
     }
 
@@ -591,6 +611,14 @@ async function handleRoute(route) {
   const navPath = route.path === 'result' ? 'results' : route.path;
   document.querySelectorAll('#mobileNav [data-route]').forEach((button) => button.classList.toggle('active', button.dataset.route === `#${navPath}`));
   if (!currentUser) return;
+  if (requiresOnboarding && route.path !== 'profile') {
+    if (!onboardingNoticeShown) {
+      onboardingNoticeShown = true;
+      toast.info('Complete your student setup to continue.');
+    }
+    navigate('profile');
+    return;
+  }
 
   if (route.path !== 'attempt' && unmountTestEngine) {
     unmountTestEngine();
@@ -691,9 +719,10 @@ async function initialize() {
   try {
     currentUser = await api.getUser();
     if (!currentUser) return redirectToLanding('signin');
-    const [, home, facets] = await Promise.all([loadBrand(), api.getStudentHome(), api.getStudentTestFacets()]);
+    const [, home, facets, profileData] = await Promise.all([loadBrand(), api.getStudentHome(), api.getStudentTestFacets(), api.getStudentProfile()]);
     homeData = home;
     testFacets = facets;
+    requiresOnboarding = !profileData?.profile?.mobile;
     elements.studentLoading.classList.add('hidden');
     elements.studentView.classList.remove('hidden');
     elements.mobileNav.classList.remove('hidden');
@@ -702,7 +731,7 @@ async function initialize() {
     api.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') redirectToLanding('signin'); });
     startRouter();
     const pendingTestId = sessionStorage.getItem(PENDING_TEST_KEY);
-    if (pendingTestId) { sessionStorage.removeItem(PENDING_TEST_KEY); await startAttempt(pendingTestId); }
+    if (pendingTestId && !requiresOnboarding) { sessionStorage.removeItem(PENDING_TEST_KEY); await startAttempt(pendingTestId); }
   } catch (error) {
     toast.error(error.message);
     redirectToLanding('signin');

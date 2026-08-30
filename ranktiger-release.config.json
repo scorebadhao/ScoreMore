@@ -12,9 +12,9 @@
   "releaseStatus": "candidate",
   "productionDeployEnabled": false,
   "productionDatabaseMigrationEnabled": false,
-  "notes": "RankTiger 25-migration promotion-readiness policy. A candidate may be built only from a committed dependency lock, the immutable approved migration checksum set, and RankTiger PROD browser-safe values. It remains artifact-only: no RankTiger repository push, no production database migration, and no Cloudflare/domain deployment.",
+  "notes": "RankTiger 26-migration authentication-foundation promotion-readiness policy. A candidate may be built only from a committed dependency lock, the immutable approved migration checksum set, and RankTiger PROD browser-safe values. It remains artifact-only: no RankTiger repository push, no production database migration, and no Cloudflare/domain deployment.",
   "dependencyLockRequired": true,
-  "requiredMigrationLockFile": "docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json",
-  "requiredMigrationCount": 25,
+  "requiredMigrationLockFile": "docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_26.json",
+  "requiredMigrationCount": 26,
   "firstCandidateVersion": "1.0.0-rc.1"
 }

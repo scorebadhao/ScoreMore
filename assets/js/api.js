@@ -1,4 +1,5 @@
 import { APP_CONFIG, brandRuntimeText } from './config.js';
+import { assertPasswordPolicy } from './passwordPolicy.js';
 import { requireSupabase } from './supabaseClient.js';
 
 function normalizeError(error, fallback = 'Something went wrong.') {
@@ -158,6 +159,22 @@ async function getProfileForUser(userId) {
   return response?.data || null;
 }
 
+async function getMfaStatus() {
+  const client = requireSupabase();
+  const [assurance, factors] = await Promise.all([
+    withTimeout(client.auth.mfa.getAuthenticatorAssuranceLevel()),
+    withTimeout(client.auth.mfa.listFactors()),
+  ]);
+  const assuranceData = unwrap(assurance, 'Unable to verify multi-factor assurance.') || {};
+  const factorData = unwrap(factors, 'Unable to load verification methods.') || {};
+  const verifiedTotp = (factorData.totp || []).filter((factor) => factor.status === 'verified');
+  return {
+    currentLevel: assuranceData.currentLevel || 'aal1',
+    nextLevel: assuranceData.nextLevel || assuranceData.currentLevel || 'aal1',
+    verifiedTotp,
+  };
+}
+
 async function getAdminContext({ attempts = 2, retryDelayMs = 350 } = {}) {
   const client = requireSupabase();
   const maxAttempts = Math.max(1, Number(attempts) || 1);
@@ -183,7 +200,12 @@ async function getAdminContext({ attempts = 2, retryDelayMs = 350 } = {}) {
         return { status: 'UNAUTHORIZED', user, profile };
       }
 
-      return { status: 'AUTHORIZED', user, profile };
+      const mfa = await getMfaStatus();
+      if (mfa.verifiedTotp.length && mfa.currentLevel !== 'aal2') {
+        return { status: 'MFA_REQUIRED', user, profile, mfa };
+      }
+
+      return { status: 'AUTHORIZED', user, profile, mfa };
     } catch (error) {
       lastError = error;
       if (attempt < maxAttempts) {
@@ -196,14 +218,31 @@ async function getAdminContext({ attempts = 2, retryDelayMs = 350 } = {}) {
 }
 
 export const api = Object.freeze({
-  async signUp({ fullName, mobile, email, password }) {
+  async getAuthCapabilities() {
+    if (!APP_CONFIG.supabaseUrl || !APP_CONFIG.supabasePublishableKey) {
+      return { google: false };
+    }
+
+    const response = await withTimeout(fetch(`${APP_CONFIG.supabaseUrl.replace(/\/+$/, '')}/auth/v1/settings`, {
+      method: 'GET',
+      headers: { apikey: APP_CONFIG.supabasePublishableKey },
+      cache: 'no-store',
+    }));
+    if (!response.ok) throw new Error('Unable to load available sign-in methods.');
+    const settings = await response.json();
+    return { google: Boolean(settings?.external?.google) };
+  },
+
+  async signUp({ fullName, mobile, email, password, captchaToken }) {
     const client = requireSupabase();
     const normalizedMobile = normalizeIndianMobile(mobile);
+    assertPasswordPolicy(password);
     const data = unwrap(await withTimeout(client.auth.signUp({
       email: clean(email),
       password,
       options: {
         emailRedirectTo: new URL('./student.html', window.location.href).href,
+        ...(captchaToken ? { captchaToken } : {}),
         data: {
           full_name: clean(fullName),
           mobile: normalizedMobile,
@@ -213,12 +252,46 @@ export const api = Object.freeze({
     return data;
   },
 
-  async signIn({ email, password }) {
+  async signIn({ email, password, captchaToken }) {
     const client = requireSupabase();
     return unwrap(await withTimeout(client.auth.signInWithPassword({
       email: clean(email),
       password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
     })), 'Unable to sign in.');
+  },
+
+  async signInWithGoogle() {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: new URL('./student.html?auth=google', window.location.href).href,
+        queryParams: { prompt: 'select_account' },
+      },
+    })), 'Unable to start Google sign in.');
+  },
+
+  async requestPasswordReset({ email, captchaToken }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(client.auth.resetPasswordForEmail(clean(email), {
+      redirectTo: new URL('./reset-password.html', window.location.href).href,
+      ...(captchaToken ? { captchaToken } : {}),
+    })), 'Unable to send a password-reset email.');
+  },
+
+  async finishPasswordRecovery(newPassword) {
+    const client = requireSupabase();
+    assertPasswordPolicy(newPassword);
+    const result = unwrap(await withTimeout(client.auth.updateUser({
+      password: newPassword,
+    })), 'Unable to update password.');
+    try {
+      unwrap(await withTimeout(client.auth.signOut({ scope: 'global' })), 'Unable to end recovery session.');
+    } catch {
+      // The password is already changed. The landing page verifies the next session.
+    }
+    return result;
   },
 
   async signOut() {
@@ -232,7 +305,7 @@ export const api = Object.freeze({
     const next = typeof newPassword === 'string' ? newPassword : '';
 
     if (!current) throw new Error('Enter your current password.');
-    if (next.length < 12) throw new Error('Use at least 12 characters for the new password.');
+    assertPasswordPolicy(next);
     if (next === current) throw new Error('Choose a new password different from your current password.');
 
     const user = await getUser();
@@ -254,6 +327,33 @@ export const api = Object.freeze({
   getSession,
   getUser,
   getAdminContext,
+
+  getMfaStatus,
+
+  async enrollAdminTotp() {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(client.auth.mfa.enroll({
+      factorType: 'totp',
+      friendlyName: `${APP_CONFIG.name} Admin`,
+    })), 'Unable to start authenticator setup.');
+  },
+
+  async verifyTotp({ factorId, code }) {
+    const client = requireSupabase();
+    const normalizedCode = String(code || '').replace(/\s/g, '');
+    if (!/^\d{6}$/.test(normalizedCode)) throw new Error('Enter the 6-digit authenticator code.');
+    return unwrap(await withTimeout(client.auth.mfa.challengeAndVerify({
+      factorId: clean(factorId),
+      code: normalizedCode,
+    })), 'The authenticator code could not be verified.');
+  },
+
+  async unenrollMfaFactor(factorId) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(client.auth.mfa.unenroll({
+      factorId: clean(factorId),
+    })), 'Unable to remove the unfinished verification method.');
+  },
 
   async getAdminTaskInbox() {
     const client = requireSupabase();
@@ -415,6 +515,19 @@ export const api = Object.freeze({
         p_target_exam_id: clean(targetExamId) || null,
       }),
     ), 'Unable to update your profile.');
+  },
+
+  async completeStudentOnboarding({ fullName, mobile, language, targetBoardId, targetExamId }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('complete_student_onboarding', {
+        p_full_name: clean(fullName),
+        p_mobile: normalizeIndianMobile(mobile),
+        p_language: clean(language),
+        p_target_board_id: clean(targetBoardId) || null,
+        p_target_exam_id: clean(targetExamId) || null,
+      }),
+    ), 'Unable to complete student setup.');
   },
 
   async getPublicConfiguration() {

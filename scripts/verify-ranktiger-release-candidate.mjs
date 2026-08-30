@@ -3,8 +3,8 @@ import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const EXPECTED_MIGRATION_LOCK_FILE = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json';
-const EXPECTED_MIGRATION_COUNT = 25;
+const EXPECTED_MIGRATION_LOCK_FILE = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_26.json';
+const EXPECTED_MIGRATION_COUNT = 26;
 const problems = [];
 const pass = (condition, message) => { if (!condition) problems.push(message); };
 const sha256 = (body) => createHash('sha256').update(body).digest('hex');
@@ -17,8 +17,8 @@ pass(policy.productionRepository === 'RankTiger', 'Release policy production rep
 pass(policy.buildTarget === 'ranktiger', 'Release build target must be ranktiger.');
 pass(policy.basePath === '/', 'RankTiger production base path must be /.');
 pass(policy.dependencyLockRequired === true, 'RankTiger release candidate must require a committed dependency lock.');
-pass(policy.requiredMigrationCount === EXPECTED_MIGRATION_COUNT, 'RankTiger release policy must recognize the approved 25-migration PROD baseline.');
-pass(policy.requiredMigrationLockFile === EXPECTED_MIGRATION_LOCK_FILE, 'RankTiger release policy must use the immutable 25-migration lock.');
+pass(policy.requiredMigrationCount === EXPECTED_MIGRATION_COUNT, 'RankTiger release policy must recognize the approved 26-migration auth baseline.');
+pass(policy.requiredMigrationLockFile === EXPECTED_MIGRATION_LOCK_FILE, 'RankTiger release policy must use the immutable 26-migration lock.');
 pass(policy.productionDeployEnabled === false, 'RankTiger release candidate must not enable production deployment.');
 pass(policy.productionDatabaseMigrationEnabled === false, 'RankTiger release candidate must not migrate production database.');
 
@@ -28,9 +28,9 @@ const lockedMigrationNames = Object.keys(lockedMigrations).sort();
 const sourceMigrationNames = (await readdir(resolve(ROOT, 'supabase/migrations')))
   .filter((name) => name.endsWith('.sql'))
   .sort();
-pass(migrationLock.lock_version === 'RANKTIGER_25', 'RankTiger migration lock version must be RANKTIGER_25.');
-pass(migrationLock.migration_count === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock metadata must declare 25 migrations.');
-pass(lockedMigrationNames.length === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock must contain exactly 25 checksum entries.');
+pass(migrationLock.lock_version === 'RANKTIGER_26', 'RankTiger migration lock version must be RANKTIGER_26.');
+pass(migrationLock.migration_count === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock metadata must declare 26 migrations.');
+pass(lockedMigrationNames.length === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock must contain exactly 26 checksum entries.');
 pass(JSON.stringify(sourceMigrationNames) === JSON.stringify(lockedMigrationNames), 'Source migration files must exactly match the approved RankTiger lock.');
 for (const name of lockedMigrationNames) {
   const expected = lockedMigrations[name];
@@ -116,9 +116,10 @@ for (const workflowName of ['promote-ranktiger-rc.yml', 'promote-ranktiger-stabl
 const pkg = JSON.parse(await readFile(resolve(ROOT, 'package.json'), 'utf8'));
 pass(pkg.scripts?.['verify:dependency-lock'] === 'node scripts/verify-dependency-lock.mjs', 'verify:dependency-lock script is missing.');
 pass(pkg.scripts?.['verify:ranktiger-rc'] === 'node scripts/verify-ranktiger-release-candidate.mjs', 'verify:ranktiger-rc script is missing.');
+pass(pkg.scripts?.['verify:auth'] === 'node scripts/verify-auth-foundation.mjs', 'verify:auth script is missing.');
 pass(
-  pkg.scripts?.['verify:patch6'] === 'npm run verify:patch5 && npm run verify:ranktiger-rc && npm run verify:dependency-lock && npm run verify:ranktiger-backup',
-  'verify:patch6 must include Patch 5 + RC structure + dependency lock + RankTiger backup safety.',
+  pkg.scripts?.['verify:patch6'] === 'npm run verify:patch5 && npm run verify:ranktiger-rc && npm run verify:dependency-lock && npm run verify:ranktiger-backup && npm run verify:auth',
+  'verify:patch6 must include Patch 5 + RC structure + dependency lock + RankTiger backup safety + auth safety.',
 );
 
 if (problems.length) {
@@ -127,7 +128,7 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log('PASS: RankTiger 25-migration release-candidate machinery is candidate-only and production-safe.');
+console.log('PASS: RankTiger 26-migration release-candidate machinery is candidate-only and production-safe.');
 console.log('RankTiger repository push: DISABLED');
 console.log('RankTiger PROD database migration: DISABLED');
 console.log('Cloudflare deployment: DISABLED');

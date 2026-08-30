@@ -22,7 +22,7 @@ assert(ranktiger.appMark === 'RT', 'RankTiger target mark changed unexpectedly.'
 assert(ranktiger.base === '/', 'RankTiger target must use root base path.');
 assert(ranktiger.environment === 'production', 'RankTiger target must remain production.');
 
-const htmlFiles = ['index.html', 'student.html', 'admin.html', 'test-builder.html'];
+const htmlFiles = ['index.html', 'reset-password.html', 'student.html', 'admin.html', 'test-builder.html'];
 for (const file of htmlFiles) {
   const source = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
   assert(source.includes('__APP_NAME__'), `${file} must contain the build-time app-name placeholder.`);

@@ -42,7 +42,7 @@ jobs:
       - name: Checkout approved ScoreMore release source
         uses: actions/checkout@v6
 
-      - name: Verify guarded workflow and all 25 locked migrations locally
+      - name: Verify guarded workflow and all 26 locked migrations locally
         run: node scripts/verify-ranktiger-prod-database-init.mjs
 
       - name: Require all RankTiger PROD credentials
@@ -151,7 +151,7 @@ jobs:
         shell: bash
         run: supabase migration list --linked | tee /tmp/ranktiger-migrations-after.txt
 
-      - name: Verify all 25 approved migrations are applied remotely
+      - name: Verify all 26 approved migrations are applied remotely
         shell: bash
         run: |
           node - <<'NODE'
@@ -218,7 +218,7 @@ jobs:
         run: |
           echo "RankTiger PROD versioned migration deployment PASSED."
           echo "Target: RankTiger PROD only"
-          echo "Locked migrations verified: 25"
+          echo "Locked migrations verified: 26"
           echo "Production catalogue baseline source: VERSIONED MIGRATION"
           echo "Supabase seed executed on PROD: NO"
           echo "RankTiger frontend deployed by this workflow: NO"

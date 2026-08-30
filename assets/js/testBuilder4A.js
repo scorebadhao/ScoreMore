@@ -1,6 +1,7 @@
 import { APP_CONFIG, isConfigured } from './config.js';
 import { api } from './api.js';
 import { toast } from './toast.js';
+import { createTurnstileController } from './turnstile.js';
 
 const PAGE_SIZE = 40;
 const SINGLE_PACKAGE_MODES = new Set(['PYQ_ORIGINAL', 'PYQ_COMPLETED']);
@@ -102,6 +103,11 @@ const state = {
   filtersDirty: true,
   facetRefreshTimer: null,
 };
+
+const builderTurnstilePromise = createTurnstileController(
+  document.getElementById('builderSignInTurnstile'),
+  'admin_builder_signin',
+).catch((error) => ({ getToken() { throw error; }, reset() {} }));
 
 let builderRestorePromise = null;
 let builderSessionRecheckTimer = null;
@@ -219,6 +225,11 @@ async function showBuilder({ reloadData = true, announceSessionError = true } = 
       try { await api.signOut(); } catch {}
       showLogin();
       throw new Error(`This account is not authorized as a ${APP_CONFIG.name} admin.`);
+    }
+
+    if (context.status === 'MFA_REQUIRED') {
+      window.location.replace('./admin.html?reason=mfa&next=test-builder');
+      return false;
     }
 
     if (context.status === 'ERROR') {
@@ -1065,13 +1076,15 @@ function bindEvents() {
     const data = new FormData(elements.loginForm);
     setBusy(elements.loginForm.querySelector('button[type="submit"]'), true, 'Signing in…');
     try {
-      await api.signIn({ email: data.get('email'), password: data.get('password') });
+      const turnstile = await builderTurnstilePromise;
+      await api.signIn({ email: data.get('email'), password: data.get('password'), captchaToken: turnstile.getToken() });
       const restored = await showBuilder();
       if (restored) toast.success('Admin access verified.');
     } catch (error) {
       toast.error(error.message);
       // Keep any valid stored session intact if a follow-up request failed.
     } finally {
+      builderTurnstilePromise.then((turnstile) => turnstile.reset()).catch(() => {});
       setBusy(elements.loginForm.querySelector('button[type="submit"]'), false);
     }
   });

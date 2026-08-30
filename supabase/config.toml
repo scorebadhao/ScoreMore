@@ -27,7 +27,7 @@ file_size_limit = "50MiB"
 [auth]
 enabled = true
 site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/admin.html"]
+additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/admin.html", "http://localhost:5173/student.html", "http://localhost:5173/reset-password.html"]
 jwt_expiry = 3600
 enable_signup = true
 
@@ -35,3 +35,22 @@ enable_signup = true
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+
+[auth.email.template.recovery]
+subject = "Reset your account password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Your account password was changed"
+content_path = "./supabase/templates/password_changed_notification.html"
+
+[auth.email.notification.identity_linked]
+enabled = true
+subject = "A new sign-in method was linked"
+content_path = "./supabase/templates/identity_linked_notification.html"
+
+[auth.email.notification.mfa_factor_enrolled]
+enabled = true
+subject = "A verification method was added"
+content_path = "./supabase/templates/mfa_factor_enrolled_notification.html"

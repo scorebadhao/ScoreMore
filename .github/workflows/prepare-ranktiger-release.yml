@@ -125,6 +125,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.RANKTIGER_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.RANKTIGER_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_TURNSTILE_SITE_KEY: ${{ secrets.RANKTIGER_TURNSTILE_SITE_KEY }}
         run: npm run build:ranktiger
 
       - name: Package RankTiger candidate release

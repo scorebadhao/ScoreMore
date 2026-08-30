@@ -2,6 +2,7 @@ import { APP_CONFIG, isConfigured } from './config.js';
 import { api } from './api.js';
 import { toast } from './toast.js';
 import { downloadJson, formatBytes, parseImportHtml } from './importEngine.js';
+import { createTurnstileController } from './turnstile.js';
 
 const elements = {
   setupNotice: document.getElementById('adminSetupNotice'),
@@ -9,6 +10,9 @@ const elements = {
   sessionMessage: document.getElementById('adminSessionMessage'),
   sessionRetry: document.getElementById('adminSessionRetry'),
   loginPanel: document.getElementById('adminLoginPanel'),
+  mfaChallengePanel: document.getElementById('adminMfaChallengePanel'),
+  mfaChallengeForm: document.getElementById('adminMfaChallengeForm'),
+  mfaSignOut: document.getElementById('adminMfaSignOut'),
   adminPanel: document.getElementById('adminPanel'),
   signOut: document.getElementById('adminSignOut'),
   loginForm: document.getElementById('adminLoginForm'),
@@ -49,6 +53,10 @@ const elements = {
   dashboardPublishNext: document.getElementById('adminDashboardPublishNext'),
   taskInboxMeta: document.getElementById('adminTaskInboxMeta'),
   refreshAdminTasks: document.getElementById('refreshAdminTasks'),
+  mfaStatus: document.getElementById('adminMfaStatus'),
+  mfaSetup: document.getElementById('adminMfaSetup'),
+  mfaDialog: document.getElementById('adminMfaDialog'),
+  mfaDialogContent: document.getElementById('adminMfaDialogContent'),
   continueDraftRepairTask: document.getElementById('continueDraftRepairTask'),
   continuePublishedImageTask: document.getElementById('continuePublishedImageTask'),
   continueFinalReviewTask: document.getElementById('continueFinalReviewTask'),
@@ -117,6 +125,12 @@ let profile = null;
 let adminRestorePromise = null;
 let adminSessionRecheckTimer = null;
 let adminAuthSubscription = null;
+let pendingMfaFactorId = null;
+let activeMfaEnrollment = null;
+const adminTurnstilePromise = createTurnstileController(
+  document.getElementById('adminSignInTurnstile'),
+  'admin_signin',
+).catch((error) => ({ getToken() { throw error; }, reset() {} }));
 let drafts = [];
 let referenceData = { boards: [], exams: [], subjects: [], topics: [] };
 let publishedQuestions = [];
@@ -288,6 +302,11 @@ function safePreviewUrl(value) {
   }
 }
 
+function safeMfaQrUrl(value) {
+  const raw = String(value || '').trim();
+  return /^data:image\/svg\+xml(?:;charset=utf-8|;utf-?8|;base64)?,/i.test(raw) ? raw : '';
+}
+
 function setBusy(form, busy) {
   form?.querySelectorAll('button, input, textarea, select').forEach((element) => {
     if (busy) {
@@ -305,6 +324,7 @@ function showRestoringAdminSession(message = 'Checking your existing secure sess
   elements.sessionRetry.classList.add('hidden');
   elements.sessionPanel.classList.remove('hidden');
   elements.loginPanel.classList.add('hidden');
+  elements.mfaChallengePanel.classList.add('hidden');
   if (!document.body.classList.contains('admin-authenticated')) {
     elements.adminPanel.classList.add('hidden');
     elements.signOut.classList.add('hidden');
@@ -321,18 +341,97 @@ function showSessionProblem(error) {
   elements.sessionRetry.classList.remove('hidden');
   elements.sessionPanel.classList.remove('hidden');
   elements.loginPanel.classList.add('hidden');
+  elements.mfaChallengePanel.classList.add('hidden');
   elements.adminPanel.classList.add('hidden');
   elements.signOut.classList.add('hidden');
 }
 
 function showLogin() {
   profile = null;
+  pendingMfaFactorId = null;
   document.body.classList.remove('admin-authenticated');
   closeAdminSidebar();
   elements.sessionPanel.classList.add('hidden');
   elements.loginPanel.classList.remove('hidden');
+  elements.mfaChallengePanel.classList.add('hidden');
   elements.adminPanel.classList.add('hidden');
   elements.signOut.classList.add('hidden');
+}
+
+function showMfaChallenge(context) {
+  pendingMfaFactorId = context?.mfa?.verifiedTotp?.[0]?.id || null;
+  document.body.classList.remove('admin-authenticated');
+  closeAdminSidebar();
+  elements.sessionPanel.classList.add('hidden');
+  elements.loginPanel.classList.add('hidden');
+  elements.adminPanel.classList.add('hidden');
+  elements.signOut.classList.add('hidden');
+  elements.mfaChallengePanel.classList.remove('hidden');
+  elements.mfaChallengeForm?.querySelector('[name="code"]')?.focus();
+}
+
+async function renderAdminMfaStatus(status = null) {
+  if (!elements.mfaStatus || !elements.mfaSetup) return;
+  try {
+    const mfa = status || await api.getMfaStatus();
+    const enabled = Boolean(mfa.verifiedTotp?.length);
+    elements.mfaStatus.textContent = enabled
+      ? 'Enabled. This admin must provide an authenticator code whenever the session is only AAL1.'
+      : 'Not enabled yet. Set up a TOTP authenticator before handling production-sensitive work.';
+    elements.mfaSetup.textContent = enabled ? 'Authenticator enabled' : 'Set up authenticator';
+    elements.mfaSetup.disabled = enabled;
+  } catch (error) {
+    elements.mfaStatus.textContent = error.message;
+    elements.mfaSetup.disabled = false;
+  }
+}
+
+async function startAdminMfaEnrollment() {
+  elements.mfaSetup.disabled = true;
+  const loading = toast.loading('Starting authenticator setup…');
+  try {
+    const factor = await api.enrollAdminTotp();
+    const factorId = factor?.id;
+    if (!factorId) throw new Error('Authenticator setup did not return a factor ID.');
+    activeMfaEnrollment = { factorId, verified: false };
+    const qrCode = safeMfaQrUrl(factor?.totp?.qr_code);
+    const secret = String(factor?.totp?.secret || '');
+    if (!qrCode || !secret) throw new Error('Authenticator setup details were incomplete.');
+
+    elements.mfaDialogContent.innerHTML = `<div class="admin-mfa-enrollment"><span class="eyebrow">Admin TOTP enrollment</span><h2>Scan with your authenticator app</h2><p>Use Google Authenticator, Microsoft Authenticator, 1Password or another TOTP app. Keep access to that app; recovery requires a Supabase project administrator.</p><img class="admin-mfa-qr" src="${escapeHtml(qrCode)}" alt="Authenticator QR code" /><p class="field-help">Cannot scan? Enter this setup key:</p><code class="admin-mfa-secret">${escapeHtml(secret)}</code><form id="adminMfaEnrollmentForm" class="auth-form" novalidate><label>6-digit code<input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required /></label><button class="button button-primary button-block" type="submit">Verify authenticator</button></form></div>`;
+    elements.mfaDialog.showModal();
+    loading.close();
+
+    elements.mfaDialogContent.querySelector('#adminMfaEnrollmentForm')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!form.reportValidity()) return;
+      setBusy(form, true);
+      const verifying = toast.loading('Verifying authenticator…');
+      try {
+        await api.verifyTotp({ factorId, code: new FormData(form).get('code') });
+        activeMfaEnrollment.verified = true;
+        activeMfaEnrollment = null;
+        elements.mfaDialog.close();
+        verifying.close();
+        toast.success('Authenticator protection is enabled for this admin.');
+        await renderAdminMfaStatus();
+      } catch (error) {
+        verifying.close();
+        setBusy(form, false);
+        toast.error(error.message);
+      }
+    });
+  } catch (error) {
+    const unfinished = activeMfaEnrollment;
+    activeMfaEnrollment = null;
+    if (unfinished?.factorId) {
+      await api.unenrollMfaFactor(unfinished.factorId).catch(() => {});
+    }
+    loading.close();
+    elements.mfaSetup.disabled = false;
+    toast.error(error.message);
+  }
 }
 
 async function showAdmin({ reloadData = true, announceSessionError = true } = {}) {
@@ -357,6 +456,11 @@ async function showAdmin({ reloadData = true, announceSessionError = true } = {}
       throw new Error(`This account is not authorized as a ${APP_CONFIG.name} admin.`);
     }
 
+    if (context.status === 'MFA_REQUIRED') {
+      showMfaChallenge(context);
+      return false;
+    }
+
     if (context.status === 'ERROR') {
       showSessionProblem(context.error);
       if (announceSessionError && document.body.classList.contains('admin-authenticated')) {
@@ -366,11 +470,14 @@ async function showAdmin({ reloadData = true, announceSessionError = true } = {}
     }
 
     profile = context.profile;
+    pendingMfaFactorId = null;
     elements.sessionPanel.classList.add('hidden');
     elements.loginPanel.classList.add('hidden');
+    elements.mfaChallengePanel.classList.add('hidden');
     elements.adminPanel.classList.remove('hidden');
     document.body.classList.add('admin-authenticated');
     elements.signOut.classList.remove('hidden');
+    await renderAdminMfaStatus(context.mfa);
 
     if (reloadData) {
       try {
@@ -3958,6 +4065,42 @@ function downloadCurrentImportReport() {
 function bindEvents() {
   initializeAdminWorkspaceNavigation();
   setRepairQueueMode('draft');
+  elements.mfaChallengeForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity() || !pendingMfaFactorId) return;
+    setBusy(form, true);
+    const loading = toast.loading('Verifying authenticator…');
+    try {
+      await api.verifyTotp({ factorId: pendingMfaFactorId, code: new FormData(form).get('code') });
+      form.reset();
+      loading.close();
+      if (new URLSearchParams(window.location.search).get('next') === 'test-builder') {
+        window.location.replace('./test-builder.html');
+        return;
+      }
+      showRestoringAdminSession('Authenticator verified. Opening the protected admin workspace…');
+      await showAdmin();
+    } catch (error) {
+      loading.close();
+      toast.error(error.message);
+    } finally {
+      setBusy(form, false);
+    }
+  });
+  elements.mfaSignOut?.addEventListener('click', async () => {
+    try { await api.signOut(); showLogin(); }
+    catch (error) { toast.error(error.message); }
+  });
+  elements.mfaSetup?.addEventListener('click', startAdminMfaEnrollment);
+  elements.mfaDialog?.addEventListener('close', () => {
+    if (!activeMfaEnrollment || activeMfaEnrollment.verified) return;
+    const { factorId } = activeMfaEnrollment;
+    activeMfaEnrollment = null;
+    api.unenrollMfaFactor(factorId)
+      .catch((error) => toast.warning(error.message))
+      .finally(() => renderAdminMfaStatus());
+  });
   elements.refreshAdminTasks?.addEventListener('click', () => loadAdminTaskInbox({ announce: true }));
   elements.continueDraftRepairTask?.addEventListener('click', () => openAdminTask('draft_repairs'));
   elements.continuePublishedImageTask?.addEventListener('click', () => openAdminTask('published_image_safety'));
@@ -3988,7 +4131,8 @@ function bindEvents() {
     setBusy(form, true);
     const loading = toast.loading('Signing in…');
     try {
-      await api.signIn({ email: values.get('email'), password: values.get('password') });
+      const turnstile = await adminTurnstilePromise;
+      await api.signIn({ email: values.get('email'), password: values.get('password'), captchaToken: turnstile.getToken() });
       const restored = await showAdmin();
       loading.close();
       if (restored) {
@@ -4000,7 +4144,10 @@ function bindEvents() {
       toast.error(error.message);
       // Never destroy a valid stored session because a follow-up profile/data
       // request failed transiently. Explicit sign-out remains user-controlled.
-    } finally { setBusy(form, false); }
+    } finally {
+      adminTurnstilePromise.then((turnstile) => turnstile.reset()).catch(() => {});
+      setBusy(form, false);
+    }
   });
 
   elements.sessionRetry?.addEventListener('click', () => {

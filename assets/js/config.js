@@ -16,6 +16,7 @@ export const APP_CONFIG = Object.freeze({
   basePath: BUILD_TARGET.base,
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL?.trim() || '',
   supabasePublishableKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || '',
+  turnstileSiteKey: import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() || '',
   requestTimeoutMs: 15000,
   questionBatchSize: 10,
   cacheVersion: BUILD_TARGET.cacheVersion,

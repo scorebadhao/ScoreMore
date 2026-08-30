@@ -44,8 +44,19 @@
 <form class="auth-form" id="adminLoginForm" novalidate="">
 <label>Email<input autocomplete="email" name="email" required="" type="email"/></label>
 <label>Password<input autocomplete="current-password" name="password" required="" type="password"/></label>
+<div class="turnstile-slot" id="adminSignInTurnstile"></div>
 <button class="button button-primary button-block" type="submit">Sign in</button>
 </form>
+</section>
+<section class="auth-card section narrow-card hidden" id="adminMfaChallengePanel">
+<span class="eyebrow">Two-step verification</span>
+<h1>Enter authenticator code</h1>
+<p>This admin account requires the current 6-digit code from its authenticator app.</p>
+<form class="auth-form" id="adminMfaChallengeForm" novalidate="">
+<label>Authenticator code<input autocomplete="one-time-code" inputmode="numeric" maxlength="6" minlength="6" name="code" pattern="[0-9]{6}" required="" type="text"/></label>
+<button class="button button-primary button-block" type="submit">Verify and open admin</button>
+</form>
+<button class="button button-ghost button-block" id="adminMfaSignOut" type="button">Sign out</button>
 </section>
 <section class="hidden admin-panel-shell" id="adminPanel">
 <div class="admin-workspace"><aside aria-label="Admin navigation" class="admin-sidebar" id="adminSidebar">
@@ -87,6 +98,10 @@
 <span><strong>__APP_NAME__</strong><small>__APP_ENVIRONMENT__ · Admin-only workspace</small></span>
 </div>
 </div><div aria-label="Admin Dashboard" class="admin-view-panel" data-admin-view-panel="dashboard">
+<section class="panel-card admin-mfa-card" aria-labelledby="adminMfaTitle">
+<div><span class="eyebrow">Admin account security</span><h2 id="adminMfaTitle">Authenticator protection</h2><p id="adminMfaStatus" class="muted">Checking multi-factor status…</p></div>
+<button class="button button-secondary" id="adminMfaSetup" type="button">Set up authenticator</button>
+</section>
 <section class="panel-card admin-task-inbox" aria-labelledby="adminTaskInboxTitle">
 <div class="section-heading compact admin-task-inbox-heading">
 <div><span class="eyebrow">Server-owned work queue</span><h2 id="adminTaskInboxTitle">Task Inbox</h2><p class="muted">Counts cover the complete database. Every Continue button opens the exact next record.</p></div>
@@ -565,6 +580,10 @@
 <dialog class="review-dialog image-repair-dialog" id="imageRepairDialog">
 <form class="dialog-close-row" method="dialog"><button aria-label="Close image repair" class="icon-button" value="cancel">×</button></form>
 <div id="imageRepairDialogContent"></div>
+</dialog>
+<dialog class="review-dialog admin-mfa-dialog" id="adminMfaDialog">
+<form class="dialog-close-row" method="dialog"><button aria-label="Close authenticator setup" class="icon-button" value="cancel">×</button></form>
+<div id="adminMfaDialogContent"></div>
 </dialog>
 <div aria-atomic="true" aria-live="polite" class="toast-root" id="toastRoot"></div>
 <script src="./assets/js/adminShell.js" type="module"></script>
