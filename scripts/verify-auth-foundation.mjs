@@ -81,6 +81,10 @@ pass(admin.includes('safeMfaQrUrl') && admin.includes('data:image\\/svg\\+xml'),
 pass(!admin.includes('safeUrl('), 'Admin auth code must not reference an undefined generic URL helper.');
 pass(supabaseConfig.includes('[auth.email.template.recovery]'), 'Local recovery email template configuration is missing.');
 pass(supabaseConfig.includes('[auth.email.notification.password_changed]'), 'Password-change notification configuration is missing.');
+for (const templateName of ['recovery', 'password_changed_notification', 'identity_linked_notification', 'mfa_factor_enrolled_notification']) {
+  pass(supabaseConfig.includes(`content_path = "./templates/${templateName}.html"`), `Supabase template path is invalid for ${templateName}.`);
+}
+pass(!supabaseConfig.includes('./supabase/templates/'), 'Template paths must be relative to supabase/config.toml without a duplicate supabase/ segment.');
 pass(vite.includes("resetPassword: resolve(import.meta.dirname, 'reset-password.html')"), 'The recovery page must be a first-class build entry.');
 
 const templates = await Promise.all([

@@ -38,19 +38,19 @@ enable_confirmations = false
 
 [auth.email.template.recovery]
 subject = "Reset your account password"
-content_path = "./supabase/templates/recovery.html"
+content_path = "./templates/recovery.html"
 
 [auth.email.notification.password_changed]
 enabled = true
 subject = "Your account password was changed"
-content_path = "./supabase/templates/password_changed_notification.html"
+content_path = "./templates/password_changed_notification.html"
 
 [auth.email.notification.identity_linked]
 enabled = true
 subject = "A new sign-in method was linked"
-content_path = "./supabase/templates/identity_linked_notification.html"
+content_path = "./templates/identity_linked_notification.html"
 
 [auth.email.notification.mfa_factor_enrolled]
 enabled = true
 subject = "A verification method was added"
-content_path = "./supabase/templates/mfa_factor_enrolled_notification.html"
+content_path = "./templates/mfa_factor_enrolled_notification.html"
