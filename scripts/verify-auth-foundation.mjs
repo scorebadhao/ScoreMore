@@ -80,11 +80,13 @@ pass(admin.includes('enrollAdminTotp') && admin.includes('verifyTotp'), 'Admin T
 pass(admin.includes('safeMfaQrUrl') && admin.includes('data:image\\/svg\\+xml'), 'Admin TOTP QR rendering must accept only SVG data URLs.');
 pass(!admin.includes('safeUrl('), 'Admin auth code must not reference an undefined generic URL helper.');
 pass(supabaseConfig.includes('[auth.email.template.recovery]'), 'Local recovery email template configuration is missing.');
+pass(supabaseConfig.includes('content_path = "./supabase/templates/recovery.html"'), 'Supabase recovery template path must be relative to the repository root.');
 pass(supabaseConfig.includes('[auth.email.notification.password_changed]'), 'Password-change notification configuration is missing.');
-for (const templateName of ['recovery', 'password_changed_notification', 'identity_linked_notification', 'mfa_factor_enrolled_notification']) {
+for (const templateName of ['password_changed_notification', 'identity_linked_notification', 'mfa_factor_enrolled_notification']) {
   pass(supabaseConfig.includes(`content_path = "./templates/${templateName}.html"`), `Supabase template path is invalid for ${templateName}.`);
 }
-pass(!supabaseConfig.includes('./supabase/templates/'), 'Template paths must be relative to supabase/config.toml without a duplicate supabase/ segment.');
+pass(!supabaseConfig.includes('content_path = "./templates/recovery.html"'), 'Recovery and notification template path bases must not be conflated.');
+pass(!supabaseConfig.includes('content_path = "./supabase/templates/password_changed_notification.html"'), 'Notification paths must not contain a duplicate supabase/ segment.');
 pass(vite.includes("resetPassword: resolve(import.meta.dirname, 'reset-password.html')"), 'The recovery page must be a first-class build entry.');
 
 const templates = await Promise.all([
