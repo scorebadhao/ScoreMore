@@ -7,10 +7,11 @@ const workflowPath = path.join(root, '.github', 'workflows', 'initialize-ranktig
 const releasePolicyPath = path.join(root, 'ranktiger-release.config.json');
 const patch3LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH3.json');
 const patch52LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json');
-const previousActiveLockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json');
-const expectedActiveLockFile = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_26.json';
-const expectedActiveMigrationCount = 26;
+const previousActiveLockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_26.json');
+const expectedActiveLockFile = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_27.json';
+const expectedActiveMigrationCount = 27;
 const authMigrationName = '20260830010000_student_google_auth_onboarding.sql';
+const homepageMigrationName = '20260901173216_homepage_test_category_stats.sql';
 const prerequisiteName = '20260805000050_catalogue_parent_prerequisites.sql';
 const prerequisitePath = path.join(root, 'supabase', 'migrations', prerequisiteName);
 const phase3eName = '20260805000100_phase3e_compatibility.sql';
@@ -127,9 +128,9 @@ const approvedNames = Object.keys(approved).sort();
 const sourceMigrationNames = fs.readdirSync(path.join(root, 'supabase', 'migrations'))
   .filter((name) => name.endsWith('.sql'))
   .sort();
-if (activeLocked.lock_version !== 'RANKTIGER_26') fail('Active RankTiger migration lock version must be RANKTIGER_26.');
-if (activeLocked.migration_count !== expectedActiveMigrationCount) fail('Active RankTiger migration lock metadata must declare 26 migrations.');
-if (approvedNames.length !== expectedActiveMigrationCount) fail(`Expected 26 active RankTiger migration checksums, found ${approvedNames.length}.`);
+if (activeLocked.lock_version !== 'RANKTIGER_27') fail('Active RankTiger migration lock version must be RANKTIGER_27.');
+if (activeLocked.migration_count !== expectedActiveMigrationCount) fail('Active RankTiger migration lock metadata must declare 27 migrations.');
+if (approvedNames.length !== expectedActiveMigrationCount) fail(`Expected 27 active RankTiger migration checksums, found ${approvedNames.length}.`);
 if (JSON.stringify(approvedNames) !== JSON.stringify(sourceMigrationNames)) {
   fail('Source migration files do not exactly match the active RankTiger migration lock.');
 }
@@ -153,22 +154,23 @@ const expectedNewMigrations = [
   '20260825010000_content_repair_integrity_gate.sql',
   '20260826212517_admin_task_inbox_published_image_queue.sql',
   authMigrationName,
+  homepageMigrationName,
 ];
 const addedMigrations = approvedNames.filter((name) => !(name in patch52Approved));
 if (JSON.stringify(addedMigrations) !== JSON.stringify(expectedNewMigrations)) {
-  fail(`Active RankTiger lock must add exactly the six reviewed migrations; found: ${addedMigrations.join(', ')}`);
+  fail(`Active RankTiger lock must add exactly the seven reviewed migrations; found: ${addedMigrations.join(', ')}`);
 }
 
 const previousApproved = previousActiveLocked?.migrations ?? {};
-if (previousActiveLocked.lock_version !== 'RANKTIGER_25' || previousActiveLocked.migration_count !== 25 || Object.keys(previousApproved).length !== 25) {
-  fail('The immutable previous RankTiger 25-migration lock is invalid.');
+if (previousActiveLocked.lock_version !== 'RANKTIGER_26' || previousActiveLocked.migration_count !== 26 || Object.keys(previousApproved).length !== 26) {
+  fail('The immutable previous RankTiger 26-migration lock is invalid.');
 }
 for (const [name, expected] of Object.entries(previousApproved)) {
-  if (approved[name] !== expected) fail(`Active RankTiger lock does not preserve the previous 25-migration checksum: ${name}`);
+  if (approved[name] !== expected) fail(`Active RankTiger lock does not preserve the previous 26-migration checksum: ${name}`);
 }
-const additionsAfter25 = approvedNames.filter((name) => !(name in previousApproved));
-if (JSON.stringify(additionsAfter25) !== JSON.stringify([authMigrationName])) {
-  fail(`RankTiger 26 lock must add only the reviewed auth migration after the immutable 25 baseline; found: ${additionsAfter25.join(', ')}`);
+const additionsAfter26 = approvedNames.filter((name) => !(name in previousApproved));
+if (JSON.stringify(additionsAfter26) !== JSON.stringify([homepageMigrationName])) {
+  fail(`RankTiger 27 lock must add only the reviewed homepage migration after the immutable 26 baseline; found: ${additionsAfter26.join(', ')}`);
 }
 
 // The prerequisite must run immediately before the locked Phase 3E topic migration.
@@ -227,9 +229,9 @@ console.log('PASS: Remote migration history is parsed from the remote column, mu
 console.log('PASS: 18 historical migrations remain unchanged.');
 console.log('PASS: 20-migration Patch 5.2 historical lock remains unchanged and is preserved by the active lock.');
 console.log('PASS: Fresh-environment catalogue parent prerequisite sorts immediately before the locked Phase 3E topic migration.');
-console.log('PASS: immutable 25-migration RankTiger baseline is preserved exactly.');
-console.log('PASS: 26 approved migrations exactly match the source set and are checksum-locked for RankTiger PROD.');
-console.log(`PASS: auth addition after baseline: ${additionsAfter25.join(', ')}`);
+console.log('PASS: immutable 26-migration RankTiger baseline is preserved exactly.');
+console.log('PASS: 27 approved migrations exactly match the source set and are checksum-locked for RankTiger PROD.');
+console.log(`PASS: homepage addition after baseline: ${additionsAfter26.join(', ')}`);
 console.log(`PASS: reviewed promotion additions: ${addedMigrations.join(', ')}`);
 console.log(`PASS: prerequisite targets only: ${[...new Set(prereqTargets)].sort().join(', ')}`);
 console.log(`PASS: versioned catalogue baseline targets only: ${[...new Set(insertTargets)].sort().join(', ')}`);

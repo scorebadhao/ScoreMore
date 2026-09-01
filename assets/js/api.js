@@ -549,7 +549,7 @@ export const api = Object.freeze({
     };
   },
 
-  async listTests({ testType = '', page = 0, pageSize = 12 } = {}) {
+  async listTests({ testType = '', testTypes = [], page = 0, pageSize = 12 } = {}) {
     const client = requireSupabase();
     const from = page * pageSize;
     const to = from + pageSize - 1;
@@ -569,7 +569,11 @@ export const api = Object.freeze({
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (testType) query = query.eq('test_type', testType);
+    const normalizedTestTypes = [...new Set((Array.isArray(testTypes) ? testTypes : [])
+      .map((value) => clean(value))
+      .filter(Boolean))];
+    if (normalizedTestTypes.length) query = query.in('test_type', normalizedTestTypes);
+    else if (testType) query = query.eq('test_type', testType);
     return unwrap(await withTimeout(query), 'Unable to load tests.') || [];
   },
 

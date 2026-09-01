@@ -1,6 +1,13 @@
 import { APP_CONFIG, isConfigured, resolvePublicSettings } from './config.js';
 import { api } from './api.js';
 import { bindAuthTabs, bindStudentAuth } from './auth.js';
+import { bindConnectionBadge } from './connectionState.js';
+import {
+  PUBLIC_TEST_CATEGORIES,
+  publicCategoryCount,
+  testTypeIcon,
+  testTypeLabel,
+} from './testTypes.js';
 import { toast } from './toast.js';
 
 const PENDING_TEST_KEY = `${APP_CONFIG.cacheVersion}:pending-test-id`;
@@ -13,11 +20,15 @@ const elements = {
   publicFeaturedTests: document.getElementById('publicFeaturedTests'),
   publicTestTypes: document.getElementById('publicTestTypes'),
   publicScopes: document.getElementById('publicScopes'),
+  publicCategoryFilter: document.getElementById('publicCategoryFilter'),
+  publicCategoryFilterLabel: document.getElementById('publicCategoryFilterLabel'),
+  clearPublicCategory: document.getElementById('clearPublicCategory'),
 };
 
 let redirecting = false;
 let publicTests = [];
 let publicConfig = { boards: [], exams: [], settings: {}, stats: {} };
+let activeCategory = '';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -34,26 +45,6 @@ function renderSkeletons(container, count = 3, compact = false) {
     { length: count },
     () => `<div class="skeleton ${compact ? 'skeleton-compact' : ''}" aria-hidden="true"></div>`,
   ).join('');
-}
-
-function testTypeLabel(type) {
-  return ({
-    PYQ_FULL: 'Previous Paper',
-    PYQ_SECTIONAL: 'Sectional PYQ',
-    TOPIC_PRACTICE: 'Topic Practice',
-    FULL_MOCK: 'Full Mock',
-    SECTIONAL_MOCK: 'Sectional Mock',
-    DAILY_QUIZ: 'Daily Quiz',
-    BOOKMARK_REVISION: 'Bookmark Revision',
-    MISTAKE_REVISION: 'Mistake Revision',
-    PERSONALIZED_TEST: 'Personalized Test',
-  })[type] || type;
-}
-
-function typeIcon(type) {
-  if (type === 'PYQ_FULL') return 'i-file';
-  if (type === 'FULL_MOCK') return 'i-target';
-  return 'i-layers';
 }
 
 function revealPublicView() {
@@ -83,7 +74,7 @@ function testCardMarkup(test, { compact = false } = {}) {
   if (compact) {
     return `
       <article class="mini-test-row">
-        <span class="mini-test-icon"><svg class="icon"><use href="#${typeIcon(test.test_type)}"></use></svg></span>
+        <span class="mini-test-icon"><svg class="icon"><use href="#${testTypeIcon(test.test_type)}"></use></svg></span>
         <span class="mini-test-copy"><strong>${escapeHtml(test.test_name)}</strong><small>${escapeHtml(type)} · ${escapeHtml(test.question_count)} questions</small></span>
         <button class="icon-button mini-test-action" data-start-test="${escapeHtml(test.test_id)}" type="button" aria-label="Sign in to start ${escapeHtml(test.test_name)}"><svg class="icon"><use href="#i-arrow"></use></svg></button>
       </article>
@@ -97,7 +88,7 @@ function testCardMarkup(test, { compact = false } = {}) {
         <span class="access-badge ${test.is_free ? 'free' : 'premium'}">${test.is_free ? 'Free' : 'Premium'}</span>
       </div>
       <div class="test-card-heading">
-        <span class="test-type-icon"><svg class="icon"><use href="#${typeIcon(test.test_type)}"></use></svg></span>
+        <span class="test-type-icon"><svg class="icon"><use href="#${testTypeIcon(test.test_type)}"></use></svg></span>
         <div>
           <h3>${escapeHtml(test.test_name)}</h3>
           <p>${escapeHtml(test.boards?.board_name || APP_CONFIG.name)} ${test.exams?.exam_name ? `· ${escapeHtml(test.exams.exam_name)}` : ''}</p>
@@ -122,11 +113,12 @@ function testCardMarkup(test, { compact = false } = {}) {
 
 function renderTests(tests) {
   if (!tests.length) {
+    const category = PUBLIC_TEST_CATEGORIES[activeCategory];
     elements.publicTestList.innerHTML = `
       <div class="empty-state catalogue-empty">
         <span class="empty-icon"><svg class="icon"><use href="#i-grid"></use></svg></span>
-        <h3>No published tests yet</h3>
-        <p>Reviewed tests will appear here as soon as the ${APP_CONFIG.name} administrator publishes them.</p>
+        <h3>${category ? `${escapeHtml(category.label)} are coming soon` : 'No published tests yet'}</h3>
+        <p>${category ? `Choose another category or check again after new student-ready tests are published.` : `Reviewed tests will appear here as soon as the ${APP_CONFIG.name} administrator publishes them.`}</p>
       </div>
     `;
     return;
@@ -158,11 +150,49 @@ function renderTestTypes(tests) {
   }
   elements.publicTestTypes.innerHTML = rows.map(([type, count]) => `
     <div class="compact-list-row">
-      <span class="compact-list-icon"><svg class="icon"><use href="#${typeIcon(type)}"></use></svg></span>
-      <span><strong>${escapeHtml(testTypeLabel(type))}</strong><small>Published practice</small></span>
+      <span class="compact-list-icon"><svg class="icon"><use href="#${testTypeIcon(type)}"></use></svg></span>
+      <span><strong>${escapeHtml(testTypeLabel(type, { plural: count !== 1 }))}</strong><small>Available now</small></span>
       <b>${count}</b>
     </div>
   `).join('');
+}
+
+function renderCategoryStats(stats = publicConfig.stats || {}, tests = publicTests) {
+  const elementIds = {
+    MOCK: 'statMockTests',
+    PYQ: 'statPyqTests',
+    SECTIONAL: 'statSectionalTests',
+    TOPIC: 'statTopicTests',
+  };
+
+  Object.entries(PUBLIC_TEST_CATEGORIES).forEach(([category, metadata]) => {
+    const databaseCount = Number(stats?.[metadata.statKey]);
+    const count = Number.isFinite(databaseCount) ? databaseCount : publicCategoryCount(tests, category);
+    const value = document.getElementById(elementIds[category]);
+    const card = document.querySelector(`[data-public-category="${category}"]`);
+    if (value) value.textContent = count.toLocaleString('en-IN');
+    if (!card) return;
+    card.dataset.count = String(count);
+    card.classList.toggle('coming-soon', count === 0);
+    card.setAttribute('aria-label', count === 0
+      ? `${metadata.label}: coming soon`
+      : `${count} ${metadata.label}. Show this category.`);
+    const detail = card.querySelector('small');
+    if (detail) detail.textContent = count === 0 ? 'Coming soon' : metadata.description;
+  });
+}
+
+function renderCategoryFilter() {
+  const metadata = PUBLIC_TEST_CATEGORIES[activeCategory];
+  elements.publicCategoryFilter?.classList.toggle('hidden', !metadata);
+  if (elements.publicCategoryFilterLabel) {
+    elements.publicCategoryFilterLabel.textContent = metadata?.label || 'all tests';
+  }
+  document.querySelectorAll('[data-public-category]').forEach((card) => {
+    const active = card.dataset.publicCategory === activeCategory;
+    card.classList.toggle('active', active);
+    card.setAttribute('aria-pressed', String(active));
+  });
 }
 
 function renderScopes(config) {
@@ -193,23 +223,26 @@ async function loadPublicConfiguration() {
   document.getElementById('scopeBadge').textContent = settings.scopeBadge;
   document.getElementById('heroTitle').textContent = settings.heroTitle;
   document.getElementById('heroSubtitle').textContent = settings.heroSubtitle;
-  const stats = publicConfig.stats || {};
-  document.getElementById('statQuestions').textContent = stats.published_questions ?? 0;
-  document.getElementById('statPapers').textContent = stats.pyq_papers ?? 0;
-  document.getElementById('statTests').textContent = stats.published_tests ?? 0;
-  document.getElementById('statAttempts').textContent = stats.student_attempts ?? 0;
+  renderCategoryStats(publicConfig.stats, publicTests);
   renderScopes(publicConfig);
 }
 
 async function loadPublicTests() {
+  const category = PUBLIC_TEST_CATEGORIES[activeCategory];
   renderSkeletons(elements.publicTestList, 3);
-  renderSkeletons(elements.publicFeaturedTests, 2, true);
-  renderSkeletons(elements.publicTestTypes, 3, true);
+  if (!category) {
+    renderSkeletons(elements.publicFeaturedTests, 2, true);
+    renderSkeletons(elements.publicTestTypes, 3, true);
+  }
   try {
-    publicTests = await api.listTests({ pageSize: 50 });
-    renderTests(publicTests);
-    renderFeaturedTests(publicTests);
-    renderTestTypes(publicTests);
+    const tests = await api.listTests({ testTypes: category?.testTypes || [], pageSize: 50 });
+    renderTests(tests);
+    if (!category) {
+      publicTests = tests;
+      renderFeaturedTests(publicTests);
+      renderTestTypes(publicTests);
+      renderCategoryStats(publicConfig.stats, publicTests);
+    }
   } catch (error) {
     elements.publicTestList.innerHTML = `
       <div class="empty-state catalogue-empty error">
@@ -222,30 +255,42 @@ async function loadPublicTests() {
   }
 }
 
-function bindNetworkState() {
-  const syncState = document.getElementById('syncState');
-  const update = () => {
-    if (!syncState) return;
-    const online = navigator.onLine;
-    syncState.innerHTML = `<span class="sync-dot"></span>${online ? 'Online' : 'Offline'}`;
-    syncState.classList.toggle('offline', !online);
-  };
-  window.addEventListener('online', update);
-  window.addEventListener('offline', update);
-  update();
+async function selectPublicCategory(category) {
+  const metadata = PUBLIC_TEST_CATEGORIES[category];
+  if (!metadata) return;
+  const card = document.querySelector(`[data-public-category="${category}"]`);
+  if (Number(card?.dataset.count || 0) === 0) {
+    toast.info(`${metadata.label} are coming soon.`);
+    return;
+  }
+  activeCategory = category;
+  renderCategoryFilter();
+  await loadPublicTests();
+  document.getElementById('publicTests')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function clearPublicCategory() {
+  if (!activeCategory) return;
+  activeCategory = '';
+  renderCategoryFilter();
+  await loadPublicTests();
 }
 
 function bindUi() {
   bindAuthTabs();
   bindStudentAuth({ onAuthenticated: redirectToStudent });
-  bindNetworkState();
+  bindConnectionBadge(document.getElementById('syncState'));
 
   document.querySelectorAll('[data-scroll-to]').forEach((button) => {
     button.addEventListener('click', () => {
       document.getElementById(button.dataset.scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
-  document.getElementById('refreshPublicTests')?.addEventListener('click', loadPublicTests);
+  document.getElementById('refreshPublicTests')?.addEventListener('click', () => loadPublicTests());
+  document.querySelectorAll('[data-public-category]').forEach((card) => {
+    card.addEventListener('click', () => selectPublicCategory(card.dataset.publicCategory));
+  });
+  elements.clearPublicCategory?.addEventListener('click', clearPublicCategory);
 }
 
 async function initialize() {

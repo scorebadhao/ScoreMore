@@ -1220,7 +1220,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
   font-size: .7rem;
   font-weight: 800;
 }
+.sync-badge.checking { color: #52616c; border-color: #d8e1e5; background: #f5f7f8; }
+.sync-badge.online { color: #176542; border-color: #cce9df; background: #effbf5; }
 .sync-badge.offline { color: #8a4a08; border-color: #f3d6a3; background: #fff7e8; }
+.sync-badge.issue { color: #9a3412; border-color: #fed7aa; background: #fff7ed; }
+.sync-label-short { display: none; }
 .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(21, 128, 61, .1); }
 .icon-button {
   width: 42px;
@@ -1234,7 +1238,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
   background: #fff;
 }
 .icon-button:hover { color: var(--primary); border-color: #9dd8cf; background: #f7fcfb; }
-.icon-button:focus-visible, .button:focus-visible, .dashboard-card:focus-visible, .catalogue-tab:focus-visible, .option-button:focus-visible, .palette-button:focus-visible { outline: none; box-shadow: var(--focus); }
+.icon-button:focus-visible, .button:focus-visible, .hero-stat:focus-visible, .dashboard-card:focus-visible, .catalogue-tab:focus-visible, .option-button:focus-visible, .palette-button:focus-visible { outline: none; box-shadow: var(--focus); }
 .header-login-button { display: none; }
 .compact-button { min-height: 42px; padding: 8px 13px; }
 
@@ -1282,10 +1286,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 .eyebrow.light { color: #aef0e4; }
 .hero-actions { margin: 25px 0 0; }
 .hero-stats { margin-top: 30px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.hero-stat { min-height: 88px; padding: 14px; border: 1px solid rgba(255,255,255,.17); border-radius: 16px; background: rgba(255,255,255,.08); backdrop-filter: blur(7px); }
-.hero-stat strong, .hero-stat span { display: block; }
+.hero-stat { min-height: 88px; padding: 14px; border: 1px solid rgba(255,255,255,.17); border-radius: 16px; color: inherit; background: rgba(255,255,255,.08); text-align: left; backdrop-filter: blur(7px); cursor: pointer; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+.hero-stat:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.45); background: rgba(255,255,255,.14); }
+.hero-stat.active { border-color: #fff; background: rgba(255,255,255,.18); box-shadow: 0 0 0 2px rgba(255,255,255,.16); }
+.hero-stat.coming-soon { cursor: default; opacity: .78; }
+.hero-stat strong, .hero-stat span, .hero-stat small { display: block; }
 .hero-stat strong { font-size: 1.65rem; }
 .hero-stat span { margin-top: 3px; color: #d9f5ef; font-size: .7rem; font-weight: 700; }
+.hero-stat small { margin-top: 5px; color: #bfe8df; font-size: .58rem; font-weight: 650; line-height: 1.35; }
 .hero-side { padding: 26px; display: grid; align-content: center; gap: 12px; background: linear-gradient(160deg, #fff, #edf8f5); }
 .hero-side h2 { margin: 0; font-size: clamp(1.45rem, 4vw, 2rem); }
 .hero-side p { margin: 0; color: var(--muted); }
@@ -1347,6 +1355,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
 /* Shared catalogue */
 .catalogue-section { scroll-margin-top: calc(var(--header-h) + 12px); }
 .catalogue-heading { align-items: center; }
+.public-category-filter { margin: 0 0 14px; padding: 10px 13px; border: 1px solid #c9e7e1; border-radius: 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--primary-dark); background: var(--primary-soft); font-size: .75rem; }
+.public-category-filter strong { color: var(--text-strong); }
 .catalogue-grid { display: grid; gap: 14px; }
 .catalogue-test-card { position: relative; overflow: hidden; min-width: 0; padding: 18px; display: flex; flex-direction: column; gap: 13px; transition: transform .16s, box-shadow .16s, border-color .16s; }
 .catalogue-test-card::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: linear-gradient(90deg, var(--primary), #2e93a4); }
@@ -1631,6 +1641,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); box-sh
   .brand-mark { width: 40px; height: 40px; flex-basis: 40px; }
   .sync-badge { padding-inline: 7px; }
   .sync-badge .sync-dot { width: 6px; height: 6px; }
+  .sync-label-full { display: none; }
+  .sync-label-short { display: inline; }
   .compact-button { min-width: 0; padding-inline: 10px; }
   .hero-grid { padding-top: 16px; }
   .hero-card { min-height: 410px; padding: 25px 22px; }
