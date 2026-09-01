@@ -39,7 +39,7 @@
         <span class="brand-copy"><strong id="brandName">__APP_NAME__</strong><small id="brandTagline">__APP_TAGLINE__</small></span>
       </a>
       <div class="header-actions">
-        <span id="syncState" class="sync-badge" aria-live="polite"><span class="sync-dot"></span>Online</span>
+        <span id="syncState" class="sync-badge checking" role="status" aria-live="polite"><span class="sync-dot" aria-hidden="true"></span><span class="sync-label-full">Connecting…</span><span class="sync-label-short">Checking…</span></span>
         <button id="profileShortcut" class="icon-button" data-route="#profile" type="button" aria-label="Open profile"><svg class="icon"><use href="#i-user"></use></svg></button>
       </div>
     </header>
@@ -66,9 +66,9 @@
 
           <div class="section-heading compact dashboard-section-heading"><div><span class="eyebrow">Quick practice</span><h2>Choose your next test</h2></div><button class="text-button" data-route="#tests" type="button">View all</button></div>
           <div class="dashboard-grid hub-quick-grid">
-            <button class="dashboard-card" data-test-filter="PYQ_FULL" type="button"><span class="dashboard-icon"><svg class="icon"><use href="#i-file"></use></svg></span><span class="dashboard-copy"><strong>Previous Papers</strong><small><b id="quickPyqCount">0</b> ready tests</small></span><svg class="icon card-arrow"><use href="#i-arrow"></use></svg></button>
+            <button class="dashboard-card" data-test-filter="PYQ_FULL" type="button"><span class="dashboard-icon"><svg class="icon"><use href="#i-file"></use></svg></span><span class="dashboard-copy"><strong>PYQ Tests</strong><small><b id="quickPyqCount">0</b> ready tests</small></span><svg class="icon card-arrow"><use href="#i-arrow"></use></svg></button>
             <button class="dashboard-card" data-test-filter="PYQ_SECTIONAL" type="button"><span class="dashboard-icon"><svg class="icon"><use href="#i-layers"></use></svg></span><span class="dashboard-copy"><strong>Sectional Tests</strong><small><b id="quickSectionalCount">0</b> focused tests</small></span><svg class="icon card-arrow"><use href="#i-arrow"></use></svg></button>
-            <button class="dashboard-card" data-test-filter="FULL_MOCK" type="button"><span class="dashboard-icon"><svg class="icon"><use href="#i-target"></use></svg></span><span class="dashboard-copy"><strong>Full Mocks</strong><small><b id="quickMockCount">0</b> simulations</small></span><svg class="icon card-arrow"><use href="#i-arrow"></use></svg></button>
+            <button class="dashboard-card" data-test-filter="FULL_MOCK" type="button"><span class="dashboard-icon"><svg class="icon"><use href="#i-target"></use></svg></span><span class="dashboard-copy"><strong>Mock Tests</strong><small><b id="quickMockCount">0</b> simulations</small></span><svg class="icon card-arrow"><use href="#i-arrow"></use></svg></button>
             <button class="dashboard-card" data-test-filter="DAILY_QUIZ" type="button"><span class="dashboard-icon"><svg class="icon"><use href="#i-clock"></use></svg></span><span class="dashboard-copy"><strong>Daily Quiz</strong><small><b id="quickDailyCount">0</b> available</small></span><svg class="icon card-arrow"><use href="#i-arrow"></use></svg></button>
           </div>
 

@@ -1,8 +1,10 @@
 import { APP_CONFIG, isConfigured, resolvePublicSettings } from './config.js';
 import { api } from './api.js';
+import { bindConnectionBadge } from './connectionState.js';
 import { assertPasswordPolicy, PASSWORD_POLICY_MESSAGE } from './passwordPolicy.js';
 import { navigate, startRouter, subscribeRoute } from './router.js';
 import { mountTestEngine } from './testEngine.js';
+import { testTypeIcon as typeIcon, testTypeLabel } from './testTypes.js';
 import { toast } from './toast.js';
 
 const PENDING_TEST_KEY = `${APP_CONFIG.cacheVersion}:pending-test-id`;
@@ -47,33 +49,10 @@ const resultFilters = { search: '', sort: 'NEWEST', page: 0 };
 let resultData = { items: [], total: 0, page: 0, has_more: false };
 let currentReview = { detail: null, items: [], filter: 'ALL' };
 
-const TEST_TYPE_LABELS = {
-  PYQ_FULL: 'Previous Papers',
-  PYQ_SECTIONAL: 'Sectional PYQ',
-  SECTIONAL_MOCK: 'Sectional Mock',
-  FULL_MOCK: 'Full Mock',
-  TOPIC_PRACTICE: 'Topic Practice',
-  DAILY_QUIZ: 'Daily Quiz',
-  BOOKMARK_REVISION: 'Bookmark Revision',
-  MISTAKE_REVISION: 'Mistake Revision',
-  PERSONALIZED_TEST: 'Personalized Test',
-};
-
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
-}
-
-function testTypeLabel(value) {
-  return TEST_TYPE_LABELS[value] || String(value || '').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function typeIcon(type) {
-  if (type === 'PYQ_FULL') return 'i-file';
-  if (type === 'FULL_MOCK') return 'i-target';
-  if (type === 'DAILY_QUIZ') return 'i-clock';
-  return 'i-layers';
 }
 
 function formatNumber(value, maximumFractionDigits = 2) {
@@ -659,19 +638,6 @@ async function handleRoute(route) {
   if (sequence === routeSequence) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function bindNetworkState() {
-  const syncState = input('syncState');
-  const update = () => {
-    const online = navigator.onLine;
-    syncState.innerHTML = `<span class="sync-dot"></span>${online ? 'Online' : 'Offline'}`;
-    syncState.classList.toggle('offline', !online);
-    syncState.title = online ? 'Connected' : 'Answers remain on this device until connectivity returns.';
-  };
-  window.addEventListener('online', update);
-  window.addEventListener('offline', update);
-  update();
-}
-
 function bindUi() {
   document.querySelectorAll('[data-route]').forEach((button) => button.addEventListener('click', () => { window.location.hash = button.dataset.route; }));
   document.querySelectorAll('[data-test-filter]').forEach((button) => button.addEventListener('click', () => { testFilters.testType = button.dataset.testFilter; testFilters.page = 0; navigate('tests'); }));
@@ -705,7 +671,23 @@ function bindUi() {
 
   input('resultSearch')?.addEventListener('input', () => { resultFilters.search = input('resultSearch').value.trim(); resultFilters.page = 0; debounce(loadResults); });
   input('resultSort')?.addEventListener('change', () => { resultFilters.sort = input('resultSort').value; resultFilters.page = 0; loadResults(); });
-  bindNetworkState();
+  bindConnectionBadge(input('syncState'), {
+    onChange({ state, previousState }) {
+      const badge = input('syncState');
+      if (badge) {
+        badge.title = state === 'online'
+          ? 'Connection verified.'
+          : 'Answers in an open test remain on this device until they can synchronize.';
+      }
+      if (state === 'offline') {
+        toast.warning('You are offline. Continue answering—responses are saved on this device.');
+      } else if (state === 'online' && ['offline', 'issue'].includes(previousState)) {
+        toast.info('Back online. Saved answers will synchronize automatically.');
+      } else if (state === 'issue' && previousState === 'online') {
+        toast.warning('The connection is unstable. Open-test answers will stay on this device until synchronization succeeds.');
+      }
+    },
+  });
 }
 
 async function initialize() {
