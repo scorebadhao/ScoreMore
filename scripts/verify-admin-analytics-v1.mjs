@@ -15,6 +15,7 @@ const sources = {
   taxonomy: read('assets/js/testTypes.js'),
   homepageMigration: read('supabase/migrations/20260901173216_homepage_test_category_stats.sql'),
   analyticsMigration: read('supabase/migrations/20260901173351_admin_analytics_v1.sql'),
+  analyticsFixMigration: read('supabase/migrations/20260902084411_admin_analytics_score_normalization_fix.sql'),
 };
 
 const failures = [];
@@ -115,7 +116,25 @@ requireText('analyticsMigration', [
   'revoke all on function public.get_admin_analytics_v1',
   'grant execute on function public.get_admin_analytics_v1',
 ]);
+requireText('analyticsFixMigration', [
+  'create or replace function public.list_admin_test_analytics_v1(',
+  't.marks_per_question,',
+  'a.total_questions * t.marks_per_question',
+  'security invoker',
+  'not public.is_admin()',
+  'revoke all on function public.list_admin_test_analytics_v1',
+  'grant execute on function public.list_admin_test_analytics_v1',
+]);
 forbidText('analyticsMigration', [
+  /security\s+definer/i,
+  /public\.attempt_answers/i,
+  /correct_answer/i,
+  /selected_answer/i,
+  /['"](?:email|mobile|user_id)['"]/i,
+  /auth\.users/i,
+  /service_role/i,
+]);
+forbidText('analyticsFixMigration', [
   /security\s+definer/i,
   /public\.attempt_answers/i,
   /correct_answer/i,
