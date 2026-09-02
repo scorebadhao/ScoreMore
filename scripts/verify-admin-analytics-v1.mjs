@@ -15,7 +15,7 @@ const sources = {
   taxonomy: read('assets/js/testTypes.js'),
   homepageMigration: read('supabase/migrations/20260901173216_homepage_test_category_stats.sql'),
   analyticsMigration: read('supabase/migrations/20260901173351_admin_analytics_v1.sql'),
-  analyticsFixMigration: read('supabase/migrations/20260902084411_admin_analytics_score_normalization_fix.sql'),
+  analyticsFixMigration: read('supabase/migrations/20260902085235_admin_analytics_score_normalization_fix.sql'),
 };
 
 const failures = [];
