@@ -362,6 +362,39 @@ export const api = Object.freeze({
     ), 'Unable to load the admin task inbox.') || {};
   },
 
+  async getAdminAnalyticsV1({ startDate, endDate, examId = '', testType = '' }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('get_admin_analytics_v1', {
+        p_start_date: clean(startDate),
+        p_end_date: clean(endDate),
+        p_exam_id: clean(examId) || null,
+        p_test_type: clean(testType) || null,
+      }),
+    ), 'Unable to load admin analytics.') || {};
+  },
+
+  async listAdminTestAnalyticsV1({
+    startDate,
+    endDate,
+    examId = '',
+    testType = '',
+    offset = 0,
+    limit = 20,
+  }) {
+    const client = requireSupabase();
+    return unwrap(await withTimeout(
+      client.rpc('list_admin_test_analytics_v1', {
+        p_start_date: clean(startDate),
+        p_end_date: clean(endDate),
+        p_exam_id: clean(examId) || null,
+        p_test_type: clean(testType) || null,
+        p_offset: Math.max(0, Number(offset) || 0),
+        p_limit: Math.min(50, Math.max(1, Number(limit) || 20)),
+      }),
+    ), 'Unable to load test analytics.') || { items: [], total: 0, offset: 0, limit: 20 };
+  },
+
   onAuthStateChange(callback) {
     const client = requireSupabase();
     return client.auth.onAuthStateChange((event, session) => callback(event, session));
