@@ -68,6 +68,7 @@
 <div class="admin-sidebar-group">
 <span class="admin-sidebar-group-label">Workspace</span>
 <button aria-current="page" class="admin-sidebar-link active" data-admin-view="dashboard" type="button"><span aria-hidden="true" class="admin-nav-icon">H</span><span><strong>Dashboard</strong><small>Queues, priorities &amp; quick actions</small></span></button>
+<button class="admin-sidebar-link" data-admin-view="analytics" type="button"><span aria-hidden="true" class="admin-nav-icon">A</span><span><strong>Analytics</strong><small>Learning, tests &amp; content health</small></span></button>
 </div>
 <div class="admin-sidebar-group">
 <span class="admin-sidebar-group-label">Question workflow</span>
@@ -152,6 +153,83 @@
 <div><span class="eyebrow">Locked quality gate</span><h2>Draft-first publishing safety</h2></div>
 <div class="admin-workflow-rail"><span>Import</span><i>→</i><span>Repair</span><i>→</i><span>Final Review</span><i>→</i><span>Publish</span><i>→</i><span>Test</span></div>
 </section>
+</div><div aria-label="Admin Analytics" class="admin-view-panel" data-admin-view-panel="analytics" hidden>
+<section class="panel-card admin-analytics-filter-card" aria-labelledby="adminAnalyticsFilterTitle">
+<div class="section-heading compact"><div><span class="eyebrow">Aggregate reporting</span><h2 id="adminAnalyticsFilterTitle">Analytics scope</h2><p class="muted">All date boundaries use India time (Asia/Kolkata). No student contact details or raw answers are included.</p></div></div>
+<form id="adminAnalyticsFilters" class="admin-analytics-filters">
+<label><span>Date range</span><select id="adminAnalyticsRange" name="range"><option value="TODAY">Today</option><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="CUSTOM">Custom dates</option></select></label>
+<label class="analytics-custom-date hidden"><span>From</span><input id="adminAnalyticsFrom" name="from" type="date" required></label>
+<label class="analytics-custom-date hidden"><span>To</span><input id="adminAnalyticsTo" name="to" type="date" required></label>
+<label><span>Exam</span><select id="adminAnalyticsExam" name="examId"><option value="">All exams</option></select></label>
+<label><span>Test type</span><select id="adminAnalyticsTestType" name="testType"><option value="">All test types</option><option value="PYQ_FULL">PYQ Test</option><option value="PYQ_SECTIONAL">Sectional PYQ Test</option><option value="TOPIC_PRACTICE">Topic Test</option><option value="FULL_MOCK">Mock Test</option><option value="SECTIONAL_MOCK">Sectional Test</option><option value="DAILY_QUIZ">Daily Quiz</option><option value="BOOKMARK_REVISION">Bookmark Revision</option><option value="MISTAKE_REVISION">Mistake Revision</option><option value="PERSONALIZED_TEST">Personalized Test</option></select></label>
+<button id="refreshAdminAnalytics" class="button button-secondary" type="submit">Refresh analytics</button>
+</form>
+<p id="adminAnalyticsMeta" class="muted admin-analytics-meta" role="status" aria-live="polite">Open Analytics to load aggregate reporting.</p>
+</section>
+
+<div class="admin-analytics-tabs" role="tablist" aria-label="Analytics sections">
+<button class="active" data-analytics-tab="overview" role="tab" aria-selected="true" aria-controls="adminAnalyticsOverview" type="button">Overview</button>
+<button data-analytics-tab="students" role="tab" aria-selected="false" aria-controls="adminAnalyticsStudents" type="button">Students</button>
+<button data-analytics-tab="tests" role="tab" aria-selected="false" aria-controls="adminAnalyticsTests" type="button">Tests</button>
+<button data-analytics-tab="content" role="tab" aria-selected="false" aria-controls="adminAnalyticsContent" type="button">Content Health</button>
+</div>
+
+<div id="adminAnalyticsOverview" data-analytics-tab-panel="overview" role="tabpanel">
+<div class="admin-analytics-kpi-grid">
+<article class="admin-analytics-kpi"><span>Registered students</span><strong data-analytics-metric="registered_students">—</strong><small>All active student accounts</small></article>
+<article class="admin-analytics-kpi"><span>Active students</span><strong data-analytics-metric="active_students">—</strong><small>Unique students who started a scoped attempt</small></article>
+<article class="admin-analytics-kpi"><span>Test starts</span><strong data-analytics-metric="test_starts">—</strong><small>Attempts started in the selected dates</small></article>
+<article class="admin-analytics-kpi"><span>Completion rate</span><strong data-analytics-metric="completion_rate" data-format="percent">—</strong><small>Started cohort submitted or auto-submitted</small></article>
+<article class="admin-analytics-kpi"><span>Average score</span><strong data-analytics-metric="average_score" data-format="percent">—</strong><small>Normalized percentage, submitted attempts only</small></article>
+<article class="admin-analytics-kpi"><span>Average accuracy</span><strong data-analytics-metric="average_accuracy" data-format="percent">—</strong><small>Submitted attempts only</small></article>
+<article class="admin-analytics-kpi"><span>Published tests</span><strong data-analytics-metric="published_tests">—</strong><small>Student-ready in the selected scope</small></article>
+<article class="admin-analytics-kpi"><span>Repeat attempts</span><strong data-analytics-metric="repeat_attempts">—</strong><small>Starts after an earlier attempt on the same test</small></article>
+</div>
+<div class="admin-analytics-split">
+<section class="panel-card admin-analytics-chart-card"><div class="section-heading compact"><div><span class="eyebrow">Selected start cohort</span><h2>Daily activity</h2><p class="muted">Starts and completed submissions by attempt start date.</p></div><div class="admin-analytics-legend"><span><i class="starts"></i>Starts</span><span><i class="submissions"></i>Submitted</span></div></div><div id="adminAnalyticsTrend" class="admin-analytics-trend" aria-live="polite"></div></section>
+<section class="panel-card admin-analytics-chart-card"><div class="section-heading compact"><div><span class="eyebrow">Test mix</span><h2>Activity by test type</h2><p class="muted">How selected-period starts are distributed.</p></div></div><div id="adminAnalyticsTypes" class="admin-analytics-types" aria-live="polite"></div></section>
+</div>
+</div>
+
+<div id="adminAnalyticsStudents" data-analytics-tab-panel="students" role="tabpanel" hidden>
+<section class="panel-card"><div class="section-heading compact"><div><span class="eyebrow">Privacy-safe student signals</span><h2>Student engagement</h2><p class="muted">These are aggregate counts only. Registered and new students are platform-wide; activity respects the exam and test-type filters.</p></div></div>
+<div class="admin-analytics-kpi-grid compact">
+<article class="admin-analytics-kpi"><span>Registered students</span><strong data-analytics-metric="registered_students">—</strong><small>All active student accounts</small></article>
+<article class="admin-analytics-kpi"><span>New students</span><strong data-analytics-metric="new_students">—</strong><small>Accounts created in the selected dates</small></article>
+<article class="admin-analytics-kpi"><span>Active students</span><strong data-analytics-metric="active_students">—</strong><small>Unique scoped attempt starters</small></article>
+<article class="admin-analytics-kpi"><span>Repeat attempts</span><strong data-analytics-metric="repeat_attempts">—</strong><small>Repeated practice starts</small></article>
+</div></section>
+</div>
+
+<div id="adminAnalyticsTests" data-analytics-tab-panel="tests" role="tabpanel" hidden>
+<div class="admin-analytics-kpi-grid compact">
+<article class="admin-analytics-kpi"><span>Test starts</span><strong data-analytics-metric="test_starts">—</strong><small>Selected start cohort</small></article>
+<article class="admin-analytics-kpi"><span>Submitted attempts</span><strong data-analytics-metric="submitted_attempts">—</strong><small>Submitted or auto-submitted</small></article>
+<article class="admin-analytics-kpi"><span>Completion rate</span><strong data-analytics-metric="completion_rate" data-format="percent">—</strong><small>Submitted ÷ starts</small></article>
+<article class="admin-analytics-kpi"><span>Average time</span><strong data-analytics-metric="average_time_seconds" data-format="duration">—</strong><small>Submitted attempts only</small></article>
+</div>
+<section class="panel-card admin-analytics-table-card"><div class="section-heading compact"><div><span class="eyebrow">Published student-ready catalogue</span><h2>Test performance</h2><p id="adminAnalyticsTestTableMeta" class="muted">Loading test rows…</p></div></div>
+<div class="admin-analytics-table-scroll"><table class="admin-analytics-table"><thead><tr><th scope="col">Test</th><th scope="col">Type</th><th scope="col">Starts</th><th scope="col">Submitted</th><th scope="col">Completion</th><th scope="col">Avg score %</th><th scope="col">Accuracy</th></tr></thead><tbody id="adminAnalyticsTestTableBody"><tr><td colspan="7">Open Analytics to load test performance.</td></tr></tbody></table></div>
+<div class="admin-analytics-pagination"><button id="adminAnalyticsPrev" class="button button-ghost" type="button" disabled>Previous</button><span id="adminAnalyticsPage">Page 1</span><button id="adminAnalyticsNext" class="button button-ghost" type="button" disabled>Next</button></div>
+</section>
+</div>
+
+<div id="adminAnalyticsContent" data-analytics-tab-panel="content" role="tabpanel" hidden>
+<section class="panel-card"><div class="section-heading compact"><div><span class="eyebrow">Publishing readiness</span><h2>Content Health</h2><p class="muted">Use attention counts to open the existing controlled repair, review and publish workflows.</p></div></div>
+<div class="admin-content-health-grid">
+<article><span>Published &amp; ready</span><strong data-content-health="published_ready">—</strong><small>Visible student-ready tests</small></article>
+<article class="attention"><span>Published not ready</span><strong data-content-health="published_not_ready">—</strong><small>Must be investigated</small></article>
+<article class="attention"><span>Question-count mismatch</span><strong data-content-health="question_count_mismatch">—</strong><small>Fixed-list tests only</small></article>
+<article class="attention"><span>Zero linked questions</span><strong data-content-health="zero_question_links">—</strong><small>Active fixed-list tests</small></article>
+<article class="attention"><span>Taxonomy review</span><strong data-content-health="taxonomy_review">—</strong><small>Name/type mismatch candidates</small></article>
+<article><span>Draft tests</span><strong data-content-health="draft_tests">—</strong><small>Not student-visible</small></article>
+<article><span>Archived tests</span><strong data-content-health="archived_tests">—</strong><small>Historical catalogue</small></article>
+<article><span>Draft repairs</span><strong data-content-health="task_inbox.draft_repairs.count">—</strong><small>Task Inbox priority 1</small></article>
+<article><span>Published image safety</span><strong data-content-health="task_inbox.published_image_safety.count">—</strong><small>Task Inbox priority 2</small></article>
+<article><span>Final reviews</span><strong data-content-health="task_inbox.final_reviews.count">—</strong><small>Task Inbox priority 3</small></article>
+<article><span>Ready to publish</span><strong data-content-health="task_inbox.ready_to_publish.count">—</strong><small>Task Inbox priority 4</small></article>
+</div></section>
+</div>
 </div><div aria-label="Import Centre" class="admin-view-panel" data-admin-view-panel="import"><div class="admin-grid">
 <section class="panel-card">
 <div class="section-heading compact">

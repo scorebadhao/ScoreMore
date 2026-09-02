@@ -27,6 +27,7 @@
     "verify:content-repair-integrity": "node scripts/verify-content-repair-integrity.mjs",
     "verify:admin-task-inbox": "node scripts/verify-admin-task-inbox.mjs",
     "verify:homepage-trust": "node scripts/verify-homepage-trust.mjs",
+    "verify:admin-analytics": "node scripts/verify-admin-analytics-v1.mjs",
     "verify:auth": "node scripts/verify-auth-foundation.mjs",
     "verify:ranktiger-rc": "node scripts/verify-ranktiger-release-candidate.mjs",
     "verify:ranktiger-backup": "node scripts/verify-ranktiger-prod-backup.mjs",
