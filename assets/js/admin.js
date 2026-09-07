@@ -2,6 +2,7 @@ import { APP_CONFIG, isConfigured } from './config.js';
 import { api } from './api.js';
 import { toast } from './toast.js';
 import { downloadJson, formatBytes, parseImportHtml } from './importEngine.js';
+import { testTypeLabel } from './testTypes.js';
 import { createTurnstileController } from './turnstile.js';
 
 const elements = {
@@ -119,6 +120,20 @@ const elements = {
   refreshPublishedImageRepairs: document.getElementById('refreshPublishedImageRepairs'),
   clearPublishedImageRepairFilters: document.getElementById('clearPublishedImageRepairFilters'),
   loadMorePublishedImageRepairs: document.getElementById('loadMorePublishedImageRepairs'),
+  analyticsFilters: document.getElementById('adminAnalyticsFilters'),
+  analyticsRange: document.getElementById('adminAnalyticsRange'),
+  analyticsFrom: document.getElementById('adminAnalyticsFrom'),
+  analyticsTo: document.getElementById('adminAnalyticsTo'),
+  analyticsExam: document.getElementById('adminAnalyticsExam'),
+  analyticsTestType: document.getElementById('adminAnalyticsTestType'),
+  analyticsMeta: document.getElementById('adminAnalyticsMeta'),
+  analyticsTrend: document.getElementById('adminAnalyticsTrend'),
+  analyticsTypes: document.getElementById('adminAnalyticsTypes'),
+  analyticsTestTableBody: document.getElementById('adminAnalyticsTestTableBody'),
+  analyticsTestTableMeta: document.getElementById('adminAnalyticsTestTableMeta'),
+  analyticsPrev: document.getElementById('adminAnalyticsPrev'),
+  analyticsNext: document.getElementById('adminAnalyticsNext'),
+  analyticsPage: document.getElementById('adminAnalyticsPage'),
 };
 
 let profile = null;
@@ -172,6 +187,12 @@ let imageRepairSummary = {
   content_ready: 0,
 };
 let adminTaskInbox = null;
+const ADMIN_ANALYTICS_PAGE_SIZE = 20;
+let adminAnalytics = null;
+let adminAnalyticsTable = { items: [], total: 0, offset: 0, limit: ADMIN_ANALYTICS_PAGE_SIZE };
+let adminAnalyticsFiltersApplied = null;
+let adminAnalyticsPage = 0;
+let adminAnalyticsLoading = false;
 let activeRepairQueue = 'draft';
 let publishedImageRepairPage = 0;
 let publishedImageRepairTotal = 0;
@@ -192,6 +213,11 @@ const ADMIN_VIEW_META = Object.freeze({
     eyebrow: 'Operations overview',
     title: 'Admin Dashboard',
     description: 'See the current queues, continue the next safe action, and move between admin functions without scrolling through one long page.',
+  },
+  analytics: {
+    eyebrow: 'Privacy-safe learning signals',
+    title: 'Admin Analytics',
+    description: 'Understand student engagement, test performance and content health through protected aggregate reporting.',
   },
   import: {
     eyebrow: 'Question workflow · Stage 1',
@@ -264,10 +290,14 @@ function setAdminView(view, { updateHash = true, scroll = true } = {}) {
     const content = document.querySelector('.admin-workspace-main');
     content?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  if (nextView === 'analytics' && document.body.classList.contains('admin-authenticated') && !adminAnalytics) {
+    void loadAdminAnalytics();
+  }
 }
 
 function initializeAdminWorkspaceNavigation() {
-  const fromHash = String(location.hash || '').match(/^#admin-(dashboard|import|repair|review|publish|tests|catalogue)$/)?.[1];
+  const fromHash = String(location.hash || '').match(/^#admin-(dashboard|analytics|import|repair|review|publish|tests|catalogue)$/)?.[1];
   let stored = '';
   try { stored = sessionStorage.getItem('scoremore-admin-active-view') || ''; } catch {}
   setAdminView(fromHash || stored || 'dashboard', { updateHash: Boolean(fromHash), scroll: false });
@@ -277,7 +307,7 @@ function initializeAdminWorkspaceNavigation() {
   });
 
   window.addEventListener('hashchange', () => {
-    const requested = String(location.hash || '').match(/^#admin-(dashboard|import|repair|review|publish|tests|catalogue)$/)?.[1];
+    const requested = String(location.hash || '').match(/^#admin-(dashboard|analytics|import|repair|review|publish|tests|catalogue)$/)?.[1];
     if (requested && requested !== activeAdminView) setAdminView(requested, { updateHash: false, scroll: false });
   });
 }
@@ -289,6 +319,263 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+function indiaDateString(offsetDays = 0) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date()).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  const base = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
+  base.setUTCDate(base.getUTCDate() + offsetDays);
+  return base.toISOString().slice(0, 10);
+}
+
+function formatAnalyticsValue(value, format = 'integer') {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '—';
+  if (format === 'percent') return `${number.toLocaleString('en-IN', { maximumFractionDigits: 1 })}%`;
+  if (format === 'decimal') return number.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  if (format === 'duration') {
+    const seconds = Math.max(0, Math.round(number));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return hours ? `${hours}h ${minutes}m` : `${minutes}m`;
+  }
+  return Math.round(number).toLocaleString('en-IN');
+}
+
+function formatAnalyticsDate(value, { includeTime = false } = {}) {
+  if (!value) return '—';
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? `${value}T12:00:00Z` : value;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    ...(includeTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+  }).format(date);
+}
+
+function configureAnalyticsDates() {
+  if (!elements.analyticsRange || !elements.analyticsFrom || !elements.analyticsTo) return;
+  const custom = elements.analyticsRange.value === 'CUSTOM';
+  document.querySelectorAll('.analytics-custom-date').forEach((field) => field.classList.toggle('hidden', !custom));
+  const today = indiaDateString();
+  elements.analyticsFrom.max = today;
+  elements.analyticsTo.max = today;
+  if (custom) {
+    if (!elements.analyticsFrom.value) elements.analyticsFrom.value = indiaDateString(-29);
+    if (!elements.analyticsTo.value) elements.analyticsTo.value = today;
+    return;
+  }
+  const days = elements.analyticsRange.value === 'TODAY' ? 1 : Number(elements.analyticsRange.value || 30);
+  elements.analyticsFrom.value = indiaDateString(-(Math.max(1, days) - 1));
+  elements.analyticsTo.value = today;
+}
+
+function readAnalyticsFilters() {
+  configureAnalyticsDates();
+  const startDate = elements.analyticsFrom?.value || '';
+  const endDate = elements.analyticsTo?.value || '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || endDate < startDate) {
+    throw new Error('Choose a valid analytics date range.');
+  }
+  if (endDate > indiaDateString()) throw new Error('Analytics dates cannot be in the future.');
+  const spanDays = Math.round((Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86400000);
+  if (spanDays > 365) throw new Error('Analytics ranges cannot exceed 366 days.');
+  return {
+    startDate,
+    endDate,
+    examId: elements.analyticsExam?.value || '',
+    testType: elements.analyticsTestType?.value || '',
+  };
+}
+
+function populateAnalyticsExamFilter() {
+  if (!elements.analyticsExam) return;
+  const selected = elements.analyticsExam.value;
+  elements.analyticsExam.innerHTML = `<option value="">All exams</option>${referenceData.exams.map((exam) => `<option value="${escapeHtml(exam.exam_id)}">${escapeHtml(exam.exam_name)}</option>`).join('')}`;
+  if ([...elements.analyticsExam.options].some((option) => option.value === selected)) {
+    elements.analyticsExam.value = selected;
+  }
+}
+
+function setAdminAnalyticsTab(tab) {
+  const nextTab = ['overview', 'students', 'tests', 'content'].includes(tab) ? tab : 'overview';
+  document.querySelectorAll('[data-analytics-tab]').forEach((control) => {
+    const active = control.dataset.analyticsTab === nextTab;
+    control.classList.toggle('active', active);
+    control.setAttribute('aria-selected', String(active));
+    control.tabIndex = active ? 0 : -1;
+  });
+  document.querySelectorAll('[data-analytics-tab-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.analyticsTabPanel !== nextTab;
+  });
+}
+
+function nestedAnalyticsValue(source, path) {
+  return String(path || '').split('.').reduce((value, key) => value?.[key], source);
+}
+
+function renderAdminAnalyticsTrend(items = []) {
+  if (!elements.analyticsTrend) return;
+  const maximum = Math.max(0, ...items.map((item) => Number(item.starts) || 0));
+  if (!items.length) {
+    elements.analyticsTrend.innerHTML = '<div class="empty-inline">No dates in this range.</div>';
+    return;
+  }
+  elements.analyticsTrend.innerHTML = items.map((item) => {
+    const starts = Number(item.starts) || 0;
+    const submissions = Number(item.submissions) || 0;
+    const startHeight = maximum ? Math.round((starts / maximum) * 100) : 0;
+    const submissionHeight = maximum ? Math.round((submissions / maximum) * 100) : 0;
+    return `<div class="admin-analytics-trend-day" title="${escapeHtml(formatAnalyticsDate(item.date))}: ${starts} starts, ${submissions} submitted"><div class="admin-analytics-trend-bars"><i style="height:${startHeight}%"></i><i style="height:${submissionHeight}%"></i></div><small>${escapeHtml(String(item.date).slice(5))}</small></div>`;
+  }).join('');
+}
+
+function renderAdminAnalyticsTypes(items = []) {
+  if (!elements.analyticsTypes) return;
+  const maximum = Math.max(0, ...items.map((item) => Number(item.starts) || 0));
+  if (!items.length || maximum === 0) {
+    elements.analyticsTypes.innerHTML = '<div class="empty-inline">No test starts for this scope.</div>';
+    return;
+  }
+  elements.analyticsTypes.innerHTML = items.map((item) => {
+    const starts = Number(item.starts) || 0;
+    const submissions = Number(item.submissions) || 0;
+    const width = Math.max(2, Math.round((starts / maximum) * 100));
+    return `<div class="admin-analytics-type-row"><div class="admin-analytics-type-copy"><strong>${escapeHtml(testTypeLabel(item.test_type, { plural: true }))}</strong><small>${starts.toLocaleString('en-IN')} starts · ${submissions.toLocaleString('en-IN')} submitted</small></div><div class="admin-analytics-type-track"><i style="width:${width}%"></i></div></div>`;
+  }).join('');
+}
+
+function renderAdminTestAnalyticsTable() {
+  const items = Array.isArray(adminAnalyticsTable?.items) ? adminAnalyticsTable.items : [];
+  const total = Number(adminAnalyticsTable?.total) || 0;
+  const first = total ? adminAnalyticsPage * ADMIN_ANALYTICS_PAGE_SIZE + 1 : 0;
+  const last = Math.min(total, first + items.length - 1);
+  if (elements.analyticsTestTableMeta) {
+    elements.analyticsTestTableMeta.textContent = total ? `Showing ${first}–${last} of ${total} student-ready published tests.` : 'No student-ready published tests match this scope.';
+  }
+  if (elements.analyticsTestTableBody) {
+    elements.analyticsTestTableBody.innerHTML = items.length ? items.map((item) => `
+      <tr>
+        <td><strong>${escapeHtml(item.test_name)}</strong><small>${escapeHtml(item.exam_name || item.exam_id || '—')}</small></td>
+        <td>${escapeHtml(testTypeLabel(item.test_type))}</td>
+        <td>${formatAnalyticsValue(item.starts)}</td>
+        <td>${formatAnalyticsValue(item.submissions)}</td>
+        <td>${formatAnalyticsValue(item.completion_rate, 'percent')}</td>
+        <td>${formatAnalyticsValue(item.average_score, 'percent')}</td>
+        <td>${formatAnalyticsValue(item.average_accuracy, 'percent')}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="7">No matching test performance rows.</td></tr>';
+  }
+  const pageCount = Math.max(1, Math.ceil(total / ADMIN_ANALYTICS_PAGE_SIZE));
+  if (elements.analyticsPage) elements.analyticsPage.textContent = `Page ${Math.min(adminAnalyticsPage + 1, pageCount)} of ${pageCount}`;
+  if (elements.analyticsPrev) elements.analyticsPrev.disabled = adminAnalyticsLoading || adminAnalyticsPage <= 0;
+  if (elements.analyticsNext) elements.analyticsNext.disabled = adminAnalyticsLoading || ((adminAnalyticsPage + 1) * ADMIN_ANALYTICS_PAGE_SIZE >= total);
+}
+
+function renderAdminAnalytics() {
+  const overview = adminAnalytics?.overview || {};
+  document.querySelectorAll('[data-analytics-metric]').forEach((element) => {
+    element.textContent = formatAnalyticsValue(overview[element.dataset.analyticsMetric], element.dataset.format || 'integer');
+  });
+  const health = adminAnalytics?.content_health || {};
+  document.querySelectorAll('[data-content-health]').forEach((element) => {
+    element.textContent = formatAnalyticsValue(nestedAnalyticsValue(health, element.dataset.contentHealth));
+  });
+  renderAdminAnalyticsTrend(adminAnalytics?.trend || []);
+  renderAdminAnalyticsTypes(adminAnalytics?.test_type_distribution || []);
+  renderAdminTestAnalyticsTable();
+
+  if (elements.analyticsMeta) {
+    const period = adminAnalytics?.period || {};
+    const filterParts = [
+      period.exam_id ? elements.analyticsExam?.selectedOptions?.[0]?.textContent : 'All exams',
+      period.test_type ? testTypeLabel(period.test_type) : 'All test types',
+    ];
+    elements.analyticsMeta.textContent = `Updated ${formatAnalyticsDate(adminAnalytics?.generated_at, { includeTime: true })} · ${formatAnalyticsDate(period.start_date)} to ${formatAnalyticsDate(period.end_date)} · ${filterParts.join(' · ')} · India time`;
+  }
+}
+
+function resetAdminAnalyticsState() {
+  adminAnalytics = null;
+  adminAnalyticsTable = { items: [], total: 0, offset: 0, limit: ADMIN_ANALYTICS_PAGE_SIZE };
+  adminAnalyticsFiltersApplied = null;
+  adminAnalyticsPage = 0;
+  document.querySelectorAll('[data-analytics-metric], [data-content-health]').forEach((element) => { element.textContent = '—'; });
+  if (elements.analyticsTrend) elements.analyticsTrend.innerHTML = '';
+  if (elements.analyticsTypes) elements.analyticsTypes.innerHTML = '';
+  if (elements.analyticsMeta) elements.analyticsMeta.textContent = 'Open Analytics to load aggregate reporting.';
+  renderAdminTestAnalyticsTable();
+}
+
+async function loadAdminAnalytics({ announce = false, resetPage = true } = {}) {
+  if (adminAnalyticsLoading || !document.body.classList.contains('admin-authenticated')) return;
+  let filters;
+  try {
+    filters = readAnalyticsFilters();
+  } catch (error) {
+    toast.warning(error.message);
+    return;
+  }
+
+  if (resetPage) adminAnalyticsPage = 0;
+  adminAnalyticsLoading = true;
+  setBusy(elements.analyticsFilters, true);
+  if (elements.analyticsMeta) elements.analyticsMeta.textContent = 'Loading protected aggregate analytics…';
+  renderAdminTestAnalyticsTable();
+  try {
+    const [summary, table] = await Promise.all([
+      api.getAdminAnalyticsV1(filters),
+      api.listAdminTestAnalyticsV1({
+        ...filters,
+        offset: adminAnalyticsPage * ADMIN_ANALYTICS_PAGE_SIZE,
+        limit: ADMIN_ANALYTICS_PAGE_SIZE,
+      }),
+    ]);
+    adminAnalytics = summary;
+    adminAnalyticsTable = table;
+    adminAnalyticsFiltersApplied = filters;
+    renderAdminAnalytics();
+    if (announce) toast.success('Analytics refreshed.');
+  } catch (error) {
+    if (elements.analyticsMeta) elements.analyticsMeta.textContent = `${error.message} Your admin session remains active.`;
+    toast.error(error.message);
+  } finally {
+    adminAnalyticsLoading = false;
+    setBusy(elements.analyticsFilters, false);
+    renderAdminTestAnalyticsTable();
+  }
+}
+
+async function loadAdminAnalyticsTablePage(page) {
+  if (adminAnalyticsLoading || !adminAnalyticsFiltersApplied) return;
+  const totalPages = Math.max(1, Math.ceil((Number(adminAnalyticsTable.total) || 0) / ADMIN_ANALYTICS_PAGE_SIZE));
+  const nextPage = Math.max(0, Math.min(page, totalPages - 1));
+  if (nextPage === adminAnalyticsPage) return;
+  const previousPage = adminAnalyticsPage;
+  adminAnalyticsPage = nextPage;
+  adminAnalyticsLoading = true;
+  renderAdminTestAnalyticsTable();
+  try {
+    adminAnalyticsTable = await api.listAdminTestAnalyticsV1({
+      ...adminAnalyticsFiltersApplied,
+      offset: adminAnalyticsPage * ADMIN_ANALYTICS_PAGE_SIZE,
+      limit: ADMIN_ANALYTICS_PAGE_SIZE,
+    });
+  } catch (error) {
+    adminAnalyticsPage = previousPage;
+    toast.error(error.message);
+  } finally {
+    adminAnalyticsLoading = false;
+    renderAdminTestAnalyticsTable();
+  }
 }
 
 function safePreviewUrl(value) {
@@ -349,6 +636,7 @@ function showSessionProblem(error) {
 function showLogin() {
   profile = null;
   pendingMfaFactorId = null;
+  resetAdminAnalyticsState();
   document.body.classList.remove('admin-authenticated');
   closeAdminSidebar();
   elements.sessionPanel.classList.add('hidden');
@@ -496,6 +784,10 @@ async function showAdmin({ reloadData = true, announceSessionError = true } = {}
         // Data/API failures must never be interpreted as an authentication failure.
         toast.error(`${error.message} Admin session remains active.`);
       }
+    }
+
+    if (activeAdminView === 'analytics' && !adminAnalytics) {
+      await loadAdminAnalytics();
     }
 
     return true;
@@ -2146,6 +2438,7 @@ async function loadReferenceData() {
   referenceData = await api.getAdminReferenceData();
   refreshDraftReferenceSelects();
   refreshTestReferenceSelects();
+  populateAnalyticsExamFilter();
   updateTestTypeUi();
 }
 
@@ -4064,6 +4357,27 @@ function downloadCurrentImportReport() {
 
 function bindEvents() {
   initializeAdminWorkspaceNavigation();
+  configureAnalyticsDates();
+  setAdminAnalyticsTab('overview');
+  elements.analyticsFilters?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void loadAdminAnalytics({ announce: true, resetPage: true });
+  });
+  elements.analyticsRange?.addEventListener('change', configureAnalyticsDates);
+  document.querySelectorAll('[data-analytics-tab]').forEach((tab) => {
+    tab.addEventListener('click', () => setAdminAnalyticsTab(tab.dataset.analyticsTab));
+    tab.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const tabs = [...document.querySelectorAll('[data-analytics-tab]')];
+      const current = tabs.indexOf(tab);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      setAdminAnalyticsTab(tabs[next].dataset.analyticsTab);
+      tabs[next].focus();
+    });
+  });
+  elements.analyticsPrev?.addEventListener('click', () => { void loadAdminAnalyticsTablePage(adminAnalyticsPage - 1); });
+  elements.analyticsNext?.addEventListener('click', () => { void loadAdminAnalyticsTablePage(adminAnalyticsPage + 1); });
   setRepairQueueMode('draft');
   elements.mfaChallengeForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
