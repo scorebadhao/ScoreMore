@@ -85,10 +85,12 @@ requireText('homepageMigration', [
   'revoke all on function public.get_public_stats() from public, anon, authenticated;',
   'grant execute on function public.get_public_stats() to anon, authenticated;',
 ]);
-forbidText('homepageMigration', [/student_attempts/i, /from public\.attempts/i]);
-
-forbidText('admin', [/data-admin-view="analytics"/i, /Admin Analytics/i]);
-forbidText('api', [/get_admin_analytics_v1/i, /list_admin_test_analytics_v1/i]);
+forbidText('homepageMigration', [
+  /student_attempts/i,
+  /from public\.attempts/i,
+  /get_admin_analytics_v1/i,
+  /list_admin_test_analytics_v1/i,
+]);
 
 for (const [name, html] of [
   ['index.html', sources.index],
@@ -106,4 +108,4 @@ if (failures.length) {
 }
 
 console.log('PASS: homepage trust, test taxonomy, truthful category counts, and resilient connection status are structurally wired.');
-console.log('PASS: migration 27 exposes content-only public counts and Release 1 contains no Admin Analytics v1 surface.');
+console.log('PASS: migration 27 remains a content-only public-count boundary; Admin Analytics is independently verified by migrations 28–29.');

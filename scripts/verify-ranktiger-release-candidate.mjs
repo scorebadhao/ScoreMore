@@ -3,8 +3,10 @@ import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const EXPECTED_MIGRATION_LOCK_FILE = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_27.json';
-const EXPECTED_MIGRATION_COUNT = 27;
+const EXPECTED_MIGRATION_LOCK_FILE = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json';
+const EXPECTED_MIGRATION_COUNT = 30;
+const EXPECTED_CANDIDATE_VERSION = '1.2.0-rc.1';
+const TAXONOMY_MIGRATION = '20260907202905_ranktiger_completed_practice_taxonomy_names.sql';
 const problems = [];
 const pass = (condition, message) => { if (!condition) problems.push(message); };
 const sha256 = (body) => createHash('sha256').update(body).digest('hex');
@@ -17,8 +19,9 @@ pass(policy.productionRepository === 'RankTiger', 'Release policy production rep
 pass(policy.buildTarget === 'ranktiger', 'Release build target must be ranktiger.');
 pass(policy.basePath === '/', 'RankTiger production base path must be /.');
 pass(policy.dependencyLockRequired === true, 'RankTiger release candidate must require a committed dependency lock.');
-pass(policy.requiredMigrationCount === EXPECTED_MIGRATION_COUNT, 'RankTiger release policy must recognize the approved 27-migration homepage baseline.');
-pass(policy.requiredMigrationLockFile === EXPECTED_MIGRATION_LOCK_FILE, 'RankTiger release policy must use the immutable 27-migration lock.');
+pass(policy.requiredMigrationCount === EXPECTED_MIGRATION_COUNT, 'RankTiger release policy must recognize the approved 30-migration RankTiger 1.2.0 baseline.');
+pass(policy.requiredMigrationLockFile === EXPECTED_MIGRATION_LOCK_FILE, 'RankTiger release policy must use the immutable 30-migration lock.');
+pass(policy.firstCandidateVersion === EXPECTED_CANDIDATE_VERSION, 'RankTiger release policy must begin the 1.2.0 candidate line at 1.2.0-rc.1.');
 pass(policy.productionDeployEnabled === false, 'RankTiger release candidate must not enable production deployment.');
 pass(policy.productionDatabaseMigrationEnabled === false, 'RankTiger release candidate must not migrate production database.');
 
@@ -28,9 +31,10 @@ const lockedMigrationNames = Object.keys(lockedMigrations).sort();
 const sourceMigrationNames = (await readdir(resolve(ROOT, 'supabase/migrations')))
   .filter((name) => name.endsWith('.sql'))
   .sort();
-pass(migrationLock.lock_version === 'RANKTIGER_27', 'RankTiger migration lock version must be RANKTIGER_27.');
-pass(migrationLock.migration_count === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock metadata must declare 27 migrations.');
-pass(lockedMigrationNames.length === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock must contain exactly 27 checksum entries.');
+pass(migrationLock.lock_version === 'RANKTIGER_30', 'RankTiger migration lock version must be RANKTIGER_30.');
+pass(migrationLock.migration_count === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock metadata must declare 30 migrations.');
+pass(lockedMigrationNames.length === EXPECTED_MIGRATION_COUNT, 'RankTiger migration lock must contain exactly 30 checksum entries.');
+pass(lockedMigrationNames.includes(TAXONOMY_MIGRATION), 'RankTiger migration lock must include the reviewed completed-practice taxonomy correction.');
 pass(JSON.stringify(sourceMigrationNames) === JSON.stringify(lockedMigrationNames), 'Source migration files must exactly match the approved RankTiger lock.');
 for (const name of lockedMigrationNames) {
   const expected = lockedMigrations[name];
@@ -117,9 +121,10 @@ const pkg = JSON.parse(await readFile(resolve(ROOT, 'package.json'), 'utf8'));
 pass(pkg.scripts?.['verify:dependency-lock'] === 'node scripts/verify-dependency-lock.mjs', 'verify:dependency-lock script is missing.');
 pass(pkg.scripts?.['verify:ranktiger-rc'] === 'node scripts/verify-ranktiger-release-candidate.mjs', 'verify:ranktiger-rc script is missing.');
 pass(pkg.scripts?.['verify:auth'] === 'node scripts/verify-auth-foundation.mjs', 'verify:auth script is missing.');
+pass(pkg.scripts?.['verify:admin-analytics'] === 'node scripts/verify-admin-analytics-v1.mjs', 'verify:admin-analytics script is missing.');
 pass(
-  pkg.scripts?.['verify:patch6'] === 'npm run verify:patch5 && npm run verify:ranktiger-rc && npm run verify:dependency-lock && npm run verify:ranktiger-backup && npm run verify:auth && npm run verify:homepage-trust',
-  'verify:patch6 must include Patch 5 + RC structure + dependency lock + RankTiger backup safety + auth safety + homepage trust safety.',
+  pkg.scripts?.['verify:patch6'] === 'npm run verify:patch5 && npm run verify:ranktiger-rc && npm run verify:dependency-lock && npm run verify:ranktiger-backup && npm run verify:auth && npm run verify:homepage-trust && npm run verify:admin-analytics',
+  'verify:patch6 must include Patch 5 + RC structure + dependency lock + RankTiger backup safety + auth + homepage trust + Admin Analytics safety.',
 );
 
 if (problems.length) {
@@ -128,7 +133,7 @@ if (problems.length) {
   process.exit(1);
 }
 
-console.log('PASS: RankTiger 27-migration release-candidate machinery is candidate-only and production-safe.');
+console.log('PASS: RankTiger 1.2.0 30-migration release-candidate machinery is candidate-only and production-safe.');
 console.log('RankTiger repository push: DISABLED');
 console.log('RankTiger PROD database migration: DISABLED');
 console.log('Cloudflare deployment: DISABLED');

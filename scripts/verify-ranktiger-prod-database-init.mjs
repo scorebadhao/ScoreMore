@@ -3,20 +3,29 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 
 const root = process.cwd();
+const migrationsRoot = path.join(root, 'supabase', 'migrations');
 const workflowPath = path.join(root, '.github', 'workflows', 'initialize-ranktiger-prod-db.yml');
 const releasePolicyPath = path.join(root, 'ranktiger-release.config.json');
 const patch3LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH3.json');
 const patch52LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json');
-const previousActiveLockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_26.json');
-const expectedActiveLockFile = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_27.json';
-const expectedActiveMigrationCount = 27;
+const productionBaselineLockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json');
+const previousCandidateLockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_27.json');
+const expectedActiveLockFile = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json';
+const expectedActiveMigrationCount = 30;
+
 const authMigrationName = '20260830010000_student_google_auth_onboarding.sql';
 const homepageMigrationName = '20260901173216_homepage_test_category_stats.sql';
+const analyticsMigrationName = '20260901173351_admin_analytics_v1.sql';
+const analyticsFixMigrationName = '20260902085235_admin_analytics_score_normalization_fix.sql';
+const taxonomyMigrationName = '20260907202905_ranktiger_completed_practice_taxonomy_names.sql';
 const prerequisiteName = '20260805000050_catalogue_parent_prerequisites.sql';
-const prerequisitePath = path.join(root, 'supabase', 'migrations', prerequisiteName);
 const phase3eName = '20260805000100_phase3e_compatibility.sql';
 const catalogueMigrationName = '20260811020000_public_catalogue_baseline.sql';
-const catalogueMigrationPath = path.join(root, 'supabase', 'migrations', catalogueMigrationName);
+
+const migrationPath = (name) => path.join(migrationsRoot, name);
+const prerequisitePath = migrationPath(prerequisiteName);
+const catalogueMigrationPath = migrationPath(catalogueMigrationName);
+const taxonomyMigrationPath = migrationPath(taxonomyMigrationName);
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -27,29 +36,73 @@ function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-for (const required of [workflowPath, releasePolicyPath, patch3LockPath, patch52LockPath, previousActiveLockPath, prerequisitePath, catalogueMigrationPath]) {
+function loadJson(filePath, label) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    fail(`${label} is missing or invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    return {};
+  }
+}
+
+function verifyLock(lock, { label, version, count, requireMetadata = true }) {
+  const approved = lock?.migrations ?? {};
+  if (version && lock.lock_version !== version) fail(`${label} lock version must be ${version}.`);
+  if ((requireMetadata && lock.migration_count !== count) || Object.keys(approved).length !== count) {
+    fail(`${label} must contain exactly ${count} migration checksums.`);
+  }
+  for (const [name, expected] of Object.entries(approved)) {
+    const filePath = migrationPath(name);
+    if (!fs.existsSync(filePath)) {
+      fail(`${label} migration is missing: ${name}`);
+      continue;
+    }
+    if (!/^[0-9a-f]{64}$/.test(expected) || sha256(filePath) !== expected) {
+      fail(`${label} migration checksum mismatch: ${name}`);
+    }
+  }
+  return approved;
+}
+
+for (const required of [
+  workflowPath,
+  releasePolicyPath,
+  patch3LockPath,
+  patch52LockPath,
+  productionBaselineLockPath,
+  previousCandidateLockPath,
+  prerequisitePath,
+  catalogueMigrationPath,
+  taxonomyMigrationPath,
+]) {
   if (!fs.existsSync(required)) fail(`Missing required RankTiger promotion-safety file: ${path.relative(root, required)}`);
 }
 if (process.exitCode) process.exit();
 
-const releasePolicy = JSON.parse(fs.readFileSync(releasePolicyPath, 'utf8'));
+const releasePolicy = loadJson(releasePolicyPath, 'RankTiger release policy');
 if (releasePolicy.requiredMigrationLockFile !== expectedActiveLockFile) {
   fail(`RankTiger release policy must use ${expectedActiveLockFile}.`);
 }
 if (releasePolicy.requiredMigrationCount !== expectedActiveMigrationCount) {
   fail(`RankTiger release policy must require exactly ${expectedActiveMigrationCount} migrations.`);
 }
-const activeLockPath = path.join(root, releasePolicy.requiredMigrationLockFile);
+if (releasePolicy.firstCandidateVersion !== '1.2.0-rc.1') {
+  fail('RankTiger release policy must begin the 1.2.0 candidate line at 1.2.0-rc.1.');
+}
+
+const activeLockPath = path.join(root, releasePolicy.requiredMigrationLockFile || '');
 if (!fs.existsSync(activeLockPath)) fail(`Missing active RankTiger migration lock: ${releasePolicy.requiredMigrationLockFile}`);
 if (process.exitCode) process.exit();
 
 const workflow = fs.readFileSync(workflowPath, 'utf8');
 const prerequisite = fs.readFileSync(prerequisitePath, 'utf8');
 const catalogue = fs.readFileSync(catalogueMigrationPath, 'utf8');
-const patch3Locked = JSON.parse(fs.readFileSync(patch3LockPath, 'utf8'));
-const patch52Locked = JSON.parse(fs.readFileSync(patch52LockPath, 'utf8'));
-const previousActiveLocked = JSON.parse(fs.readFileSync(previousActiveLockPath, 'utf8'));
-const activeLocked = JSON.parse(fs.readFileSync(activeLockPath, 'utf8'));
+const taxonomy = fs.readFileSync(taxonomyMigrationPath, 'utf8');
+const patch3Locked = loadJson(patch3LockPath, 'Patch 3 lock');
+const patch52Locked = loadJson(patch52LockPath, 'Patch 5.2 lock');
+const productionBaselineLocked = loadJson(productionBaselineLockPath, 'RankTiger 25 production lock');
+const previousCandidateLocked = loadJson(previousCandidateLockPath, 'RankTiger 27 candidate lock');
+const activeLocked = loadJson(activeLockPath, 'RankTiger 30 active lock');
 
 const requiredWorkflowFragments = [
   'INITIALIZE_RANKTIGER_PROD',
@@ -69,6 +122,8 @@ const requiredWorkflowFragments = [
   'Missing remote migration versions after deploy',
   'Unapproved remote migration versions detected after deploy',
   'verify-ranktiger-prod-database-init.mjs',
+  'all 30 locked migrations',
+  'Locked migrations verified: 30',
 ];
 for (const fragment of requiredWorkflowFragments) {
   if (!workflow.includes(fragment)) fail(`RankTiger workflow is missing required safety/apply fragment: ${fragment}`);
@@ -88,66 +143,43 @@ for (const pattern of forbiddenWorkflowPatterns) {
   if (pattern.test(workflow)) fail(`RankTiger workflow contains forbidden operation/pattern: ${pattern}`);
 }
 
-const forbiddenDevSecrets = [
+for (const secret of [
   'secrets.SUPABASE_DB_PASSWORD',
   'secrets.SUPABASE_PROJECT_ID',
   'secrets.VITE_SUPABASE_URL',
   'secrets.VITE_SUPABASE_PUBLISHABLE_KEY',
-];
-for (const secret of forbiddenDevSecrets) {
+]) {
   if (workflow.includes(secret)) fail(`RankTiger workflow must not reference ScoreMore DEV secret: ${secret}`);
 }
 
-// Patch 3's original 18 migrations are immutable.
-const original = patch3Locked?.migrations ?? {};
-if (Object.keys(original).length !== 18) fail(`Expected 18 Patch 3 historical migrations, found ${Object.keys(original).length}.`);
-for (const [name, expected] of Object.entries(original)) {
-  const filePath = path.join(root, 'supabase', 'migrations', name);
-  if (!fs.existsSync(filePath)) {
-    fail(`Historical migration is missing: ${name}`);
-    continue;
-  }
-  if (sha256(filePath) !== expected) fail(`Historical migration checksum mismatch: ${name}`);
-}
+const patch3Approved = verifyLock(patch3Locked, { label: 'Patch 3 historical lock', version: null, count: 18, requireMetadata: false });
+const patch52Approved = verifyLock(patch52Locked, { label: 'Patch 5.2 historical lock', version: 'PATCH5_2', count: 20 });
+const productionBaselineApproved = verifyLock(productionBaselineLocked, { label: 'RankTiger 1.1.0 production baseline', version: 'RANKTIGER_25', count: 25 });
+const previousCandidateApproved = verifyLock(previousCandidateLocked, { label: 'RankTiger 27 candidate baseline', version: 'RANKTIGER_27', count: 27 });
+const approved = verifyLock(activeLocked, { label: 'RankTiger 1.2.0 active lock', version: 'RANKTIGER_30', count: expectedActiveMigrationCount });
 
-// Patch 5.2 locks 18 historical migrations + prerequisite + catalogue baseline.
-const patch52Approved = patch52Locked?.migrations ?? {};
-if (Object.keys(patch52Approved).length !== 20) fail(`Expected 20 Patch 5.2 historical migrations, found ${Object.keys(patch52Approved).length}.`);
+for (const [name, expected] of Object.entries(patch3Approved)) {
+  if (patch52Approved[name] !== expected) fail(`Patch 5.2 lock does not preserve Patch 3 checksum: ${name}`);
+}
 for (const [name, expected] of Object.entries(patch52Approved)) {
-  const filePath = path.join(root, 'supabase', 'migrations', name);
-  if (!fs.existsSync(filePath)) {
-    fail(`Patch 5.2 historical migration is missing: ${name}`);
-    continue;
-  }
-  if (sha256(filePath) !== expected) fail(`Patch 5.2 historical migration checksum mismatch: ${name}`);
+  if (productionBaselineApproved[name] !== expected) fail(`RankTiger 25 lock does not preserve Patch 5.2 checksum: ${name}`);
+}
+for (const [name, expected] of Object.entries(productionBaselineApproved)) {
+  if (approved[name] !== expected) fail(`RankTiger 30 lock does not preserve production baseline checksum: ${name}`);
+}
+for (const [name, expected] of Object.entries(previousCandidateApproved)) {
+  if (approved[name] !== expected) fail(`RankTiger 30 lock does not preserve candidate-27 checksum: ${name}`);
 }
 
-// The active promotion lock must be an exact immutable snapshot of every source migration.
-const approved = activeLocked?.migrations ?? {};
 const approvedNames = Object.keys(approved).sort();
-const sourceMigrationNames = fs.readdirSync(path.join(root, 'supabase', 'migrations'))
+const sourceMigrationNames = fs.readdirSync(migrationsRoot)
   .filter((name) => name.endsWith('.sql'))
   .sort();
-if (activeLocked.lock_version !== 'RANKTIGER_27') fail('Active RankTiger migration lock version must be RANKTIGER_27.');
-if (activeLocked.migration_count !== expectedActiveMigrationCount) fail('Active RankTiger migration lock metadata must declare 27 migrations.');
-if (approvedNames.length !== expectedActiveMigrationCount) fail(`Expected 27 active RankTiger migration checksums, found ${approvedNames.length}.`);
 if (JSON.stringify(approvedNames) !== JSON.stringify(sourceMigrationNames)) {
-  fail('Source migration files do not exactly match the active RankTiger migration lock.');
+  fail('Source migration files do not exactly match the active RankTiger 30 migration lock.');
 }
-for (const [name, expected] of Object.entries(approved)) {
-  const filePath = path.join(root, 'supabase', 'migrations', name);
-  if (!fs.existsSync(filePath)) {
-    fail(`Active RankTiger migration is missing: ${name}`);
-    continue;
-  }
-  if (!/^[0-9a-f]{64}$/.test(expected) || sha256(filePath) !== expected) {
-    fail(`Active RankTiger migration checksum mismatch: ${name}`);
-  }
-}
-for (const [name, expected] of Object.entries(patch52Approved)) {
-  if (approved[name] !== expected) fail(`Active RankTiger lock does not preserve Patch 5.2 checksum: ${name}`);
-}
-const expectedNewMigrations = [
+
+const expectedAfterPatch52 = [
   '20260814010000_draft_first_image_content_repair_workflow.sql',
   '20260816010000_phase4a_safety_efficiency_v1.sql',
   '20260817010000_phase4a_facet_performance_fix.sql',
@@ -155,35 +187,42 @@ const expectedNewMigrations = [
   '20260826212517_admin_task_inbox_published_image_queue.sql',
   authMigrationName,
   homepageMigrationName,
+  analyticsMigrationName,
+  analyticsFixMigrationName,
+  taxonomyMigrationName,
 ];
-const addedMigrations = approvedNames.filter((name) => !(name in patch52Approved));
-if (JSON.stringify(addedMigrations) !== JSON.stringify(expectedNewMigrations)) {
-  fail(`Active RankTiger lock must add exactly the seven reviewed migrations; found: ${addedMigrations.join(', ')}`);
+const additionsAfterPatch52 = approvedNames.filter((name) => !(name in patch52Approved));
+if (JSON.stringify(additionsAfterPatch52) !== JSON.stringify(expectedAfterPatch52)) {
+  fail(`RankTiger 30 lock must add exactly the ten reviewed migrations after Patch 5.2; found: ${additionsAfterPatch52.join(', ')}`);
 }
 
-const previousApproved = previousActiveLocked?.migrations ?? {};
-if (previousActiveLocked.lock_version !== 'RANKTIGER_26' || previousActiveLocked.migration_count !== 26 || Object.keys(previousApproved).length !== 26) {
-  fail('The immutable previous RankTiger 26-migration lock is invalid.');
-}
-for (const [name, expected] of Object.entries(previousApproved)) {
-  if (approved[name] !== expected) fail(`Active RankTiger lock does not preserve the previous 26-migration checksum: ${name}`);
-}
-const additionsAfter26 = approvedNames.filter((name) => !(name in previousApproved));
-if (JSON.stringify(additionsAfter26) !== JSON.stringify([homepageMigrationName])) {
-  fail(`RankTiger 27 lock must add only the reviewed homepage migration after the immutable 26 baseline; found: ${additionsAfter26.join(', ')}`);
+const expectedAfterProduction = [
+  authMigrationName,
+  homepageMigrationName,
+  analyticsMigrationName,
+  analyticsFixMigrationName,
+  taxonomyMigrationName,
+];
+const additionsAfterProduction = approvedNames.filter((name) => !(name in productionBaselineApproved));
+if (JSON.stringify(additionsAfterProduction) !== JSON.stringify(expectedAfterProduction)) {
+  fail(`RankTiger 30 lock must add exactly migrations 26–30 after the immutable production baseline; found: ${additionsAfterProduction.join(', ')}`);
 }
 
-// The prerequisite must run immediately before the locked Phase 3E topic migration.
-const orderedNames = Object.keys(approved).sort();
+const expectedAfterCandidate27 = [analyticsMigrationName, analyticsFixMigrationName, taxonomyMigrationName];
+const additionsAfterCandidate27 = approvedNames.filter((name) => !(name in previousCandidateApproved));
+if (JSON.stringify(additionsAfterCandidate27) !== JSON.stringify(expectedAfterCandidate27)) {
+  fail(`RankTiger 30 lock must add only Analytics v1, its score fix, and taxonomy correction after candidate 27; found: ${additionsAfterCandidate27.join(', ')}`);
+}
+
+const orderedNames = approvedNames;
 const prereqIndex = orderedNames.indexOf(prerequisiteName);
 const phase3eIndex = orderedNames.indexOf(phase3eName);
 if (prereqIndex < 0 || phase3eIndex < 0 || prereqIndex + 1 !== phase3eIndex) {
   fail('Catalogue prerequisite migration must sort immediately before 20260805000100_phase3e_compatibility.sql.');
 }
 
-// It may write only the parent rows needed by Phase 3E: boards, exams, subjects.
 const prerequisiteAllowedTables = new Set(['boards', 'exams', 'subjects']);
-const prereqTargets = [...prerequisite.matchAll(/insert\s+into\s+(?:public\.)?([a-zA-Z0-9_]+)/gi)].map((m) => m[1].toLowerCase());
+const prereqTargets = [...prerequisite.matchAll(/insert\s+into\s+(?:public\.)?([a-zA-Z0-9_]+)/gi)].map((match) => match[1].toLowerCase());
 if (!prereqTargets.length) fail('Catalogue prerequisite migration contains no INSERT targets.');
 for (const target of new Set(prereqTargets)) {
   if (!prerequisiteAllowedTables.has(target)) fail(`Catalogue prerequisite writes to non-approved table: ${target}`);
@@ -191,26 +230,22 @@ for (const target of new Set(prereqTargets)) {
 for (const requiredSubject of ['REASONING', 'QUANTITATIVE_APTITUDE', 'ENGLISH', 'GUJARATI']) {
   if (!prerequisite.includes(`'${requiredSubject}'`)) fail(`Catalogue prerequisite is missing required subject: ${requiredSubject}`);
 }
-
-const forbiddenPrerequisitePatterns = [
+for (const pattern of [
   /insert\s+into\s+(?:public\.)?(topics|app_settings|profiles|questions|draft_questions|tests|attempts|attempt_answers|payments|package_access|admin_audit_logs)\b/i,
   /auth\.users/i,
   /service_role/i,
   /sb_secret_/i,
-];
-for (const pattern of forbiddenPrerequisitePatterns) {
+]) {
   if (pattern.test(prerequisite)) fail(`Catalogue prerequisite contains forbidden pattern: ${pattern}`);
 }
 
-// Production reference data remains versioned; never Supabase seed.
 const approvedCatalogueTables = new Set(['boards', 'exams', 'subjects', 'topics', 'app_settings']);
-const insertTargets = [...catalogue.matchAll(/insert\s+into\s+(?:public\.)?([a-zA-Z0-9_]+)/gi)].map((m) => m[1].toLowerCase());
+const insertTargets = [...catalogue.matchAll(/insert\s+into\s+(?:public\.)?([a-zA-Z0-9_]+)/gi)].map((match) => match[1].toLowerCase());
 if (!insertTargets.length) fail('Public catalogue migration contains no INSERT targets.');
 for (const target of new Set(insertTargets)) {
   if (!approvedCatalogueTables.has(target)) fail(`Public catalogue migration writes to non-approved table: ${target}`);
 }
-
-const forbiddenCatalogueTerms = [
+for (const pattern of [
   /['"]app_name['"]/i,
   /['"]app_mark['"]/i,
   /['"]app_environment['"]/i,
@@ -218,20 +253,68 @@ const forbiddenCatalogueTerms = [
   /auth\.users/i,
   /service_role/i,
   /sb_secret_/i,
-];
-for (const pattern of forbiddenCatalogueTerms) {
+]) {
   if (pattern.test(catalogue)) fail(`Public catalogue migration contains forbidden identity/test/user pattern: ${pattern}`);
+}
+
+const taxonomyIds = [
+  'GSSSB-CCE-2024-1705-S3-REAL-PYQ-V1-COMPLETED-PRACTICE-TEST',
+  'GSSSB-CCE-2024-2005-S1-REAL-PYQ-V1-COMPLETED-PRACTICE-TEST',
+  'GSSSB-CCE-2024-2005-S2-REAL-PYQ-V1-COMPLETED-PRACTICE-TEST',
+  'GSSSB-CCE-2024-2005-S3-REAL-PYQ-V1-COMPLETED-PRACTICE-TEST',
+  'GSSSB-CCE-2024-2005-S4-REAL-PYQ-V1-COMPLETED-PRACTICE-TEST',
+];
+const correctedNames = [
+  'CCE 2024 Completed Practice Test - 17 May Shift 3',
+  'CCE 2024 Completed Practice Test - 20 May Shift 1',
+  'CCE 2024 Completed Practice Test - 20 May Shift 2',
+  'CCE 2024 Completed Practice Test - 20 May Shift 3',
+  'CCE 2024 Completed Practice Test - 20 May Shift 4',
+];
+for (const id of taxonomyIds) {
+  const occurrences = taxonomy.split(id).length - 1;
+  if (occurrences < 3) fail(`Taxonomy migration does not fully guard and verify exact test ID: ${id}`);
+}
+for (const correctedName of correctedNames) {
+  if (!taxonomy.includes(`'${correctedName}'`)) fail(`Taxonomy migration is missing approved test name: ${correctedName}`);
+}
+for (const fragment of [
+  "set local lock_timeout = '5s'",
+  "set local statement_timeout = '30s'",
+  "t.test_type <> 'FULL_MOCK'",
+  "t.test_type = 'FULL_MOCK'",
+  't.test_name is distinct from v.corrected_name',
+  "upper(t.test_name) like '%PYQ%'",
+  "using errcode = 'P0001'",
+]) {
+  if (!taxonomy.includes(fragment)) fail(`Taxonomy migration is missing required safety fragment: ${fragment}`);
+}
+const taxonomyUpdateTargets = [...taxonomy.matchAll(/\bupdate\s+(?:public\.)?([a-z_][a-z0-9_]*)/gi)].map((match) => match[1].toLowerCase());
+if (!taxonomyUpdateTargets.length || taxonomyUpdateTargets.some((target) => target !== 'tests')) {
+  fail(`Taxonomy migration may update only public.tests; found: ${taxonomyUpdateTargets.join(', ') || 'none'}`);
+}
+for (const pattern of [
+  /\bdelete\s+from\b/i,
+  /\btruncate\b/i,
+  /\bdrop\s+(?:table|function|schema|type)\b/i,
+  /\balter\s+table\b/i,
+  /\binsert\s+into\b/i,
+  /auth\.users/i,
+  /service_role/i,
+  /sb_secret_/i,
+]) {
+  if (pattern.test(taxonomy)) fail(`Taxonomy migration contains forbidden operation/pattern: ${pattern}`);
 }
 
 if (process.exitCode) process.exit();
 console.log('PASS: RankTiger PROD database initialization is migration-only; production seed execution is forbidden.');
-console.log('PASS: Remote migration history is parsed from the remote column, must be an approved subset before write, and must exactly match after write.');
-console.log('PASS: 18 historical migrations remain unchanged.');
-console.log('PASS: 20-migration Patch 5.2 historical lock remains unchanged and is preserved by the active lock.');
-console.log('PASS: Fresh-environment catalogue parent prerequisite sorts immediately before the locked Phase 3E topic migration.');
-console.log('PASS: immutable 26-migration RankTiger baseline is preserved exactly.');
-console.log('PASS: 27 approved migrations exactly match the source set and are checksum-locked for RankTiger PROD.');
-console.log(`PASS: homepage addition after baseline: ${additionsAfter26.join(', ')}`);
-console.log(`PASS: reviewed promotion additions: ${addedMigrations.join(', ')}`);
+console.log('PASS: Remote migration history must be an approved subset before write and exactly match after write.');
+console.log('PASS: 18-migration Patch 3 and 20-migration Patch 5.2 historical locks remain immutable.');
+console.log('PASS: immutable 25-migration RankTiger 1.1.0 production baseline is preserved exactly.');
+console.log('PASS: immutable 27-migration candidate baseline is preserved exactly.');
+console.log('PASS: 30 approved migrations exactly match the source set and are checksum-locked for RankTiger 1.2.0.');
+console.log(`PASS: reviewed migrations after production baseline: ${additionsAfterProduction.join(', ')}`);
+console.log(`PASS: reviewed additions after candidate 27: ${additionsAfterCandidate27.join(', ')}`);
+console.log('PASS: completed-practice taxonomy correction is exact-ID, FULL_MOCK-guarded, bounded, and self-verifying.');
 console.log(`PASS: prerequisite targets only: ${[...new Set(prereqTargets)].sort().join(', ')}`);
 console.log(`PASS: versioned catalogue baseline targets only: ${[...new Set(insertTargets)].sort().join(', ')}`);
