@@ -12,9 +12,9 @@
   "releaseStatus": "candidate",
   "productionDeployEnabled": false,
   "productionDatabaseMigrationEnabled": false,
-  "notes": "RankTiger 1.2.0 promotion-readiness policy for the 30-migration authentication, homepage trust, Admin Analytics v1, score-normalization, and completed-practice taxonomy baseline. A candidate may be built only from a committed dependency lock, the immutable approved migration checksum set, and RankTiger PROD browser-safe values. It remains artifact-only: no RankTiger repository push, no production database migration, and no Cloudflare/domain deployment.",
+  "notes": "RankTiger 1.2.1 promotion-readiness policy for the 31-migration subject-safe sectional identity and atomic batch-draft update on top of the immutable RankTiger 1.2.0 baseline. A candidate may be built only from a committed dependency lock, the immutable approved migration checksum set, and RankTiger PROD browser-safe values. It remains artifact-only: no RankTiger repository push, no production database migration, and no Cloudflare/domain deployment.",
   "dependencyLockRequired": true,
-  "requiredMigrationLockFile": "docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json",
-  "requiredMigrationCount": 30,
-  "firstCandidateVersion": "1.2.0-rc.1"
+  "requiredMigrationLockFile": "docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_31.json",
+  "requiredMigrationCount": 31,
+  "firstCandidateVersion": "1.2.1-rc.1"
 }

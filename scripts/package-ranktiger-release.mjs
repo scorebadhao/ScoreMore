@@ -8,8 +8,8 @@ const DIST = resolve(ROOT, 'dist');
 const POLICY_FILE = resolve(ROOT, 'ranktiger-release.config.json');
 const PACKAGE_LOCK = resolve(ROOT, 'package-lock.json');
 const MIGRATIONS_DIR = resolve(ROOT, 'supabase/migrations');
-const EXPECTED_MIGRATION_LOCK_FILE = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json';
-const EXPECTED_MIGRATION_COUNT = 30;
+const EXPECTED_MIGRATION_LOCK_FILE = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_31.json';
+const EXPECTED_MIGRATION_COUNT = 31;
 
 function fail(message) {
   console.error(`\nERROR: ${message}`);
@@ -19,7 +19,7 @@ function fail(message) {
 function normalizeVersion(value) {
   const version = String(value || '').trim().replace(/^v/i, '');
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version)) {
-    fail('RANKTIGER_RELEASE_VERSION must be SemVer, for example 1.2.0 or 1.2.0-rc.1.');
+    fail('RANKTIGER_RELEASE_VERSION must be SemVer, for example 1.2.1 or 1.2.1-rc.1.');
   }
   return version;
 }
@@ -152,7 +152,7 @@ if (
   || policy.productionDeployEnabled !== false
   || policy.productionDatabaseMigrationEnabled !== false
 ) {
-  fail('RankTiger release policy is not in the approved 30-migration RankTiger 1.2.0 candidate-only safe mode.');
+  fail('RankTiger release policy is not in the approved 31-migration RankTiger 1.2.1 candidate-only safe mode.');
 }
 
 const migrationLockPath = resolve(ROOT, policy.requiredMigrationLockFile);
@@ -175,11 +175,11 @@ const migrationFiles = (await readdir(MIGRATIONS_DIR))
   .sort();
 
 if (
-  migrationLock.lock_version !== 'RANKTIGER_30'
+  migrationLock.lock_version !== 'RANKTIGER_31'
   || migrationLock.migration_count !== policy.requiredMigrationCount
   || lockedMigrationNames.length !== policy.requiredMigrationCount
 ) {
-  fail('RankTiger migration lock metadata does not match the approved 30-migration RankTiger 1.2.0 baseline.');
+  fail('RankTiger migration lock metadata does not match the approved 31-migration RankTiger 1.2.1 baseline.');
 }
 if (JSON.stringify(migrationFiles) !== JSON.stringify(lockedMigrationNames)) {
   fail('Source migration files do not exactly match the approved RankTiger migration lock.');

@@ -70,6 +70,14 @@ const elements = {
   selectAllFiltered: document.getElementById('phase4aSelectAllFiltered'),
   clearSelection: document.getElementById('phase4aClearSelection'),
   selectedBar: document.getElementById('phase4aSelectedBar'),
+  batchCard: document.getElementById('phase4aSectionalBatchCard'),
+  batchMarks: document.getElementById('phase4aBatchMarks'),
+  batchNegative: document.getElementById('phase4aBatchNegative'),
+  batchSortOrder: document.getElementById('phase4aBatchSortOrder'),
+  batchPreviewButton: document.getElementById('phase4aBatchPreviewButton'),
+  batchCreateButton: document.getElementById('phase4aBatchCreateButton'),
+  batchState: document.getElementById('phase4aBatchState'),
+  batchPanel: document.getElementById('phase4aBatchPanel'),
   testForm: document.getElementById('phase4aTestForm'),
   customTypeField: document.getElementById('phase4aCustomTypeField'),
   previewButton: document.getElementById('phase4aPreviewButton'),
@@ -102,6 +110,8 @@ const state = {
   questionRequestId: 0,
   filtersDirty: true,
   facetRefreshTimer: null,
+  batchPreview: null,
+  batchPreviewSignature: '',
 };
 
 const builderTurnstilePromise = createTurnstileController(
@@ -427,24 +437,46 @@ function buildIdentitySuggestion() {
   const packages = selectedValues('package_ids');
   if (!packages.length) return null;
   const subjects = selectedValues('subject_ids');
+  const topics = selectedValues('topic_ids');
   const years = selectedValues('exam_years');
 
   if (state.mode === 'PYQ_SECTIONAL' && packages.length > 1) {
     const subjectPart = subjects.length === 1 ? subjects[0] : subjects.length > 1 ? 'MULTI-SUBJECT' : 'SECTIONAL';
     const yearPart = years.length === 1 ? years[0] : '';
-    const token = stableIdentityToken([...packages, ...subjects, ...years]);
+    const topicPart = topics.length ? 'TOPIC' : '';
+    const token = stableIdentityToken([...packages, ...subjects, ...topics, ...years]);
     return {
-      testId: ['SECTIONAL', 'MULTI', yearPart, subjectPart, token].filter(Boolean).join('-').replace(/[^A-Z0-9-]/g, '-').replace(/-+/g, '-'),
+      testId: ['SECTIONAL', 'MULTI', yearPart, subjectPart, topicPart, token].filter(Boolean).join('-').replace(/[^A-Z0-9-]/g, '-').replace(/-+/g, '-'),
       testName: `Sectional test · ${packages.length} packages${subjects.length === 1 ? ` · ${subjects[0].replaceAll('_', ' ')}` : subjects.length > 1 ? ` · ${subjects.length} subjects` : ''}`,
       neutral: true,
     };
   }
 
   const packageId = packages[0];
+  if (state.mode === 'PYQ_SECTIONAL') {
+    if (!subjects.length) return null;
+    const subjectPart = subjects.length === 1 ? subjects[0] : subjects.length > 1 ? 'MULTI-SUBJECT' : 'SECTIONAL';
+    const topicPart = topics.length ? `TOPIC-${stableIdentityToken(topics)}` : '';
+    const scopeToken = subjects.length > 1 ? stableIdentityToken([...subjects, ...topics]) : '';
+    const packageOption = (state.facets.packages || []).find((item) => normalizeValue(item.value) === packageId);
+    const subjectOption = subjects.length === 1
+      ? (state.facets.subjects || []).find((item) => normalizeValue(item.value) === subjects[0])
+      : null;
+    const subjectLabel = subjectOption?.label || subjects[0]?.replaceAll('_', ' ') || 'Sectional';
+    return {
+      testId: [packageId, subjectPart, topicPart, scopeToken, 'SECTIONAL-TEST']
+        .filter(Boolean)
+        .join('-')
+        .replace(/[^A-Z0-9-]/g, '-')
+        .replace(/-+/g, '-'),
+      testName: `${packageOption?.label || packageId} · ${subjects.length > 1 ? `${subjects.length} subjects` : subjectLabel} sectional test`,
+      neutral: false,
+    };
+  }
+
   const suffix = ({
     PYQ_ORIGINAL: 'ORIGINAL-FULL-TEST',
     PYQ_COMPLETED: 'COMPLETED-PRACTICE-TEST',
-    PYQ_SECTIONAL: 'SECTIONAL-TEST',
     CUSTOM: 'CUSTOM-TEST',
   })[state.mode] || 'TEST';
   const packageOption = (state.facets.packages || []).find((item) => normalizeValue(item.value) === packageId);
@@ -461,6 +493,9 @@ function updateIdentityHint() {
   const packages = selectedValues('package_ids');
   if (state.mode === 'PYQ_SECTIONAL' && packages.length > 1) {
     elements.identityHint.textContent = `Multi-package sectional test: use a neutral test ID. ${APP_CONFIG.name} will preserve all ${packages.length} source package IDs in test provenance.`;
+    elements.identityHint.classList.add('is-important');
+  } else if (state.mode === 'PYQ_SECTIONAL' && packages.length === 1) {
+    elements.identityHint.textContent = 'The generated Test ID includes the subject (and a topic token when needed), so one package can safely contain separate Gujarati, English, Maths and Reasoning tests.';
     elements.identityHint.classList.add('is-important');
   } else {
     elements.identityHint.textContent = 'Use a clear test identity. Multi-package sectional tests use a neutral generated ID while preserving every source package in provenance.';
@@ -491,8 +526,17 @@ function maybeSuggestIdentity({ force = false } = {}) {
 function validateTestIdentity(payload) {
   if (payload.builderMode !== 'PYQ_SECTIONAL') return;
   const packages = Array.isArray(payload.filters?.package_ids) ? payload.filters.package_ids.map(normalizeValue) : [];
-  if (packages.length <= 1) return;
   const testId = normalizeValue(payload.testId);
+  const subjects = Array.isArray(payload.filters?.subject_ids) ? payload.filters.subject_ids.map(normalizeValue) : [];
+  if (packages.length === 1 && subjects.length > 0) {
+    const unsafeLegacyId = `${packages[0]}-SECTIONAL-TEST`
+      .replace(/[^A-Z0-9-]/g, '-')
+      .replace(/-+/g, '-');
+    if (testId === unsafeLegacyId) {
+      throw new Error('This old package-only Test ID is unsafe because every subject would share it. Use the generated subject-specific Test ID.');
+    }
+  }
+  if (packages.length <= 1) return;
   const misleading = packages.some((packageId) => testId === packageId || testId.startsWith(`${packageId}-`));
   if (misleading) {
     throw new Error('Multi-package sectional tests must use a neutral Test ID that does not look like one selected source package. Use the generated neutral ID or enter another neutral ID.');
@@ -582,6 +626,7 @@ function applyModeControlState({ normalizeSelections = true } = {}) {
 function updateModeUI() {
   applyModeControlState();
   invalidatePreview();
+  invalidateBatchPreview();
   renderFilterChips();
   renderSelectedBar();
 }
@@ -669,6 +714,7 @@ async function handleFilterCheckbox(checkbox) {
     else values.push(value);
   }
   setSelectedValues(key, values);
+  if (key === 'package_ids') invalidateBatchPreview();
   invalidatePreview('Filters changed. Preview the resolved test again.');
   markFiltersDirty();
   renderFilterChips();
@@ -694,9 +740,11 @@ function renderFilterChips() {
     button.addEventListener('click', async () => {
       const key = button.dataset.removeFilter;
       setSelectedValues(key, selectedValues(key).filter((value) => value !== button.dataset.removeValue));
+      if (key === 'package_ids') invalidateBatchPreview();
       invalidatePreview('Filters changed. Preview the resolved test again.');
       markFiltersDirty();
       await refreshFacets();
+      maybeSuggestIdentity();
     });
   });
 }
@@ -960,6 +1008,220 @@ async function previewTest({ silent = false } = {}) {
   }
 }
 
+function buildBatchPayload() {
+  return {
+    packageIds: [...selectedValues('package_ids')],
+    includeSupplemental: Boolean(elements.includeSupplements?.checked),
+    marksPerQuestion: Number(elements.batchMarks?.value || 0),
+    negativeMarks: Number(elements.batchNegative?.value || 0),
+    sortOrderStart: Number(elements.batchSortOrder?.value || 0),
+  };
+}
+
+function batchSignature(payload = buildBatchPayload()) {
+  return JSON.stringify({
+    packageIds: [...payload.packageIds].map(normalizeValue).sort(),
+    includeSupplemental: payload.includeSupplemental,
+    marksPerQuestion: payload.marksPerQuestion,
+    negativeMarks: payload.negativeMarks,
+    sortOrderStart: payload.sortOrderStart,
+  });
+}
+
+function updateBatchActionState() {
+  if (!elements.batchCreateButton) return;
+  const current = Boolean(
+    state.batchPreview
+    && state.batchPreviewSignature === batchSignature()
+    && state.batchPreview.can_create,
+  );
+  elements.batchCreateButton.disabled = !current;
+  if (!state.batchPreview || state.batchPreviewSignature !== batchSignature()) {
+    elements.batchCreateButton.textContent = 'Preview before creating';
+  } else if (Number(state.batchPreview.blocked_count || 0) > 0) {
+    elements.batchCreateButton.textContent = 'Resolve conflicts first';
+  } else if (Number(state.batchPreview.create_count || 0) === 0) {
+    elements.batchCreateButton.textContent = 'All subjects already exist';
+  } else {
+    elements.batchCreateButton.textContent = `Create ${state.batchPreview.create_count} missing draft${Number(state.batchPreview.create_count) === 1 ? '' : 's'}`;
+  }
+}
+
+function invalidateBatchPreview(message = 'Package selection changed. Preview the batch again.') {
+  state.batchPreview = null;
+  state.batchPreviewSignature = '';
+  elements.batchPanel?.classList.add('hidden');
+  if (elements.batchPanel) elements.batchPanel.innerHTML = '';
+  if (elements.batchState) elements.batchState.textContent = message;
+  updateBatchActionState();
+}
+
+function batchStatusLabel(status) {
+  return ({
+    CREATE_DRAFT: 'Create draft',
+    ALREADY_EXISTS: 'Keep existing',
+    BLOCKED_DUPLICATE_SCOPE: 'Review duplicates',
+    BLOCKED_ID_CONFLICT: 'ID conflict',
+  })[status] || status.replaceAll('_', ' ');
+}
+
+function renderBatchPreview(preview) {
+  const items = Array.isArray(preview?.items) ? preview.items : [];
+  const rows = [
+    ['Subjects found', preview.subject_count || 0],
+    ['Drafts to create', preview.create_count || 0],
+    ['Existing kept', preview.existing_count || 0],
+    ['Blocked', preview.blocked_count || 0],
+  ];
+
+  elements.batchPanel.innerHTML = `
+    <div class="phase4a-preview-grid">
+      ${rows.map(([label, value]) => `<div class="phase4a-preview-stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join('')}
+    </div>
+    <div class="phase4a-batch-list">
+      ${items.map((item) => {
+        const status = String(item.action_status || 'BLOCKED_ID_CONFLICT').toUpperCase();
+        const statusClass = status === 'CREATE_DRAFT' ? 'create' : status === 'ALREADY_EXISTS' ? 'existing' : 'blocked';
+        return `<article class="phase4a-batch-item ${escapeHtml(statusClass)}">
+          <div class="phase4a-batch-item-heading">
+            <div><strong>${escapeHtml(item.subject_name || item.subject_id)}</strong><span>${escapeHtml(item.package_id)}</span></div>
+            <span class="phase4a-batch-status">${escapeHtml(batchStatusLabel(status))}</span>
+          </div>
+          <div class="phase4a-batch-item-meta">
+            <span>${escapeHtml(item.question_count || 0)} questions</span>
+            <span>${escapeHtml(item.source_pyq_count || 0)} source PYQ</span>
+            ${Number(item.supplemental_count || 0) > 0 ? `<span>${escapeHtml(item.supplemental_count)} supplemental</span>` : ''}
+            <span>${escapeHtml(String(item.proposed_test_type || '').replaceAll('_', ' '))}</span>
+            <span>${escapeHtml(item.duration_minutes || 0)} min</span>
+          </div>
+          <strong class="phase4a-batch-test-name">${escapeHtml(item.existing_test_name || item.proposed_test_name)}</strong>
+          <code>${escapeHtml(item.existing_test_id || item.proposed_test_id)}</code>
+          <p>${escapeHtml(item.action_message || '')}</p>
+        </article>`;
+      }).join('')}
+    </div>`;
+  elements.batchPanel.classList.remove('hidden');
+  elements.batchState.textContent = Number(preview.blocked_count || 0) > 0
+    ? `${preview.blocked_count} identity conflict${Number(preview.blocked_count) === 1 ? '' : 's'} must be reviewed. Nothing can be created yet.`
+    : Number(preview.create_count || 0) > 0
+      ? `${preview.create_count} missing draft${Number(preview.create_count) === 1 ? '' : 's'} can be created; ${preview.existing_count || 0} existing test${Number(preview.existing_count || 0) === 1 ? '' : 's'} will be skipped.`
+      : 'Every detected package subject already has a test. No write is needed.';
+  updateBatchActionState();
+}
+
+function validateBatchPayload(payload) {
+  if (state.mode !== 'PYQ_SECTIONAL') throw new Error('Choose Sectional test mode first.');
+  if (!payload.packageIds.length) throw new Error('Select at least one active Paper / Package for the batch.');
+  if (payload.packageIds.length > 10) throw new Error('Create sectional tests for no more than 10 packages at a time.');
+  if (!Number.isFinite(payload.marksPerQuestion) || payload.marksPerQuestion <= 0) throw new Error('Marks per question must be greater than zero.');
+  if (!Number.isFinite(payload.negativeMarks) || payload.negativeMarks < 0) throw new Error('Negative marks cannot be negative.');
+  if (!Number.isInteger(payload.sortOrderStart) || payload.sortOrderStart < 0) throw new Error('Starting catalogue order must be a non-negative whole number.');
+}
+
+async function previewSectionalBatch({ silent = false } = {}) {
+  const payload = buildBatchPayload();
+  validateBatchPayload(payload);
+  setBusy(elements.batchPreviewButton, true, 'Previewing all subjects…');
+  try {
+    const preview = await api.previewPhase4ASectionalBatch(payload);
+    state.batchPreview = preview;
+    state.batchPreviewSignature = batchSignature(payload);
+    renderBatchPreview(preview);
+    if (!silent) toast.success('Sectional batch preview is ready.');
+    return preview;
+  } catch (error) {
+    state.batchPreview = null;
+    state.batchPreviewSignature = '';
+    elements.batchPanel?.classList.remove('hidden');
+    if (elements.batchPanel) elements.batchPanel.innerHTML = `<div class="phase4a-inline-error">${escapeHtml(error.message)}</div>`;
+    if (elements.batchState) elements.batchState.textContent = 'Batch preview failed. No test was changed.';
+    updateBatchActionState();
+    throw error;
+  } finally {
+    setBusy(elements.batchPreviewButton, false);
+  }
+}
+
+function requestBatchConfirmation({ preview, payload }) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const createCount = Number(preview?.create_count || 0);
+    const existingCount = Number(preview?.existing_count || 0);
+    elements.confirmContent.innerHTML = `
+      <div class="phase4a-confirm-content">
+        <span class="eyebrow">Sectional batch confirmation</span>
+        <h2>Create ${escapeHtml(createCount)} missing draft${createCount === 1 ? '' : 's'}?</h2>
+        <p>This is one atomic database operation. Existing tests are skipped, every new test stays in Draft, and any identity conflict cancels the complete operation.</p>
+        <div class="phase4a-confirm-summary">
+          <span><strong>${escapeHtml(createCount)}</strong> new drafts</span>
+          <span><strong>${escapeHtml(existingCount)}</strong> existing kept</span>
+          <span><strong>${escapeHtml(payload.marksPerQuestion)}</strong> mark / question</span>
+          <span><strong>${escapeHtml(payload.negativeMarks)}</strong> negative mark</span>
+        </div>
+        <div class="notice">After creation, inspect the subject, question count, language, time and marking scheme before publishing each test.</div>
+        <div class="phase4a-confirm-actions">
+          <button id="phase4aConfirmBatchYes" class="button button-primary" type="button">Create missing drafts</button>
+          <button id="phase4aConfirmBatchNo" class="button button-ghost" type="button">Cancel</button>
+        </div>
+      </div>`;
+    elements.confirmContent.querySelector('#phase4aConfirmBatchYes')?.addEventListener('click', () => {
+      finish(true);
+      elements.confirmDialog.close();
+    });
+    elements.confirmContent.querySelector('#phase4aConfirmBatchNo')?.addEventListener('click', () => {
+      finish(false);
+      elements.confirmDialog.close();
+    });
+    elements.confirmDialog.addEventListener('close', () => finish(false), { once: true });
+    if (!elements.confirmDialog.open) elements.confirmDialog.showModal();
+  });
+}
+
+async function createSectionalBatch() {
+  const payload = buildBatchPayload();
+  try {
+    validateBatchPayload(payload);
+    const signature = batchSignature(payload);
+    const preview = state.batchPreview && state.batchPreviewSignature === signature
+      ? state.batchPreview
+      : await previewSectionalBatch({ silent: true });
+    if (Number(preview.blocked_count || 0) > 0) {
+      toast.error('Resolve the identity conflicts shown in the batch preview first.');
+      return;
+    }
+    if (Number(preview.create_count || 0) === 0) {
+      toast.info('Every detected package subject already has a test. Nothing was created.');
+      return;
+    }
+    const confirmed = await requestBatchConfirmation({ preview, payload });
+    if (!confirmed) return;
+
+    [elements.batchMarks, elements.batchNegative, elements.batchSortOrder, elements.batchPreviewButton, elements.batchCreateButton]
+      .filter(Boolean)
+      .forEach((control) => { control.disabled = true; });
+    const loading = toast.loading?.('Creating missing sectional drafts…');
+    try {
+      const result = await api.savePhase4ASectionalBatch(payload);
+      await previewSectionalBatch({ silent: true });
+      toast.success(`${result?.created_count || 0} sectional draft${Number(result?.created_count || 0) === 1 ? '' : 's'} created. Existing tests were kept unchanged.`);
+    } finally {
+      loading?.close?.();
+    }
+  } catch (error) {
+    toast.error(error.message);
+  } finally {
+    [elements.batchMarks, elements.batchNegative, elements.batchSortOrder, elements.batchPreviewButton]
+      .filter(Boolean)
+      .forEach((control) => { control.disabled = false; });
+    updateBatchActionState();
+  }
+}
+
 function requestConfirmation({ publish, preview }) {
   return new Promise((resolve) => {
     let settled = false;
@@ -1065,6 +1327,7 @@ async function clearFilters() {
   elements.includeSuperseded.checked = false;
   elements.includeUnassigned.checked = state.mode === 'CUSTOM';
   elements.search.value = '';
+  invalidateBatchPreview('Select one or more packages, then preview the batch.');
   invalidatePreview('Filters cleared. Preview the resolved test again.');
   markFiltersDirty('Filters cleared. Apply to refresh the question stack.');
   await refreshFacets();
@@ -1117,6 +1380,7 @@ function bindEvents() {
 
   [elements.includeSupplements, elements.includeSuperseded, elements.includeUnassigned].forEach((checkbox) => {
     checkbox?.addEventListener('change', () => {
+      if (checkbox === elements.includeSupplements) invalidateBatchPreview('Supplement setting changed. Preview the batch again.');
       invalidatePreview('Filters changed. Preview the resolved test again.');
       markFiltersDirty();
       scheduleFacetRefresh();
@@ -1166,6 +1430,17 @@ function bindEvents() {
     } catch (error) {
       toast.error(error.message);
     }
+  });
+  elements.batchPreviewButton?.addEventListener('click', async () => {
+    try {
+      await previewSectionalBatch();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  });
+  elements.batchCreateButton?.addEventListener('click', createSectionalBatch);
+  [elements.batchMarks, elements.batchNegative, elements.batchSortOrder].forEach((input) => {
+    input?.addEventListener('input', () => invalidateBatchPreview('Batch settings changed. Preview all subjects again.'));
   });
   elements.testForm?.addEventListener('submit', saveTest);
   elements.testForm?.elements?.testId?.addEventListener('input', (event) => {

@@ -201,6 +201,32 @@
           </div>
         </section>
 
+        <section id="phase4aSectionalBatchCard" class="panel-card phase4a-batch-card mode-hidden" data-mode-visibility="PYQ_SECTIONAL" aria-labelledby="sectionalBatchTitle">
+          <div class="section-heading compact phase4a-batch-heading">
+            <div>
+              <span class="eyebrow">Batch option</span>
+              <h2 id="sectionalBatchTitle">Create every package subject</h2>
+              <p class="muted">Preview one missing fixed-list sectional test per subject for each selected package. Existing tests—including legacy IDs—are kept unchanged.</p>
+            </div>
+            <span class="phase4a-batch-safety">Draft-only · atomic · no overwrite</span>
+          </div>
+          <div class="phase4a-batch-guidance">
+            <strong>Educator-safe defaults</strong>
+            <span>Each subject gets its complete published question set. Time is calculated at about 36 seconds per question and rounded to 5 minutes. Review every draft before publishing.</span>
+          </div>
+          <div class="phase4a-batch-settings">
+            <label>Marks per question<input id="phase4aBatchMarks" type="number" min="0.001" step="0.001" value="1" /></label>
+            <label>Negative marks<input id="phase4aBatchNegative" type="number" min="0" step="0.001" value="0.25" /></label>
+            <label>Starting catalogue order<input id="phase4aBatchSortOrder" type="number" min="0" step="1" value="1" /></label>
+          </div>
+          <div class="phase4a-batch-actions">
+            <button id="phase4aBatchPreviewButton" class="button button-secondary" type="button">Preview all subjects</button>
+            <button id="phase4aBatchCreateButton" class="button button-primary" type="button" disabled>Create missing drafts</button>
+            <span id="phase4aBatchState" class="muted" aria-live="polite">Select one or more packages, then preview the batch.</span>
+          </div>
+          <div id="phase4aBatchPanel" class="phase4a-batch-panel hidden" aria-live="polite"></div>
+        </section>
+
         <section class="panel-card phase4a-question-card" aria-labelledby="questionStackTitle">
           <div class="section-heading compact phase4a-question-heading">
             <div>
