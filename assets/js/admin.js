@@ -193,6 +193,8 @@ let adminAnalyticsTable = { items: [], total: 0, offset: 0, limit: ADMIN_ANALYTI
 let adminAnalyticsFiltersApplied = null;
 let adminAnalyticsPage = 0;
 let adminAnalyticsLoading = false;
+let adminAnalyticsTableLoaded = false;
+let activeAdminAnalyticsTab = 'overview';
 let activeRepairQueue = 'draft';
 let publishedImageRepairPage = 0;
 let publishedImageRepairTotal = 0;
@@ -407,6 +409,7 @@ function populateAnalyticsExamFilter() {
 
 function setAdminAnalyticsTab(tab) {
   const nextTab = ['overview', 'students', 'tests', 'content'].includes(tab) ? tab : 'overview';
+  activeAdminAnalyticsTab = nextTab;
   document.querySelectorAll('[data-analytics-tab]').forEach((control) => {
     const active = control.dataset.analyticsTab === nextTab;
     control.classList.toggle('active', active);
@@ -416,6 +419,15 @@ function setAdminAnalyticsTab(tab) {
   document.querySelectorAll('[data-analytics-tab-panel]').forEach((panel) => {
     panel.hidden = panel.dataset.analyticsTabPanel !== nextTab;
   });
+
+  if (
+    nextTab === 'tests'
+    && adminAnalyticsFiltersApplied
+    && !adminAnalyticsTableLoaded
+    && !adminAnalyticsLoading
+  ) {
+    void loadAdminAnalyticsTablePage(0, { force: true });
+  }
 }
 
 function nestedAnalyticsValue(source, path) {
@@ -454,6 +466,21 @@ function renderAdminAnalyticsTypes(items = []) {
 }
 
 function renderAdminTestAnalyticsTable() {
+  if (!adminAnalyticsTableLoaded) {
+    if (elements.analyticsTestTableMeta) {
+      elements.analyticsTestTableMeta.textContent = adminAnalyticsLoading && activeAdminAnalyticsTab === 'tests'
+        ? 'Loading protected test-performance rows…'
+        : 'Open Tests to load paginated test performance.';
+    }
+    if (elements.analyticsTestTableBody) {
+      elements.analyticsTestTableBody.innerHTML = '<tr><td colspan="7">Test performance loads only when this tab is opened.</td></tr>';
+    }
+    if (elements.analyticsPage) elements.analyticsPage.textContent = 'Page —';
+    if (elements.analyticsPrev) elements.analyticsPrev.disabled = true;
+    if (elements.analyticsNext) elements.analyticsNext.disabled = true;
+    return;
+  }
+
   const items = Array.isArray(adminAnalyticsTable?.items) ? adminAnalyticsTable.items : [];
   const total = Number(adminAnalyticsTable?.total) || 0;
   const first = total ? adminAnalyticsPage * ADMIN_ANALYTICS_PAGE_SIZE + 1 : 0;
@@ -508,6 +535,7 @@ function resetAdminAnalyticsState() {
   adminAnalyticsTable = { items: [], total: 0, offset: 0, limit: ADMIN_ANALYTICS_PAGE_SIZE };
   adminAnalyticsFiltersApplied = null;
   adminAnalyticsPage = 0;
+  adminAnalyticsTableLoaded = false;
   document.querySelectorAll('[data-analytics-metric], [data-content-health]').forEach((element) => { element.textContent = '—'; });
   if (elements.analyticsTrend) elements.analyticsTrend.innerHTML = '';
   if (elements.analyticsTypes) elements.analyticsTypes.innerHTML = '';
@@ -526,21 +554,27 @@ async function loadAdminAnalytics({ announce = false, resetPage = true } = {}) {
   }
 
   if (resetPage) adminAnalyticsPage = 0;
+  adminAnalyticsTable = { items: [], total: 0, offset: 0, limit: ADMIN_ANALYTICS_PAGE_SIZE };
+  adminAnalyticsTableLoaded = false;
   adminAnalyticsLoading = true;
   setBusy(elements.analyticsFilters, true);
   if (elements.analyticsMeta) elements.analyticsMeta.textContent = 'Loading protected aggregate analytics…';
   renderAdminTestAnalyticsTable();
   try {
-    const [summary, table] = await Promise.all([
-      api.getAdminAnalyticsV1(filters),
-      api.listAdminTestAnalyticsV1({
+    const summary = await api.getAdminAnalyticsV1(filters);
+    let table = { items: [], total: 0, offset: 0, limit: ADMIN_ANALYTICS_PAGE_SIZE };
+    let tableLoaded = false;
+    if (activeAdminAnalyticsTab === 'tests') {
+      table = await api.listAdminTestAnalyticsV1({
         ...filters,
         offset: adminAnalyticsPage * ADMIN_ANALYTICS_PAGE_SIZE,
         limit: ADMIN_ANALYTICS_PAGE_SIZE,
-      }),
-    ]);
+      });
+      tableLoaded = true;
+    }
     adminAnalytics = summary;
     adminAnalyticsTable = table;
+    adminAnalyticsTableLoaded = tableLoaded;
     adminAnalyticsFiltersApplied = filters;
     renderAdminAnalytics();
     if (announce) toast.success('Analytics refreshed.');
@@ -554,14 +588,15 @@ async function loadAdminAnalytics({ announce = false, resetPage = true } = {}) {
   }
 }
 
-async function loadAdminAnalyticsTablePage(page) {
+async function loadAdminAnalyticsTablePage(page, { force = false } = {}) {
   if (adminAnalyticsLoading || !adminAnalyticsFiltersApplied) return;
   const totalPages = Math.max(1, Math.ceil((Number(adminAnalyticsTable.total) || 0) / ADMIN_ANALYTICS_PAGE_SIZE));
   const nextPage = Math.max(0, Math.min(page, totalPages - 1));
-  if (nextPage === adminAnalyticsPage) return;
+  if (nextPage === adminAnalyticsPage && !force) return;
   const previousPage = adminAnalyticsPage;
   adminAnalyticsPage = nextPage;
   adminAnalyticsLoading = true;
+  adminAnalyticsTableLoaded = false;
   renderAdminTestAnalyticsTable();
   try {
     adminAnalyticsTable = await api.listAdminTestAnalyticsV1({
@@ -569,8 +604,10 @@ async function loadAdminAnalyticsTablePage(page) {
       offset: adminAnalyticsPage * ADMIN_ANALYTICS_PAGE_SIZE,
       limit: ADMIN_ANALYTICS_PAGE_SIZE,
     });
+    adminAnalyticsTableLoaded = true;
   } catch (error) {
     adminAnalyticsPage = previousPage;
+    adminAnalyticsTableLoaded = false;
     toast.error(error.message);
   } finally {
     adminAnalyticsLoading = false;

@@ -16,6 +16,7 @@ const sources = {
   homepageMigration: read('supabase/migrations/20260901173216_homepage_test_category_stats.sql'),
   analyticsMigration: read('supabase/migrations/20260901173351_admin_analytics_v1.sql'),
   analyticsFixMigration: read('supabase/migrations/20260902085235_admin_analytics_score_normalization_fix.sql'),
+  analyticsPerformanceMigration: read('supabase/migrations/20260909165335_admin_analytics_statement_timeout_fix.sql'),
 };
 
 const failures = [];
@@ -95,6 +96,9 @@ requireText('adminJs', [
   'getAdminAnalyticsV1',
   'listAdminTestAnalyticsV1',
   'ADMIN_ANALYTICS_PAGE_SIZE',
+  'adminAnalyticsTableLoaded',
+  "activeAdminAnalyticsTab === 'tests'",
+  'Test performance loads only when this tab is opened.',
 ]);
 requireText('api', [
   "client.rpc('get_admin_analytics_v1'",
@@ -125,6 +129,20 @@ requireText('analyticsFixMigration', [
   'revoke all on function public.list_admin_test_analytics_v1',
   'grant execute on function public.list_admin_test_analytics_v1',
 ]);
+requireText('analyticsPerformanceMigration', [
+  'create or replace function public.test_is_student_ready(p_test_id text)',
+  "when jsonb_array_length(coalesce(q.image_refs, '[]'::jsonb)) = 0 then true",
+  'else public.question_is_student_ready(q.question_id)',
+  'create or replace function public.get_admin_analytics_v1(',
+  'create or replace function public.list_admin_test_analytics_v1(',
+  'scoped_tests_base as materialized',
+  'fixed_link_stats as materialized',
+  'public.test_is_student_ready(t.test_id) as student_ready',
+  'security invoker',
+  'not public.is_admin()',
+  'revoke all on function public.get_admin_analytics_v1',
+  'grant execute on function public.get_admin_analytics_v1',
+]);
 forbidText('analyticsMigration', [
   /security\s+definer/i,
   /public\.attempt_answers/i,
@@ -136,6 +154,14 @@ forbidText('analyticsMigration', [
 ]);
 forbidText('analyticsFixMigration', [
   /security\s+definer/i,
+  /public\.attempt_answers/i,
+  /correct_answer/i,
+  /selected_answer/i,
+  /['"](?:email|mobile|user_id)['"]/i,
+  /auth\.users/i,
+  /service_role/i,
+]);
+forbidText('analyticsPerformanceMigration', [
   /public\.attempt_answers/i,
   /correct_answer/i,
   /selected_answer/i,

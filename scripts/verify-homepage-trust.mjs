@@ -108,4 +108,4 @@ if (failures.length) {
 }
 
 console.log('PASS: homepage trust, test taxonomy, truthful category counts, and resilient connection status are structurally wired.');
-console.log('PASS: migration 27 remains a content-only public-count boundary; Admin Analytics is independently verified by migrations 28–29.');
+console.log('PASS: migration 27 remains a content-only public-count boundary; Admin Analytics is independently verified by migrations 28–29 and 32.');

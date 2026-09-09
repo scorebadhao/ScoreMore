@@ -34,6 +34,7 @@ Apply migrations in timestamp order through the controlled GitHub Actions databa
 20260902085235_admin_analytics_score_normalization_fix.sql
 20260907202905_ranktiger_completed_practice_taxonomy_names.sql
 20260908154802_sectional_batch_identity_safety.sql
+20260909165335_admin_analytics_statement_timeout_fix.sql
 ```
 
 Do not edit an already-applied migration. Add a new timestamped migration for every production schema change.
@@ -97,3 +98,5 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260907202905_ranktiger_completed_practice_taxonomy_names.sql` corrects completed-practice catalogue names without presenting supplemented practice as exact PYQ content.
 
 - `20260908154802_sectional_batch_identity_safety.sql` prevents a Test ID from replacing a different package/subject/topic scope and adds preview-first, atomic, draft-only sectional creation for every subject in selected packages.
+
+- `20260909165335_admin_analytics_statement_timeout_fix.sql` preserves Analytics v1 results while eliminating repeated readiness scans that exceeded the authenticated statement timeout.

@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Candidate version, for example 1.2.1-rc.1'
+        description: 'Candidate version, for example 1.2.1-rc.2'
         required: true
-        default: '1.2.1-rc.1'
+        default: '1.2.1-rc.2'
         type: string
       confirmation:
         description: 'Type PREPARE_RANKTIGER_RC exactly. This prepares an artifact only; it does NOT deploy.'
