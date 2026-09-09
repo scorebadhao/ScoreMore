@@ -28,6 +28,12 @@ Apply migrations in timestamp order through the controlled GitHub Actions databa
 20260817010000_phase4a_facet_performance_fix.sql
 20260825010000_content_repair_integrity_gate.sql
 20260826212517_admin_task_inbox_published_image_queue.sql
+20260830010000_student_google_auth_onboarding.sql
+20260901173216_homepage_test_category_stats.sql
+20260901173351_admin_analytics_v1.sql
+20260902085235_admin_analytics_score_normalization_fix.sql
+20260907202905_ranktiger_completed_practice_taxonomy_names.sql
+20260908154802_sectional_batch_identity_safety.sql
 ```
 
 Do not edit an already-applied migration. Add a new timestamped migration for every production schema change.
@@ -79,3 +85,15 @@ Repairs the Phase 3E AI_PROPOSED false-invalid status, adds compact mobile repor
 - `20260825010000_content_repair_integrity_gate.sql` adds an independent content-repair state for visual and non-visual drafts, exact audited Final Review-to-Repair routing, optimistic repair revisions, mandatory source/presentation confirmation and a server-side publication gate.
 
 - `20260826212517_admin_task_inbox_published_image_queue.sql` adds an admin-only, server-owned Task Inbox read model with exact full-database counts and exact next-record routing for draft repair, published image safety, Final Review and Publish.
+
+- `20260830010000_student_google_auth_onboarding.sql` adds trusted Google student onboarding while preserving database-owned roles and admin MFA requirements.
+
+- `20260901173216_homepage_test_category_stats.sql` replaces internal homepage counters with public student-ready test-category aggregates.
+
+- `20260901173351_admin_analytics_v1.sql` adds admin-only aggregate analytics and bounded paginated test performance.
+
+- `20260902085235_admin_analytics_score_normalization_fix.sql` normalizes analytics score percentages against each test's configured marks.
+
+- `20260907202905_ranktiger_completed_practice_taxonomy_names.sql` corrects completed-practice catalogue names without presenting supplemented practice as exact PYQ content.
+
+- `20260908154802_sectional_batch_identity_safety.sql` prevents a Test ID from replacing a different package/subject/topic scope and adds preview-first, atomic, draft-only sectional creation for every subject in selected packages.

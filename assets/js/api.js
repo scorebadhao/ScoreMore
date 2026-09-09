@@ -1334,7 +1334,7 @@ export const api = Object.freeze({
     )];
 
     return unwrap(await withTimeout(
-      client.rpc('save_phase4a_dynamic_test_v15', {
+      client.rpc('save_phase4a_dynamic_test_v16', {
         p_test_id: clean(input.testId)?.toUpperCase(),
         p_test_name: clean(input.testName),
         p_builder_mode: clean(input.builderMode)?.toUpperCase() || 'CUSTOM',
@@ -1350,6 +1350,51 @@ export const api = Object.freeze({
       }),
       Math.max(APP_CONFIG.requestTimeoutMs, 120000),
     ), 'Unable to save the dynamic multi-filter test.');
+  },
+
+  async previewPhase4ASectionalBatch({ packageIds = [], includeSupplemental = true } = {}) {
+    const client = requireSupabase();
+    const normalizedPackageIds = [...new Set(
+      (Array.isArray(packageIds) ? packageIds : [])
+        .map((value) => clean(value)?.toUpperCase())
+        .filter(Boolean),
+    )];
+
+    return unwrap(await withTimeout(
+      client.rpc('preview_phase4a_sectional_batch_v1', {
+        p_package_ids: normalizedPackageIds,
+        p_include_supplemental: Boolean(includeSupplemental),
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 90000),
+    ), 'Unable to preview the package sectional batch.');
+  },
+
+  async savePhase4ASectionalBatch({
+    packageIds = [],
+    includeSupplemental = true,
+    marksPerQuestion = 1,
+    negativeMarks = 0,
+    sortOrderStart = 1,
+  } = {}) {
+    const client = requireSupabase();
+    const normalizedSortOrder = Number(sortOrderStart);
+    const normalizedPackageIds = [...new Set(
+      (Array.isArray(packageIds) ? packageIds : [])
+        .map((value) => clean(value)?.toUpperCase())
+        .filter(Boolean),
+    )];
+
+    return unwrap(await withTimeout(
+      client.rpc('save_phase4a_sectional_batch_v1', {
+        p_package_ids: normalizedPackageIds,
+        p_include_supplemental: Boolean(includeSupplemental),
+        p_marks_per_question: Number(marksPerQuestion) || 1,
+        p_negative_marks: Math.max(0, Number(negativeMarks) || 0),
+        p_sort_order_start: Number.isFinite(normalizedSortOrder) ? Math.round(normalizedSortOrder) : 1,
+        p_confirmation: 'CREATE_MISSING_SECTIONAL_DRAFTS',
+      }),
+      Math.max(APP_CONFIG.requestTimeoutMs, 120000),
+    ), 'Unable to create the package sectional drafts.');
   },
 
   async listDrafts({ status = 'PENDING', page = 0, pageSize = 24 } = {}) {

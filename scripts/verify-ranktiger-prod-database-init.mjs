@@ -10,14 +10,16 @@ const patch3LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH
 const patch52LockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_PATCH5_2.json');
 const productionBaselineLockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json');
 const previousCandidateLockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_27.json');
-const expectedActiveLockFile = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json';
-const expectedActiveMigrationCount = 30;
+const previousStableLockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json');
+const expectedActiveLockFile = 'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_31.json';
+const expectedActiveMigrationCount = 31;
 
 const authMigrationName = '20260830010000_student_google_auth_onboarding.sql';
 const homepageMigrationName = '20260901173216_homepage_test_category_stats.sql';
 const analyticsMigrationName = '20260901173351_admin_analytics_v1.sql';
 const analyticsFixMigrationName = '20260902085235_admin_analytics_score_normalization_fix.sql';
 const taxonomyMigrationName = '20260907202905_ranktiger_completed_practice_taxonomy_names.sql';
+const sectionalBatchMigrationName = '20260908154802_sectional_batch_identity_safety.sql';
 const prerequisiteName = '20260805000050_catalogue_parent_prerequisites.sql';
 const phase3eName = '20260805000100_phase3e_compatibility.sql';
 const catalogueMigrationName = '20260811020000_public_catalogue_baseline.sql';
@@ -26,6 +28,7 @@ const migrationPath = (name) => path.join(migrationsRoot, name);
 const prerequisitePath = migrationPath(prerequisiteName);
 const catalogueMigrationPath = migrationPath(catalogueMigrationName);
 const taxonomyMigrationPath = migrationPath(taxonomyMigrationName);
+const sectionalBatchMigrationPath = migrationPath(sectionalBatchMigrationName);
 
 function fail(message) {
   console.error(`FAIL: ${message}`);
@@ -71,9 +74,11 @@ for (const required of [
   patch52LockPath,
   productionBaselineLockPath,
   previousCandidateLockPath,
+  previousStableLockPath,
   prerequisitePath,
   catalogueMigrationPath,
   taxonomyMigrationPath,
+  sectionalBatchMigrationPath,
 ]) {
   if (!fs.existsSync(required)) fail(`Missing required RankTiger promotion-safety file: ${path.relative(root, required)}`);
 }
@@ -86,8 +91,8 @@ if (releasePolicy.requiredMigrationLockFile !== expectedActiveLockFile) {
 if (releasePolicy.requiredMigrationCount !== expectedActiveMigrationCount) {
   fail(`RankTiger release policy must require exactly ${expectedActiveMigrationCount} migrations.`);
 }
-if (releasePolicy.firstCandidateVersion !== '1.2.0-rc.1') {
-  fail('RankTiger release policy must begin the 1.2.0 candidate line at 1.2.0-rc.1.');
+if (releasePolicy.firstCandidateVersion !== '1.2.1-rc.1') {
+  fail('RankTiger release policy must begin the 1.2.1 candidate line at 1.2.1-rc.1.');
 }
 
 const activeLockPath = path.join(root, releasePolicy.requiredMigrationLockFile || '');
@@ -98,11 +103,13 @@ const workflow = fs.readFileSync(workflowPath, 'utf8');
 const prerequisite = fs.readFileSync(prerequisitePath, 'utf8');
 const catalogue = fs.readFileSync(catalogueMigrationPath, 'utf8');
 const taxonomy = fs.readFileSync(taxonomyMigrationPath, 'utf8');
+const sectionalBatch = fs.readFileSync(sectionalBatchMigrationPath, 'utf8');
 const patch3Locked = loadJson(patch3LockPath, 'Patch 3 lock');
 const patch52Locked = loadJson(patch52LockPath, 'Patch 5.2 lock');
 const productionBaselineLocked = loadJson(productionBaselineLockPath, 'RankTiger 25 production lock');
 const previousCandidateLocked = loadJson(previousCandidateLockPath, 'RankTiger 27 candidate lock');
-const activeLocked = loadJson(activeLockPath, 'RankTiger 30 active lock');
+const previousStableLocked = loadJson(previousStableLockPath, 'RankTiger 30 stable lock');
+const activeLocked = loadJson(activeLockPath, 'RankTiger 31 active lock');
 
 const requiredWorkflowFragments = [
   'INITIALIZE_RANKTIGER_PROD',
@@ -122,8 +129,8 @@ const requiredWorkflowFragments = [
   'Missing remote migration versions after deploy',
   'Unapproved remote migration versions detected after deploy',
   'verify-ranktiger-prod-database-init.mjs',
-  'all 30 locked migrations',
-  'Locked migrations verified: 30',
+  'all 31 locked migrations',
+  'Locked migrations verified: 31',
 ];
 for (const fragment of requiredWorkflowFragments) {
   if (!workflow.includes(fragment)) fail(`RankTiger workflow is missing required safety/apply fragment: ${fragment}`);
@@ -156,7 +163,8 @@ const patch3Approved = verifyLock(patch3Locked, { label: 'Patch 3 historical loc
 const patch52Approved = verifyLock(patch52Locked, { label: 'Patch 5.2 historical lock', version: 'PATCH5_2', count: 20 });
 const productionBaselineApproved = verifyLock(productionBaselineLocked, { label: 'RankTiger 1.1.0 production baseline', version: 'RANKTIGER_25', count: 25 });
 const previousCandidateApproved = verifyLock(previousCandidateLocked, { label: 'RankTiger 27 candidate baseline', version: 'RANKTIGER_27', count: 27 });
-const approved = verifyLock(activeLocked, { label: 'RankTiger 1.2.0 active lock', version: 'RANKTIGER_30', count: expectedActiveMigrationCount });
+const previousStableApproved = verifyLock(previousStableLocked, { label: 'RankTiger 1.2.0 stable baseline', version: 'RANKTIGER_30', count: 30 });
+const approved = verifyLock(activeLocked, { label: 'RankTiger 1.2.1 active lock', version: 'RANKTIGER_31', count: expectedActiveMigrationCount });
 
 for (const [name, expected] of Object.entries(patch3Approved)) {
   if (patch52Approved[name] !== expected) fail(`Patch 5.2 lock does not preserve Patch 3 checksum: ${name}`);
@@ -165,10 +173,13 @@ for (const [name, expected] of Object.entries(patch52Approved)) {
   if (productionBaselineApproved[name] !== expected) fail(`RankTiger 25 lock does not preserve Patch 5.2 checksum: ${name}`);
 }
 for (const [name, expected] of Object.entries(productionBaselineApproved)) {
-  if (approved[name] !== expected) fail(`RankTiger 30 lock does not preserve production baseline checksum: ${name}`);
+  if (approved[name] !== expected) fail(`RankTiger 31 lock does not preserve production baseline checksum: ${name}`);
 }
 for (const [name, expected] of Object.entries(previousCandidateApproved)) {
-  if (approved[name] !== expected) fail(`RankTiger 30 lock does not preserve candidate-27 checksum: ${name}`);
+  if (approved[name] !== expected) fail(`RankTiger 31 lock does not preserve candidate-27 checksum: ${name}`);
+}
+for (const [name, expected] of Object.entries(previousStableApproved)) {
+  if (approved[name] !== expected) fail(`RankTiger 31 lock does not preserve the RankTiger 1.2.0 stable checksum: ${name}`);
 }
 
 const approvedNames = Object.keys(approved).sort();
@@ -176,7 +187,7 @@ const sourceMigrationNames = fs.readdirSync(migrationsRoot)
   .filter((name) => name.endsWith('.sql'))
   .sort();
 if (JSON.stringify(approvedNames) !== JSON.stringify(sourceMigrationNames)) {
-  fail('Source migration files do not exactly match the active RankTiger 30 migration lock.');
+  fail('Source migration files do not exactly match the active RankTiger 31 migration lock.');
 }
 
 const expectedAfterPatch52 = [
@@ -190,10 +201,11 @@ const expectedAfterPatch52 = [
   analyticsMigrationName,
   analyticsFixMigrationName,
   taxonomyMigrationName,
+  sectionalBatchMigrationName,
 ];
 const additionsAfterPatch52 = approvedNames.filter((name) => !(name in patch52Approved));
 if (JSON.stringify(additionsAfterPatch52) !== JSON.stringify(expectedAfterPatch52)) {
-  fail(`RankTiger 30 lock must add exactly the ten reviewed migrations after Patch 5.2; found: ${additionsAfterPatch52.join(', ')}`);
+  fail(`RankTiger 31 lock must add exactly the eleven reviewed migrations after Patch 5.2; found: ${additionsAfterPatch52.join(', ')}`);
 }
 
 const expectedAfterProduction = [
@@ -202,16 +214,22 @@ const expectedAfterProduction = [
   analyticsMigrationName,
   analyticsFixMigrationName,
   taxonomyMigrationName,
+  sectionalBatchMigrationName,
 ];
 const additionsAfterProduction = approvedNames.filter((name) => !(name in productionBaselineApproved));
 if (JSON.stringify(additionsAfterProduction) !== JSON.stringify(expectedAfterProduction)) {
-  fail(`RankTiger 30 lock must add exactly migrations 26–30 after the immutable production baseline; found: ${additionsAfterProduction.join(', ')}`);
+  fail(`RankTiger 31 lock must add exactly migrations 26–31 after the immutable production baseline; found: ${additionsAfterProduction.join(', ')}`);
 }
 
-const expectedAfterCandidate27 = [analyticsMigrationName, analyticsFixMigrationName, taxonomyMigrationName];
+const expectedAfterCandidate27 = [analyticsMigrationName, analyticsFixMigrationName, taxonomyMigrationName, sectionalBatchMigrationName];
 const additionsAfterCandidate27 = approvedNames.filter((name) => !(name in previousCandidateApproved));
 if (JSON.stringify(additionsAfterCandidate27) !== JSON.stringify(expectedAfterCandidate27)) {
-  fail(`RankTiger 30 lock must add only Analytics v1, its score fix, and taxonomy correction after candidate 27; found: ${additionsAfterCandidate27.join(', ')}`);
+  fail(`RankTiger 31 lock must add only Analytics v1, its score fix, taxonomy correction and sectional identity safety after candidate 27; found: ${additionsAfterCandidate27.join(', ')}`);
+}
+
+const additionsAfterStable = approvedNames.filter((name) => !(name in previousStableApproved));
+if (JSON.stringify(additionsAfterStable) !== JSON.stringify([sectionalBatchMigrationName])) {
+  fail(`RankTiger 31 lock must add only the sectional identity/batch migration after the immutable RankTiger 1.2.0 stable baseline; found: ${additionsAfterStable.join(', ')}`);
 }
 
 const orderedNames = approvedNames;
@@ -306,15 +324,56 @@ for (const pattern of [
   if (pattern.test(taxonomy)) fail(`Taxonomy migration contains forbidden operation/pattern: ${pattern}`);
 }
 
+for (const fragment of [
+  'create or replace function public.save_phase4a_dynamic_test_v16(',
+  'already belongs to a different test scope. Nothing was overwritten.',
+  'The package-only sectional Test ID % is unsafe.',
+  "pg_advisory_xact_lock(hashtext('scoremore:dynamic-test:' || v_test_id))",
+  'revoke execute on function public.save_phase4a_dynamic_test_v15(',
+  'create or replace function public.phase4a_sectional_batch_plan_v1(',
+  "when p.existing_test_count = 1 then 'ALREADY_EXISTS'",
+  "else 'CREATE_DRAFT'",
+  'create or replace function public.preview_phase4a_sectional_batch_v1(',
+  'create or replace function public.save_phase4a_sectional_batch_v1(',
+  'perform pg_advisory_xact_lock(',
+  'was created while this batch was running. No sectional draft was created; preview again.',
+  "<> 'CREATE_MISSING_SECTIONAL_DRAFTS'",
+  "where action_status = 'CREATE_DRAFT'",
+  'public.save_phase4a_dynamic_test_v16(',
+  'revoke all on function public.phase4a_sectional_batch_plan_v1(text[],boolean) from public, anon, authenticated;',
+  'grant execute on function public.preview_phase4a_sectional_batch_v1(text[],boolean) to authenticated;',
+]) {
+  if (!sectionalBatch.includes(fragment)) fail(`Sectional identity/batch migration is missing required safety fragment: ${fragment}`);
+}
+if ((sectionalBatch.match(/if not public\.is_admin\(\)/g) || []).length < 4) {
+  fail('Sectional identity/batch migration must enforce admin authorization in every client-callable or privileged planning function.');
+}
+for (const pattern of [
+  /\bdelete\s+from\b/i,
+  /\btruncate\b/i,
+  /\bdrop\s+(?:table|function|schema|type)\b/i,
+  /\balter\s+table\b/i,
+  /\bcreate\s+table\b/i,
+  /insert\s+into\s+(?:public\.)?(profiles|questions|draft_questions|attempts|attempt_answers|payments|package_access)\b/i,
+  /auth\.users/i,
+  /service_role/i,
+  /sb_secret_/i,
+]) {
+  if (pattern.test(sectionalBatch)) fail(`Sectional identity/batch migration contains forbidden operation/pattern: ${pattern}`);
+}
+
 if (process.exitCode) process.exit();
 console.log('PASS: RankTiger PROD database initialization is migration-only; production seed execution is forbidden.');
 console.log('PASS: Remote migration history must be an approved subset before write and exactly match after write.');
 console.log('PASS: 18-migration Patch 3 and 20-migration Patch 5.2 historical locks remain immutable.');
 console.log('PASS: immutable 25-migration RankTiger 1.1.0 production baseline is preserved exactly.');
 console.log('PASS: immutable 27-migration candidate baseline is preserved exactly.');
-console.log('PASS: 30 approved migrations exactly match the source set and are checksum-locked for RankTiger 1.2.0.');
+console.log('PASS: immutable 30-migration RankTiger 1.2.0 stable baseline is preserved exactly.');
+console.log('PASS: 31 approved migrations exactly match the source set and are checksum-locked for RankTiger 1.2.1.');
 console.log(`PASS: reviewed migrations after production baseline: ${additionsAfterProduction.join(', ')}`);
 console.log(`PASS: reviewed additions after candidate 27: ${additionsAfterCandidate27.join(', ')}`);
+console.log(`PASS: reviewed additions after stable 1.2.0: ${additionsAfterStable.join(', ')}`);
 console.log('PASS: completed-practice taxonomy correction is exact-ID, FULL_MOCK-guarded, bounded, and self-verifying.');
+console.log('PASS: sectional batch is admin-only, conflict-blocking, atomic, draft-only and preserves existing tests.');
 console.log(`PASS: prerequisite targets only: ${[...new Set(prereqTargets)].sort().join(', ')}`);
 console.log(`PASS: versioned catalogue baseline targets only: ${[...new Set(insertTargets)].sort().join(', ')}`);
