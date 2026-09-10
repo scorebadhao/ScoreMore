@@ -8,7 +8,7 @@ const certificatePath = path.join(root, '.github', 'backup-keys', 'ranktiger-pro
 const encryptPath = path.join(root, 'scripts', 'encrypt-ranktiger-backup.mjs');
 const decryptPath = path.join(root, 'scripts', 'decrypt-ranktiger-backup.mjs');
 const guidePath = path.join(root, 'docs', 'RANKTIGER_PROD_ENCRYPTED_BACKUP.md');
-const lockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json');
+const lockPath = path.join(root, 'docs', 'LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json');
 const packagePath = path.join(root, 'package.json');
 const expectedFingerprint = '92d5c109c6e94200b4390e5ce9710cc61a99a9da3d30ce651ca4baf8f3d34d18';
 
@@ -47,9 +47,10 @@ const requiredWorkflowFragments = [
   'supabase/setup-cli@v2',
   'version: 2.111.0',
   'supabase migration list --linked',
-  'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json',
+  'docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json',
   'match(/\\d{14}/)?.[0]',
-  'remote.size !== 25',
+  'remote.size !== 30',
+  'RankTiger 1.2.0 stable (30 locked migrations), before RankTiger 1.2.1 migrations 31-32',
   'supabase db dump --linked --file "$PLAIN_DIR/roles.sql" --role-only',
   'supabase db dump --linked --file "$PLAIN_DIR/schema.sql"',
   'supabase db dump --linked --file "$PLAIN_DIR/data.sql" --use-copy --data-only',
@@ -96,18 +97,18 @@ if (!(encryptIndex >= 0 && encryptIndex < removeIndex && removeIndex < uploadInd
   fail('Workflow must encrypt, remove plaintext, and only then upload the artifact.');
 }
 
-if (locked.lock_version !== 'RANKTIGER_25' || locked.migration_count !== 25 || Object.keys(locked.migrations || {}).length !== 25) {
-  fail('Pre-promotion backup lock must remain the immutable 25-migration RankTiger 1.1.0 baseline.');
+if (locked.lock_version !== 'RANKTIGER_30' || locked.migration_count !== 30 || Object.keys(locked.migrations || {}).length !== 30) {
+  fail('Pre-promotion backup lock must remain the immutable 30-migration RankTiger 1.2.0 stable baseline.');
 }
 for (const [name, expected] of Object.entries(locked.migrations || {})) {
   const migrationPath = path.join(root, 'supabase', 'migrations', name);
   if (!fs.existsSync(migrationPath)) {
-    fail(`RankTiger 1.1.0 baseline migration is missing: ${name}`);
+    fail(`RankTiger 1.2.0 stable baseline migration is missing: ${name}`);
     continue;
   }
   const actual = crypto.createHash('sha256').update(fs.readFileSync(migrationPath)).digest('hex');
   if (!/^[0-9a-f]{64}$/.test(expected) || actual !== expected) {
-    fail(`RankTiger 1.1.0 baseline migration checksum mismatch: ${name}`);
+    fail(`RankTiger 1.2.0 stable baseline migration checksum mismatch: ${name}`);
   }
 }
 
@@ -138,6 +139,9 @@ if (!guide.includes(expectedFingerprint.match(/.{2}/g).join(':').toUpperCase()))
 if (!guide.includes('Storage object bytes') || !guide.includes('one day')) {
   fail('Recovery guide must state the storage-object limitation and artifact retention.');
 }
+if (!guide.includes('30-migration RankTiger 1.2.0 stable baseline')) {
+  fail('Recovery guide must identify the exact stable production baseline required before backup.');
+}
 
 if (pkg.scripts?.['verify:ranktiger-backup'] !== 'node scripts/verify-ranktiger-prod-backup.mjs') {
   fail('package.json is missing verify:ranktiger-backup.');
@@ -163,7 +167,7 @@ for (const filePath of walk(root)) {
 
 if (process.exitCode) process.exit();
 console.log('PASS: RankTiger PROD backup workflow is manual, main-only, target-guarded, and read-only.');
-console.log('PASS: exact 25-migration RankTiger 1.1.0 baseline is required before export.');
+console.log('PASS: exact 30-migration RankTiger 1.2.0 stable baseline is required before export.');
 console.log('PASS: roles, schema, data, and migration history exports use the pinned Supabase CLI.');
 console.log('PASS: AES-256-GCM and RSA-4096 OAEP-SHA256 protect the artifact before upload.');
 console.log('PASS: repository contains the recovery certificate only; no private recovery key material.');
