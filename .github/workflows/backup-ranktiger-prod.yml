@@ -110,12 +110,12 @@ jobs:
         shell: bash
         run: supabase migration list --linked | tee "$RUNNER_TEMP/ranktiger-migrations-before-backup.txt"
 
-      - name: Require exact 25-migration RankTiger 1.1.0 baseline — NO WRITE
+      - name: Require exact 30-migration RankTiger 1.2.0 stable baseline — NO WRITE
         shell: bash
         run: |
           node - <<'NODE'
           const fs = require('fs');
-          const locked = JSON.parse(fs.readFileSync('docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_25.json', 'utf8'));
+          const locked = JSON.parse(fs.readFileSync('docs/LOCKED_MIGRATION_CHECKSUMS_RANKTIGER_30.json', 'utf8'));
           const output = fs.readFileSync(process.env.RUNNER_TEMP + '/ranktiger-migrations-before-backup.txt', 'utf8');
           const expected = new Set(Object.keys(locked.migrations || {}).map((name) => name.split('_', 1)[0]));
           const remote = new Set(output
@@ -124,15 +124,15 @@ jobs:
             .filter((version) => /^\d{14}$/.test(version)));
           const missing = [...expected].filter((version) => !remote.has(version));
           const unexpected = [...remote].filter((version) => !expected.has(version));
-          if (locked.lock_version !== 'RANKTIGER_25' || locked.migration_count !== 25 || expected.size !== 25) {
-            console.error('The immutable RankTiger 1.1.0 production baseline lock must contain exactly 25 migrations.');
+          if (locked.lock_version !== 'RANKTIGER_30' || locked.migration_count !== 30 || expected.size !== 30) {
+            console.error('The immutable RankTiger 1.2.0 stable production baseline lock must contain exactly 30 migrations.');
             process.exit(1);
           }
-          if (missing.length || unexpected.length || remote.size !== 25) {
-            console.error(`Blocked: RankTiger PROD is not at the exact 25-migration RankTiger 1.1.0 baseline. Missing: ${missing.join(', ') || 'none'}. Unexpected: ${unexpected.join(', ') || 'none'}.`);
+          if (missing.length || unexpected.length || remote.size !== 30) {
+            console.error(`Blocked: RankTiger PROD is not at the exact 30-migration RankTiger 1.2.0 stable baseline. Missing: ${missing.join(', ') || 'none'}. Unexpected: ${unexpected.join(', ') || 'none'}.`);
             process.exit(1);
           }
-          console.log('Verified exact 25-migration RankTiger 1.1.0 production baseline.');
+          console.log('Verified exact 30-migration RankTiger 1.2.0 stable production baseline.');
           NODE
 
       - name: Export official Supabase logical backup — READ ONLY
@@ -175,7 +175,7 @@ jobs:
           const manifest = {
             format: 'ranktiger-prod-supabase-logical-backup-v1',
             target: 'RankTiger PROD',
-            baseline: '25 locked migrations before RankTiger 1.2.0 30-migration promotion',
+            baseline: 'RankTiger 1.2.0 stable (30 locked migrations), before RankTiger 1.2.1 migrations 31-32',
             source_commit: process.env.GITHUB_SHA,
             workflow_run_id: process.env.GITHUB_RUN_ID,
             created_at_utc: new Date().toISOString(),

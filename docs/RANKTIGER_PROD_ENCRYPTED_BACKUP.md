@@ -4,7 +4,7 @@
 
 `Backup RankTiger PROD Database — READ ONLY` creates the required pre-promotion rollback point for the RankTiger production database. The workflow is manually dispatched from ScoreMore `main` and accepts only the exact confirmation `BACKUP_RANKTIGER_PROD`.
 
-The workflow reads RankTiger PROD, verifies the exact 20-migration pre-promotion baseline, creates the logical exports recommended by Supabase, encrypts them, deletes plaintext working files, and uploads only ciphertext. It never runs migrations or seed data, updates either GitHub repository, deploys a frontend, or invokes Cloudflare.
+The workflow reads RankTiger PROD, verifies the exact 30-migration RankTiger 1.2.0 stable baseline, creates the logical exports recommended by Supabase, encrypts them, deletes plaintext working files, and uploads only ciphertext. It never runs migrations or seed data, updates either GitHub repository, deploys a frontend, or invokes Cloudflare.
 
 Official references:
 
